@@ -1,0 +1,462 @@
+import type {Ability,AttackAction,Character,CreatureAction,DamagePacket,DamageType,GameState,OwnedContentMatch,OwnedContentPack,ResolvedSheet,Spell,TransformationEffects,TransformationOption,TransitionResult} from './types.js';
+import {CONDITIONS,CREATURES,classLevel,contentRegistrySnapshot} from './content-registry.js';
+import {parseCharacter,safeJsonParse} from './schema.js';
+import {installExtensionPack,listExtensionPacks,loadArtOverride,loadBooleanSetting,optimizePortrait,removeArtOverride,removeExtensionPack,saveArtOverride,saveBooleanSetting} from './storage.js';
+import {SAMPLE_CHARACTERS} from './sample-data.js';
+import {applyOwnedContentPack,applyOwnedContentPacks,ownedContentTemplate,parseOwnedContentPack,safeOwnedContentParse} from './owned-content.js';
+import {
+  applyCondition,applyDamage,attackBonuses,attackRollSources,availableTransformations,castSpell,
+  completeTruePolymorph,concentrationSaveMode,createInitialState,declareAttack,declareRecklessAttack,endConcentration,endRage,endTransformation,endTurn,
+  extendRage,heal,longRest,markOncePerTurn,removeCondition,resolveAdvantage,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollDice,
+  proficiencyBonus,rulesMetadata,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence
+} from './engine.js';
+
+const $=<T extends HTMLElement>(selector:string)=>{
+  const node=document.querySelector<T>(selector);if(!node)throw new Error(`Missing UI element: ${selector}`);return node;
+};
+const clear=(node:HTMLElement)=>{while(node.firstChild)node.removeChild(node.firstChild)};
+const text=(tag:string,value:string,className?:string)=>{const node=document.createElement(tag);node.textContent=value;if(className)node.className=className;return node};
+const button=(label:string,handler:()=>void,className='button secondary')=>{const node=document.createElement('button');node.type='button';node.className=className;node.textContent=label;node.addEventListener('click',handler);return node};
+const signed=(value:number)=>value>=0?`+${value}`:`${value}`;
+const damageTypes:DamageType[]=['Acid','Bludgeoning','Cold','Fire','Force','Lightning','Necrotic','Piercing','Poison','Psychic','Radiant','Slashing','Thunder'];
+const commonConditions=Object.keys(CONDITIONS).sort((a,b)=>a.localeCompare(b));
+
+const art:Record<string,string>={
+  base:`<svg viewBox="0 0 240 210" role="img" aria-label="Base character portrait"><circle cx="120" cy="105" r="78" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><path d="M120 42c20 0 36 16 36 36s-16 36-36 36-36-16-36-36 16-36 36-36Zm-52 132c7-34 29-54 52-54s45 20 52 54" fill="none" stroke="#f1ede5" stroke-width="9" stroke-linecap="round"/><path d="M64 62l20 8m92-8-20 8M82 35l11 20m65-20-11 20" stroke="#c9872b" stroke-width="3"/></svg>`,
+  wolf:`<svg viewBox="0 0 240 210" role="img" aria-label="Wolf form portrait"><circle cx="120" cy="105" r="80" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><path d="M72 63l28 15 20-10 20 10 29-15-10 46-11 40-28 25-29-25-10-40Z" fill="#29343b" stroke="#f1ede5" stroke-width="5" stroke-linejoin="round"/><path d="M96 108l16 6m32-6-16 6m-23 28h30l-15 13Z" fill="none" stroke="#c9872b" stroke-width="4" stroke-linecap="round"/><path d="M87 70 66 40l8 43m79-13 21-30-8 43" fill="#29343b" stroke="#f1ede5" stroke-width="5"/></svg>`,
+  bear:`<svg viewBox="0 0 240 210" role="img" aria-label="Bear form portrait"><circle cx="120" cy="105" r="80" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><circle cx="78" cy="70" r="25" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><circle cx="162" cy="70" r="25" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><path d="M65 105c0-38 23-62 55-62s55 24 55 62-22 69-55 69-55-31-55-69Z" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><ellipse cx="120" cy="132" rx="31" ry="23" fill="#171c20" stroke="#c9872b" stroke-width="4"/><circle cx="98" cy="103" r="5" fill="#c9872b"/><circle cx="142" cy="103" r="5" fill="#c9872b"/></svg>`,
+  spider:`<svg viewBox="0 0 240 210" role="img" aria-label="Spider form portrait"><circle cx="120" cy="105" r="80" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><ellipse cx="120" cy="126" rx="34" ry="45" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><circle cx="120" cy="82" r="25" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><g fill="none" stroke="#f1ede5" stroke-width="6" stroke-linecap="round"><path d="M92 90 57 60 35 58M90 108 48 92 27 98M90 130 49 140 29 156M96 153 66 180 50 192M148 90l35-30 22-2M150 108l42-16 21 6M150 130l41 10 20 16M144 153l30 27 16 12"/></g><g fill="#c9872b"><circle cx="108" cy="76" r="4"/><circle cx="120" cy="72" r="4"/><circle cx="132" cy="76" r="4"/></g></svg>`,
+  snake:`<svg viewBox="0 0 240 210" role="img" aria-label="Snake form portrait"><circle cx="120" cy="105" r="80" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><path d="M177 65c-49-25-91-4-90 27 1 29 54 22 59 50 5 31-59 36-84 10-15-15-10-38 10-48" fill="none" stroke="#f1ede5" stroke-width="18" stroke-linecap="round"/><path d="M173 64l22 1-13 18Z" fill="#29343b" stroke="#f1ede5" stroke-width="4"/><circle cx="182" cy="70" r="3.5" fill="#c9872b"/><path d="M195 74l17 7" stroke="#c9872b" stroke-width="3"/></svg>`,
+  cat:`<svg viewBox="0 0 240 210" role="img" aria-label="Feline form portrait"><circle cx="120" cy="105" r="80" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><path d="M75 76 92 42l28 20 28-20 17 34-7 71-38 29-38-29Z" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><path d="M96 106l14 5m34-5-14 5m-25 29h30" stroke="#c9872b" stroke-width="4" stroke-linecap="round"/><circle cx="98" cy="94" r="5" fill="#c9872b"/><circle cx="142" cy="94" r="5" fill="#c9872b"/></svg>`,
+  bat:`<svg viewBox="0 0 240 210" role="img" aria-label="Bat form portrait"><circle cx="120" cy="105" r="80" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><path d="M120 92c-25-35-63-43-91-26 15 9 24 22 24 38-13 5-23 14-29 27 31-6 58 3 79 27l17-32 17 32c21-24 48-33 79-27-6-13-16-22-29-27 0-16 9-29 24-38-28-17-66-9-91 26Z" fill="#29343b" stroke="#f1ede5" stroke-width="5" stroke-linejoin="round"/><circle cx="120" cy="103" r="22" fill="#20272d" stroke="#c9872b" stroke-width="4"/></svg>`,
+  horse:`<svg viewBox="0 0 240 210" role="img" aria-label="Horse form portrait"><circle cx="120" cy="105" r="80" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><path d="M78 164c11-24 18-50 19-81l-8-37 29 19 28-18-3 37c20 17 28 42 20 70-22 22-59 28-85 10Z" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><path d="M107 107h8m18 0h8m-28 31c9 5 19 5 28 0" stroke="#c9872b" stroke-width="4" stroke-linecap="round"/></svg>`,
+  goat:`<svg viewBox="0 0 240 210" role="img" aria-label="Goat form portrait"><circle cx="120" cy="105" r="80" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><path d="M91 77C64 57 62 33 75 20c4 24 19 35 38 42m36 15c27-20 29-44 16-57-4 24-19 35-38 42" fill="none" stroke="#f1ede5" stroke-width="7" stroke-linecap="round"/><path d="M76 82c0-25 20-39 44-39s44 14 44 39l-8 63-36 31-36-31Z" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><path d="M104 109h6m20 0h6m-24 32h16" stroke="#c9872b" stroke-width="4" stroke-linecap="round"/></svg>`,
+  toad:`<svg viewBox="0 0 240 210" role="img" aria-label="Toad form portrait"><circle cx="120" cy="105" r="80" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><ellipse cx="120" cy="128" rx="69" ry="47" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><circle cx="80" cy="87" r="24" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><circle cx="160" cy="87" r="24" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><circle cx="80" cy="87" r="7" fill="#c9872b"/><circle cx="160" cy="87" r="7" fill="#c9872b"/><path d="M83 142c23 15 51 15 74 0" fill="none" stroke="#c9872b" stroke-width="4" stroke-linecap="round"/></svg>`
+};
+
+let baseCharacters:Character[]=SAMPLE_CHARACTERS.map(parseCharacter);
+let baseCharacter=baseCharacters[0] as Character;
+let characters:Character[]=[...baseCharacters];
+let character=characters[0] as Character;
+let state=createInitialState(character);
+let sheet=resolveSheet(character,state);
+let currentTab='actions';
+let selectedOptionId='base';
+const selectedOptionalBonuses=new Map<string,Set<string>>();
+const radiantActions=new Set<string>();
+let pendingTempChoice:{incoming:number;source:string}|null=null;
+let magicEffectsEnabled=true;
+let reduceMotion=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)').matches:false;
+let auraInitialized=false;
+let previousTransformId:string|undefined;
+let auraTimer:number|undefined;
+const artOverrideCache=new Map<string,string|undefined>();
+const artLoading=new Set<string>();
+const registrySnapshot=contentRegistrySnapshot();
+let installedPacks:OwnedContentPack[]=[];
+let pendingActiveSnapshot:Partial<GameState>['activeTransform']|undefined;
+
+function addActivity(message:string){state.log.unshift(message);state.log=state.log.slice(0,25);persist();}
+function notify(message:string){$('#status-message').textContent=message;addActivity(message);}
+function persist(){try{localStorage.setItem('altered-v0.18',JSON.stringify({baseCharacters,currentCharacterId:baseCharacter.id,state}));}catch{/* storage is optional */}}
+function restore(){
+  try{
+    const raw=localStorage.getItem('altered-v0.18')??localStorage.getItem('altered-v0.17')??localStorage.getItem('altered-v0.15')??localStorage.getItem('altered-v0.9')??localStorage.getItem('altered-v0.8')??localStorage.getItem('altered-v0.4');if(!raw)return false;
+    const parsed=JSON.parse(raw) as {baseCharacters?:unknown[];currentCharacterId?:string;baseCharacter?:unknown;character?:unknown;state?:Partial<GameState>};
+    const library:Character[]=[];
+    if(Array.isArray(parsed.baseCharacters)){for(const rawCharacter of parsed.baseCharacters.slice(0,50)){try{const entry=parseCharacter(rawCharacter);if(!library.some(existing=>existing.id===entry.id))library.push(entry);}catch{/* one damaged library entry should not block the rest */}}}
+    if(library.length===0){const restored=parseCharacter(parsed.baseCharacter??parsed.character);library.push(restored);}
+    for(const sample of SAMPLE_CHARACTERS.map(parseCharacter))if(!library.some(entry=>entry.id===sample.id))library.push(sample);
+    baseCharacters=library;
+    const requestedId=typeof parsed.currentCharacterId==='string'?parsed.currentCharacterId:typeof (parsed.baseCharacter as {id?:unknown}|undefined)?.id==='string'?String((parsed.baseCharacter as {id:string}).id):typeof (parsed.character as {id?:unknown}|undefined)?.id==='string'?String((parsed.character as {id:string}).id):library[0]?.id;
+    const restored=library.find(entry=>entry.id===requestedId)??library[0];if(!restored)return false;
+    const clean=createInitialState(restored);const saved=parsed.state;
+    if(saved){clean.hp=Math.max(0,Math.min(restored.hp.max,Number(saved.hp??clean.hp)));clean.tempHp=Math.max(0,Number(saved.tempHp??0));
+      if(typeof saved.tempHpSource==='string')clean.tempHpSource=saved.tempHpSource;
+      for(const [id,pool] of Object.entries(saved.resources??{})){const target=clean.resources[id];if(target)target.current=Math.max(0,Math.min(target.max,Number(pool.current)));}
+      for(const [level,slot] of Object.entries(saved.spellSlots??{})){const target=clean.spellSlots[level];if(target)target.current=Math.max(0,Math.min(target.max,Number(slot.current)));}
+      if(Array.isArray(saved.conditions))clean.conditions=saved.conditions.filter(x=>typeof x==='string').slice(0,20);
+      if(Array.isArray(saved.overlays))clean.overlays=saved.overlays.filter(x=>typeof x==='string').slice(0,20);
+      if(Array.isArray(saved.log))clean.log=saved.log.filter(x=>typeof x==='string').slice(0,25);
+      if(saved.turn&&typeof saved.turn.number==='number')clean.turn={...clean.turn,...saved.turn,oncePerTurn:{...(saved.turn.oncePerTurn??{})}};
+      if(saved.rage&&typeof saved.rage.active==='boolean')clean.rage={...clean.rage,...saved.rage,extendedThisTurn:Boolean(saved.rage.extendedThisTurn)};
+      if(saved.concentration&&typeof saved.concentration.name==='string')clean.concentration={name:saved.concentration.name,source:String(saved.concentration.source??'Unknown')};
+      const legacyCheck=(saved as Partial<GameState>&{pendingConcentration?:{dc?:number;damage?:number;source?:string}}).pendingConcentration;if(legacyCheck&&typeof legacyCheck.dc==='number')clean.concentrationChecks=[{dc:Number(legacyCheck.dc),damage:Number(legacyCheck.damage??0),source:String(legacyCheck.source??'damage')}];
+      if(Array.isArray(saved.concentrationChecks))clean.concentrationChecks=saved.concentrationChecks.filter(x=>x&&typeof x.dc==='number').slice(0,20).map(x=>({dc:Number(x.dc),damage:Number(x.damage??0),source:String(x.source??'damage')}));
+      pendingActiveSnapshot=saved.activeTransform;const savedId=saved.activeTransform?.option?.id;
+      if(typeof savedId==='string'){
+        const option=availableTransformations(restored,clean).find(o=>o.id===savedId);
+        if(option)clean.activeTransform={option,startedTurn:Number(saved.activeTransform?.startedTurn??1),duration:String(saved.activeTransform?.duration??''),tempHpSource:Boolean(saved.activeTransform?.tempHpSource),...(saved.activeTransform?.spellConcentration?{spellConcentration:true}:{}),...(saved.activeTransform?.permanentUntilDispelled?{permanentUntilDispelled:true}:{})};
+      }
+    }
+    baseCharacter=restored;character=restored;characters=[...baseCharacters];state=clean;return true;
+  }catch{return false;}
+}
+
+function currentOption(){return availableTransformations(character,state).find(o=>o.id===selectedOptionId)}
+function applyResult(result:TransitionResult){
+  if(result.choice){pendingTempChoice={incoming:result.choice.incoming,source:result.choice.source};const dialog=$<HTMLDialogElement>('#temp-hp-dialog');$('#temp-hp-copy').textContent=`Keep the current ${result.choice.current} Temporary Hit Points or replace them with ${result.choice.incoming} from ${result.choice.source}?`;$('#keep-current-thp').textContent=`Keep ${result.choice.current}`;$('#keep-new-thp').textContent=`Use ${result.choice.incoming}`;dialog.showModal();}
+  notify(result.message);render();
+}
+function setCharacter(next:Character){character=next;baseCharacter=baseCharacters.find(entry=>entry.id===next.id)??next;state=createInitialState(character);sheet=resolveSheet(character,state);selectedOptionId='base';currentTab='actions';radiantActions.clear();selectedOptionalBonuses.clear();notify(`${character.name} loaded in Base Form.`);render();}
+function reconcileState(next:Character,previous:GameState){
+  const clean=createInitialState(next);clean.hp=Math.min(previous.hp,next.hp.max);clean.tempHp=previous.tempHp;if(previous.tempHpSource)clean.tempHpSource=previous.tempHpSource;
+  for(const [id,pool] of Object.entries(clean.resources)){const old=previous.resources[id];if(old)pool.current=Math.min(old.current,pool.max);}
+  for(const [level,slot] of Object.entries(clean.spellSlots)){const old=previous.spellSlots[level];if(old)slot.current=Math.min(old.current,slot.max);}
+  clean.conditions=[...previous.conditions];clean.overlays=previous.overlays.filter(id=>id.startsWith('spell:')||(next.transformationGrants??[]).some(grant=>grant.id===id));clean.log=[...previous.log];clean.turn={...previous.turn,oncePerTurn:{...previous.turn.oncePerTurn}};clean.rage={...previous.rage};clean.concentrationChecks=previous.concentrationChecks.map(check=>({...check}));
+  if(previous.concentration)clean.concentration={...previous.concentration};
+  const previousId=previous.activeTransform?.option.id;if(previousId){const option=availableTransformations(next,clean).find(candidate=>candidate.id===previousId);if(option)clean.activeTransform={option,startedTurn:previous.activeTransform?.startedTurn??clean.turn.number,duration:previous.activeTransform?.duration??'',tempHpSource:Boolean(previous.activeTransform?.tempHpSource),...(previous.activeTransform?.spellConcentration?{spellConcentration:true}:{}),...(previous.activeTransform?.permanentUntilDispelled?{permanentUntilDispelled:true}:{})};else if(previous.activeTransform?.tempHpSource){clean.tempHp=0;delete clean.tempHpSource;if(clean.concentration?.name===(previous.activeTransform.option.spellName??previous.activeTransform.option.label))delete clean.concentration;}}
+  return clean;
+}
+
+function creatureById(id?:string){return id?(character.customForms[id]??CREATURES[id]):undefined;}
+function artCacheKey(targetId:string){return `${character.id}:${targetId}`;}
+function artTargetInfo(){
+  const active=state.activeTransform?.option;
+  const selected=!active?currentOption():undefined;
+  const option=active??selected;
+  const form=creatureById(option?.formId);
+  if(form)return {targetId:`form:${form.id}`,label:form.name,fallbackKey:form.artKey,option};
+  return {targetId:'base',label:character.name,fallbackKey:'base',option};
+}
+function queueArtLoad(targetId:string){
+  const key=artCacheKey(targetId);if(artOverrideCache.has(key)||artLoading.has(key))return;artLoading.add(key);
+  void loadArtOverride(character.id,targetId).then(value=>{artOverrideCache.set(key,value);artLoading.delete(key);if(artTargetInfo().targetId===targetId)renderArt();}).catch(()=>{artOverrideCache.set(key,undefined);artLoading.delete(key);});
+}
+function appendPortrait(container:HTMLElement,targetId:string,fallbackKey:string,label:string,className='main-form-art'){
+  const wrapper=document.createElement('div');wrapper.className=className;const key=artCacheKey(targetId);const override=artOverrideCache.get(key);
+  if(override){const image=document.createElement('img');image.src=override;image.alt=`Custom artwork for ${label}`;wrapper.append(image);}
+  else{wrapper.innerHTML=art[fallbackKey]??art['base']??'';queueArtLoad(targetId);}
+  container.append(wrapper);return Boolean(override);
+}
+function renderArt(){
+  const container=$('#form-art');clear(container);
+  const active=state.activeTransform?.option;
+  const preview=!active?currentOption():undefined;
+  const activeForm=creatureById(active?.formId);
+  const mainTarget=activeForm?{targetId:`form:${activeForm.id}`,label:activeForm.name,fallbackKey:activeForm.artKey}:{targetId:'base',label:character.name,fallbackKey:'base'};
+  container.classList.toggle('is-active',Boolean(active));container.classList.toggle('is-base',!active);
+  appendPortrait(container,mainTarget.targetId,mainTarget.fallbackKey,mainTarget.label);
+  container.append(text('div',active?'ACTIVE FORM':'BASE FORM','form-state '+(active?'active':'base')));
+  container.append(text('div',active?.label??character.name,'art-label'));
+  if(!active&&preview&&preview.profile!=='base'&&preview.formId){
+    const form=creatureById(preview.formId);if(form){const chip=document.createElement('div');chip.className='form-preview';const icon=document.createElement('div');icon.className='form-preview-icon';appendPortrait(icon,`form:${form.id}`,form.artKey,form.name,'preview-art');const copy=document.createElement('div');copy.append(text('span','Selected form'),text('strong',preview.label));chip.append(icon,copy);container.append(chip);}
+  }
+  const target=artTargetInfo();$('#art-target-label').textContent=`Artwork target: ${target.label}`;
+  const reset=$<HTMLButtonElement>('#reset-art');const cached=artOverrideCache.get(artCacheKey(target.targetId));reset.disabled=!cached;
+}
+function auraPaletteClass(){
+  const active=state.activeTransform?.option;
+  if(!active)return state.rage.active?'aura-rage':undefined;
+  const form=creatureById(active.formId);
+  const normalizedType=(form?.type??'').toLowerCase();
+  const normalizedId=(form?.id??active.id).toLowerCase();
+  const normalizedName=(form?.name??active.label).toLowerCase();
+  const isMoonDruidWildshape=active.profile==='wildshape'&&character.classes.some(c=>c.name==='Druid'&&c.subclass?.toLowerCase().includes('moon'));
+  if(normalizedType==='beast')return isMoonDruidWildshape?'aura-moon':'aura-beast';
+  if(normalizedType==='undead')return normalizedName.includes('shadow')||normalizedId.includes('shadow')?'aura-shadow':'aura-undead';
+  if(normalizedType==='fey')return 'aura-fey';
+  if(normalizedType==='fiend')return 'aura-fiend';
+  if(normalizedType==='celestial')return 'aura-celestial';
+  if(normalizedType==='dragon')return 'aura-draconic';
+  if(normalizedType==='plant')return 'aura-plant';
+  if(normalizedType==='ooze')return 'aura-ooze';
+  if(normalizedType==='construct')return 'aura-construct';
+  if(normalizedType==='aberration')return 'aura-aberrant';
+  if(normalizedType==='elemental'){
+    if(/fire|flame|ember|magma|lava/.test(normalizedId)||/fire|flame|ember|magma|lava/.test(normalizedName))return 'aura-elemental-fire';
+    if(/water|ice|frost|tidal|wave/.test(normalizedId)||/water|ice|frost|tidal|wave/.test(normalizedName))return 'aura-elemental-water';
+    if(/air|wind|storm|lightning|thunder/.test(normalizedId)||/air|wind|storm|lightning|thunder/.test(normalizedName))return 'aura-elemental-air';
+    if(/earth|stone|rock|dust|sand/.test(normalizedId)||/earth|stone|rock|dust|sand/.test(normalizedName))return 'aura-elemental-earth';
+    return 'aura-elemental';
+  }
+  if(active.profile==='polymorph')return 'aura-arcane';
+  if(active.profile==='shapechange')return 'aura-prismatic';
+  if(active.profile==='wildshape')return isMoonDruidWildshape?'aura-moon':'aura-nature';
+  return 'aura-overlay';
+}
+function scheduleAuraClassRemoval(className:string,duration:number){if(auraTimer!==undefined)window.clearTimeout(auraTimer);auraTimer=window.setTimeout(()=>{$('#app').classList.remove(className);auraTimer=undefined;},duration);}
+function syncAuraState(){
+  const app=$('#app');const activeId=state.activeTransform?.option.id;const palette=auraPaletteClass();
+  app.classList.toggle('effects-disabled',!magicEffectsEnabled);app.classList.toggle('reduce-motion',reduceMotion);app.classList.toggle('form-active',Boolean(activeId));app.classList.toggle('rage-empowered',state.rage.active);
+  for(const value of ['aura-moon','aura-beast','aura-nature','aura-arcane','aura-prismatic','aura-overlay','aura-rage','aura-undead','aura-shadow','aura-fey','aura-fiend','aura-celestial','aura-draconic','aura-plant','aura-ooze','aura-construct','aura-aberrant','aura-elemental','aura-elemental-fire','aura-elemental-water','aura-elemental-air','aura-elemental-earth'])app.classList.toggle(value,value===palette);
+  if(!auraInitialized){previousTransformId=activeId;auraInitialized=true;return;}
+  if(activeId&&activeId!==previousTransformId){app.classList.remove('form-dissipating');app.classList.add('form-transforming');scheduleAuraClassRemoval('form-transforming',1150);}
+  else if(!activeId&&previousTransformId){app.classList.remove('form-transforming');app.classList.add('form-dissipating');scheduleAuraClassRemoval('form-dissipating',820);}
+  previousTransformId=activeId;
+}
+function renderContentRegistry(target:HTMLElement,compact=false){
+  clear(target);const summary=document.createElement('div');summary.className='registry-summary';
+  const labels:[string,number][]=[['Creatures',registrySnapshot.counts.creatures],['Class rules',registrySnapshot.counts['class-features']],['Species rules',registrySnapshot.counts['species-features']],['Spells',registrySnapshot.counts.spells],['Conditions',registrySnapshot.counts.conditions],['Profiles',registrySnapshot.counts['transformation-profiles']]];
+  for(const [label,count] of labels)summary.append(text('span',`${label}: ${count}`,'registry-chip'));target.append(summary);
+  if(compact)return;
+  for(const pack of registrySnapshot.packs){const row=document.createElement('div');row.className='content-pack';row.append(text('strong',pack.name),text('span',`v${pack.version}`),text('small',`${pack.domain} · ${pack.source} · verified ${pack.verified}`));target.append(row);}
+}
+function renderSettings(){
+  $<HTMLInputElement>('#magic-effects-enabled').checked=magicEffectsEnabled;$<HTMLInputElement>('#reduce-motion').checked=reduceMotion;
+  $('#content-registry-summary').textContent=`${registrySnapshot.packs.length} versioned built-in packs plus ${installedPacks.length} private local packs. Built-in rules are verified through ${registrySnapshot.verifiedThrough}. Character, private content, and combat state remain separate layers.`;
+  renderContentRegistry($('#content-pack-list'));
+}
+function slug(value:string){return value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,70)||'private-content';}
+function downloadJson(data:unknown,filename:string){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=filename;link.click();URL.revokeObjectURL(url);}
+function setImportStatus(message:string){$('#import-status').textContent=message;}
+function setBuilderStatus(message:string){$('#builder-status').textContent=message;}
+function packCounts(pack:OwnedContentPack){const c=pack.content;return `${c.transformationGrants.length} transformations · ${c.customForms.length} forms · ${c.knownForms.length} known · ${c.seenForms.length} seen · ${c.features.length} features · ${c.resources.length} resources · ${c.spells.length} spells`;}
+function packMatchLabel(pack:OwnedContentPack){return pack.appliesTo.map(rule=>{const parts:string[]=[];if(rule.characterId)parts.push(`character ${rule.characterId}`);if(rule.species)parts.push(rule.species);if(rule.className)parts.push(rule.className);if(rule.subclass)parts.push(rule.subclass);if(rule.minimumClassLevel)parts.push(`level ${rule.minimumClassLevel}+`);if(rule.maximumClassLevel)parts.push(`through level ${rule.maximumClassLevel}`);return parts.join(' · ')||'all characters';}).join(' OR ');}
+function renderInstalledPacks(){
+  const root=$('#installed-pack-list');clear(root);$('#installed-pack-count').textContent=`${installedPacks.length} installed`;
+  if(installedPacks.length===0){root.append(text('div','No private packs are installed on this device.','empty'));return;}
+  for(const pack of installedPacks){
+    const row=document.createElement('div');row.className='installed-pack';
+    const copy=document.createElement('div');copy.append(text('strong',`${pack.metadata.name} v${pack.metadata.version}`),text('span',pack.metadata.source),text('small',`${packCounts(pack)} · Match: ${packMatchLabel(pack)}`));
+    const actions=document.createElement('div');actions.className='pack-actions';
+    actions.append(button('Apply',()=>{try{const result=applyOwnedContentPack(baseCharacter,pack);if(!result.applied){setImportStatus(result.notes.join(' '));return;}rebuildEffectiveCharacterLibrary(true);selectedOptionId='base';setImportStatus(`${pack.metadata.name} applied from the private library. Added ${result.added.transformations} transformations and ${result.added.forms} private forms.`);renderInstalledPacks();render();}catch(error){setImportStatus(`Could not apply pack: ${error instanceof Error?error.message:'Unknown error'}`);}},'button compact'));
+    actions.append(button('Export',()=>downloadJson(pack,`${slug(pack.metadata.name)}-${slug(pack.metadata.version)}.json`),'button compact'));
+    actions.append(button('Remove',()=>{void (async()=>{await removeExtensionPack(pack.metadata.id);installedPacks=await listExtensionPacks();rebuildEffectiveCharacterLibrary(true);selectedOptionId='base';renderInstalledPacks();renderSettings();render();setImportStatus(`${pack.metadata.name} removed. The current character was rebuilt from its clean base import, so that pack’s mechanics were removed automatically.`);})();},'button compact danger'));
+    row.append(copy,actions);root.append(row);
+  }
+}
+async function refreshInstalledPacks(){installedPacks=await listExtensionPacks();renderInstalledPacks();}
+function applyInstalledPacks(imported:Character){const result=applyOwnedContentPacks(imported,installedPacks);return result;}
+function rebuildEffectiveCharacterLibrary(preserveState=true){
+  const previousId=character.id;const previousState=state;characters=baseCharacters.map(entry=>applyOwnedContentPacks(entry,installedPacks).character);
+  const next=characters.find(entry=>entry.id===previousId)??characters[0];if(!next)return;character=next;baseCharacter=baseCharacters.find(entry=>entry.id===next.id)??next;state=preserveState?reconcileState(next,previousState):createInitialState(next);sheet=resolveSheet(character,state);
+}
+function populateBuilderClassOptions(){const select=$<HTMLSelectElement>('#builder-match-class');clear(select);for(const entry of character.classes){const option=document.createElement('option');option.value=entry.name;option.textContent=`${entry.subclass?`${entry.subclass} `:''}${entry.name} ${entry.level}`;select.append(option);}}
+function numericValue(id:string){const raw=$<HTMLInputElement>(id).value.trim();if(!raw)return undefined;const value=Number(raw);if(!Number.isFinite(value))throw new Error(`${id.replace('#builder-','')} must be a number.`);return value;}
+function booleanChoice(id:string){const value=$<HTMLSelectElement>(id).value;return value==='inherit'?undefined:value==='true';}
+function damageList(id:string):DamageType[]{const raw=$<HTMLInputElement>(id).value.trim();if(!raw)return [];const byName=new Map(damageTypes.map(type=>[type.toLowerCase(),type]));return [...new Set(raw.split(',').map(value=>value.trim()).filter(Boolean).map(value=>{const found=byName.get(value.toLowerCase());if(!found)throw new Error(`${value} is not a supported damage type.`);return found;}))];}
+function builderMatch():OwnedContentMatch{
+  const mode=$<HTMLSelectElement>('#builder-match').value;const selectedClass=$<HTMLSelectElement>('#builder-match-class').value;const classEntry=character.classes.find(entry=>entry.name===selectedClass)??character.classes[0];
+  if(mode==='all')return {};
+  if(mode==='character')return {characterId:character.id};
+  if(!classEntry)throw new Error('Choose a class for pack matching.');
+  if(mode==='class')return {className:classEntry.name,minimumClassLevel:classEntry.level};
+  if(!classEntry.subclass)throw new Error(`${classEntry.name} has no subclass to match.`);
+  return {className:classEntry.name,subclass:classEntry.subclass,minimumClassLevel:classEntry.level};
+}
+function mergeAdvancedEffects(base:TransformationEffects):TransformationEffects{
+  const raw=$<HTMLTextAreaElement>('#builder-advanced-effects').value.trim();if(!raw)return base;if(raw.length>30_000)throw new Error('Advanced effects JSON is too large.');const parsed=JSON.parse(raw) as unknown;if(typeof parsed!=='object'||parsed===null||Array.isArray(parsed))throw new Error('Advanced effects JSON must be one object.');return {...base,...parsed as TransformationEffects};
+}
+function builderRetention(){
+  const preset=$<HTMLSelectElement>('#builder-retention').value;
+  if(preset==='full-replacement')return {hp:true,hitDice:true,mentalAbilities:false,proficiencies:false,creatureType:false,classFeatures:false,feats:false,spellcasting:false,speech:false};
+  if(preset==='wildshape-like')return {hp:true,hitDice:true,mentalAbilities:true,proficiencies:true,creatureType:true,classFeatures:true,feats:true,spellcasting:false,speech:true};
+  if(preset==='shapechange-like')return {hp:true,hitDice:true,mentalAbilities:true,proficiencies:true,creatureType:true,classFeatures:false,feats:false,spellcasting:true,speech:true};
+  return {hp:true,hitDice:true,mentalAbilities:true,proficiencies:true,creatureType:true,classFeatures:true,feats:true,spellcasting:true,speech:true};
+}
+function createPackFromBuilder():OwnedContentPack{
+  const packName=$<HTMLInputElement>('#builder-pack-name').value.trim();const source=$<HTMLInputElement>('#builder-source').value.trim();const label=$<HTMLInputElement>('#builder-label').value.trim();if(!packName||!source||!label)throw new Error('Pack name, source, and transformation name are required.');
+  const profile=$<HTMLSelectElement>('#builder-profile').value as TransformationOption['profile'];const formId=$<HTMLInputElement>('#builder-form-id').value.trim();
+  const abilitySet:Partial<Record<Ability,number>>={};for(const abilityName of ['str','dex','con','int','wis','cha'] as Ability[]){const value=numericValue(`#builder-${abilityName}-set`);if(value!==undefined)abilitySet[abilityName]=value;}
+  const speedSet:Record<string,number>={};for(const [kind,id] of [['fly','#builder-fly-speed'],['swim','#builder-swim-speed'],['climb','#builder-climb-speed']] as const){const value=numericValue(id);if(value!==undefined)speedSet[kind]=value;}
+  const speedBonus:Record<string,number>={};const walkBonus=numericValue('#builder-walk-bonus');if(walkBonus) speedBonus.walk=walkBonus;
+  const effects:TransformationEffects={};const size=$<HTMLSelectElement>('#builder-size').value;if(size)effects.size=size;const creatureType=$<HTMLSelectElement>('#builder-creature-type').value;if(creatureType)effects.creatureType=creatureType;if(Object.keys(abilitySet).length)effects.abilitySet=abilitySet;if(Object.keys(speedSet).length)effects.speedSet=speedSet;if(Object.keys(speedBonus).length)effects.speedBonus=speedBonus;
+  const acBonus=numericValue('#builder-ac-bonus');if(acBonus)effects.acBonus=acBonus;const tempHp=numericValue('#builder-temp-hp');if(tempHp&&tempHp>0)effects.temporaryHp={mode:'fixed',value:tempHp};const resistances=damageList('#builder-resistances');if(resistances.length)effects.resistances=resistances;const immunities=damageList('#builder-immunities');if(immunities.length)effects.immunities=immunities;
+  const canSpeak=booleanChoice('#builder-speak');if(canSpeak!==undefined)effects.canSpeak=canSpeak;const canCast=booleanChoice('#builder-cast');if(canCast!==undefined)effects.canCast=canCast;const canConcentrate=booleanChoice('#builder-concentrate');if(canConcentrate!==undefined)effects.canConcentrate=canConcentrate;const canAttack=booleanChoice('#builder-attack');if(canAttack!==undefined)effects.canAttack=canAttack;const canManipulate=booleanChoice('#builder-manipulate');if(canManipulate!==undefined)effects.canManipulateObjects=canManipulate;
+  const finalEffects=mergeAdvancedEffects(effects);
+  const customForms:unknown[]=[];const customRaw=$<HTMLTextAreaElement>('#builder-custom-form').value.trim();if(customRaw){if(customRaw.length>120_000)throw new Error('Custom form JSON is too large.');customForms.push(JSON.parse(customRaw));}
+  if(formId&&!customRaw){const existing=character.customForms[formId];if(existing)customForms.push(existing);}
+  const requiresForm=['wildshape','polymorph','true-polymorph','shapechange','animal-shapes'].includes(profile);if(requiresForm&&!formId)throw new Error('This replacement profile requires a replacement form ID.');if(formId&&customRaw){const candidate=customForms[0] as {id?:unknown};if(candidate?.id!==formId)throw new Error('Replacement form ID must match the id in the custom form JSON.');}
+  const resourceId=$<HTMLInputElement>('#builder-resource-id').value.trim();const resourceCost=numericValue('#builder-resource-cost')??1;const resourceMax=numericValue('#builder-resource-max')??1;const existingResource=resourceId?character.resources.find(resource=>resource.id===resourceId):undefined;
+  const grant:Record<string,unknown>={id:`${slug(label)}-${Date.now().toString(36)}`,label,profile,formIds:formId?[formId]:[],source,actionCost:$<HTMLSelectElement>('#builder-action').value,endActionCost:$<HTMLSelectElement>('#builder-end-action').value,duration:$<HTMLInputElement>('#builder-duration').value.trim()||'Until ended',effects:finalEffects};
+  if(profile==='custom')grant.retention=builderRetention();
+  if(resourceId){grant.resourceId=resourceId;grant.resourceCost=resourceCost;}
+  const resources:unknown[]=[];if(resourceId&&!existingResource)resources.push({id:resourceId,name:resourceId.split('-').map(word=>word.charAt(0).toUpperCase()+word.slice(1)).join(' '),current:resourceMax,max:resourceMax,recovery:$<HTMLSelectElement>('#builder-resource-recovery').value});
+  const knownForms=profile==='wildshape'&&formId?[formId]:[];const seenForms=(profile==='wildshape'||profile==='shapechange'||profile==='true-polymorph')&&formId?[formId]:[];
+  const rawPack={schemaVersion:1,kind:'altered-owned-content-pack',metadata:{id:`${slug(packName)}-${Date.now().toString(36)}`,name:packName,version:'1.0.0',source,description:`Private transformation mechanics for ${label}.`,privateUse:true,createdAt:new Date().toISOString()},appliesTo:[builderMatch()],content:{customForms,knownForms,seenForms,transformationGrants:[grant],features:[],resources,spells:[]}};
+  return parseOwnedContentPack(rawPack);
+}
+async function installAndApplyPack(pack:OwnedContentPack){await installExtensionPack(pack);installedPacks=await listExtensionPacks();const result=applyOwnedContentPack(baseCharacter,pack);rebuildEffectiveCharacterLibrary(true);selectedOptionId='base';renderInstalledPacks();render();return result;}
+
+function renderCharacterStrip(){
+  const select=$<HTMLSelectElement>('#sample-character');clear(select);
+  for(const c of characters){const option=document.createElement('option');option.value=c.id;option.textContent=c.name;select.append(option);}select.value=character.id;
+  $('#character-name').textContent=character.name;
+  $('#character-build').textContent=`${character.species} · ${character.classes.map(c=>`${c.subclass?`${c.subclass} `:''}${c.name} ${c.level}`).join(' / ')}`;
+  const meta=rulesMetadata();$('#rules-badge').textContent=`${meta.srd} · ${registrySnapshot.packs.length} built-in + ${installedPacks.length} private · verified ${meta.reviewed}`;
+}
+function renderTransformSelector(){
+  const select=$<HTMLSelectElement>('#form-select');const options=availableTransformations(character,state);clear(select);
+  const groups=new Map<string,HTMLOptGroupElement>();
+  const groupName=(o:TransformationOption)=>o.profile==='base'?'Character':o.profile==='wildshape'?'Wild Shape':o.profile==='polymorph'?'Polymorph':o.profile==='true-polymorph'?'True Polymorph':o.profile==='shapechange'?'Shapechange':o.profile==='animal-shapes'?'Animal Shapes':o.profile==='overlay'?'Class, species, spell, item, and private transformations':'Custom replacement forms';
+  for(const o of options){const name=groupName(o);let group=groups.get(name);if(!group){group=document.createElement('optgroup');group.label=name;groups.set(name,group);select.append(group);}const item=document.createElement('option');item.value=o.id;item.textContent=o.label;item.disabled=!o.usable;item.title=o.reason??o.source;group.append(item);}
+  const activeId=state.activeTransform?.option.id;
+  if(activeId&&selectedOptionId==='base'&&options.some(o=>o.id===activeId))selectedOptionId=activeId;
+  else if(!options.some(o=>o.id===selectedOptionId))selectedOptionId=activeId??'base';
+  select.value=selectedOptionId;
+  const selected=options.find(o=>o.id===selectedOptionId);const active=state.activeTransform?.option;
+  $('#form-reason').textContent=active&&selected?.id===active.id?`${active.label} is active. Choose another legal form to change directly, or press End Form to return to ${character.name}.`:selected?.reason??selected?.source??'';
+  const transform=$<HTMLButtonElement>('#transform-button');transform.textContent=selected?.deactivate?selected.label:selected?.profile==='overlay'?'Activate':active&&selected?.id!==active.id?'Change Form':selected?.profile==='base'?'Choose a Form':'Transform';transform.disabled=!selected||!selected.usable||selected.profile==='base'||selected.id===active?.id;transform.hidden=Boolean(!selected||selected.profile==='base'||selected.id===active?.id);
+  const end=$<HTMLButtonElement>('#end-form-button');const permanentTruePolymorph=active?.profile==='true-polymorph'&&state.activeTransform?.permanentUntilDispelled;const needsBonus=active?.profile==='wildshape'||active?.profile==='animal-shapes';const canEnd=permanentTruePolymorph||!needsBonus||state.turn.bonusRemaining>0;end.textContent=permanentTruePolymorph?'Remove Dispelled Effect':needsBonus&&!canEnd?'End Form — Bonus Action Used':'End Form';end.disabled=!active||!canEnd;end.hidden=!active;if(permanentTruePolymorph)end.title='True Polymorph cannot be ended voluntarily after the full hour. Use this only after the effect is dispelled or otherwise ended externally.';else if(active&&needsBonus&&!canEnd)end.title='Voluntarily ending this form requires a Bonus Action. Start a new turn or regain a Bonus Action first.';else end.removeAttribute('title');
+}
+function metric(label:string,value:string,note:string){const node=document.createElement('div');node.className='metric';node.append(text('span',label),text('strong',value),text('small',note));return node}
+function healthMetric(){
+  const available=state.hp+state.tempHp;
+  const node=document.createElement('div');node.className='metric vitality-metric';
+  const heading=document.createElement('div');heading.className='vitality-heading';
+  const labels=document.createElement('div');labels.append(text('span','Available Health'),text('small','Damage is taken from Temporary HP first.'));
+  heading.append(labels,text('strong',String(available)));
+  const breakdown=document.createElement('div');breakdown.className='vitality-breakdown';
+  const hp=document.createElement('div');hp.className='vitality-part hp-part';hp.append(text('span','Hit Points'),text('b',`${state.hp} / ${character.hp.max}`));
+  const temporary=document.createElement('div');temporary.className='vitality-part temp-part'+(state.tempHp>0?' active':'');temporary.append(text('span','Temporary HP'),text('b',String(state.tempHp)),text('small',state.tempHpSource??'None'));
+  breakdown.append(hp,temporary);node.append(heading,breakdown);return node;
+}
+function speedText(){return Object.entries(sheet.speeds).filter(([,v])=>v!==undefined).map(([k,v])=>`${k} ${v} ft.`).join(' · ')||'0 ft.'}
+function renderMetrics(){
+  const grid=$('#metric-grid');clear(grid);grid.append(healthMetric(),metric('Armor Class',String(sheet.ac),sheet.acSource),metric('Speed',String(sheet.speeds.walk??0)+' ft.',speedText()));
+  const economy=$('#action-economy');clear(economy);const chips:[string,number][]=[['Action',state.turn.actionsRemaining],['Surge Action',state.turn.surgeActionsRemaining],['Bonus Action',state.turn.bonusRemaining],['Reaction',state.turn.reactionRemaining]];for(const [name,count] of chips){const node=text('span',`${name}: ${count}`,'economy-chip '+(count>0?'available':'used'));economy.append(node);}
+  $('#turn-number').textContent=`Turn ${state.turn.number}`;
+}
+function renderResources(){
+  const strip=$('#resource-strip');clear(strip);
+  for(const pool of Object.values(state.resources)){const node=document.createElement('span');node.className='resource-chip';node.append(document.createTextNode(`${pool.name} `),text('b',`${pool.current}/${pool.max}`));strip.append(node);}
+  for(const [level,slot] of Object.entries(state.spellSlots)){if(slot.max>0){const node=document.createElement('span');node.className='resource-chip';node.append(document.createTextNode(`L${level} slots `),text('b',`${slot.current}/${slot.max}`));strip.append(node);}}
+  if(state.concentration)strip.append(text('span',`Concentrating: ${state.concentration.name}`,'state-chip'));
+  if(state.concentrationChecks.length){const next=state.concentrationChecks[0];if(next)strip.append(text('span',`Concentration check: DC ${next.dc}${state.concentrationChecks.length>1?` (+${state.concentrationChecks.length-1})`:''}`,'state-chip warning'));}
+}
+function renderQuickFeatures(){
+  const box=$('#quick-features');clear(box);
+  if(classLevel(character,'Barbarian')>=1){
+    const rage=button(state.rage.active?'End Rage':'Rage',()=>applyResult(state.rage.active?endRage(state):startRage(character,state)),'button secondary'+(state.rage.active?' active':''));box.append(rage);
+    if(state.rage.active&&classLevel(character,'Barbarian')<15)box.append(button('Extend Rage',()=>applyResult(extendRage(character,state))));
+  }
+  if(classLevel(character,'Barbarian')>=2){const reckless=button(state.rage.recklessDeclared?'Reckless On':'Reckless',()=>applyResult(declareRecklessAttack(character,state)),'button secondary'+(state.rage.recklessDeclared?' active':''));box.append(reckless);}
+  if(classLevel(character,'Fighter')>=1)box.append(button('Second Wind',()=>{const roll=rollDice('1d10').total;applyResult(useSecondWind(character,state,roll));}));
+  if(classLevel(character,'Fighter')>=2)box.append(button('Action Surge',()=>applyResult(useActionSurge(character,state))));
+  if(classLevel(character,'Paladin')>=1)box.append(button('Lay On Hands',()=>applyResult(useLayOnHands(character,state,Number($<HTMLInputElement>('#damage-amount').value)))));
+  if(classLevel(character,'Druid')>=5){box.append(button('Slot → Wild Shape',()=>applyResult(useWildResurgence(character,state,'slot-to-shape'))));box.append(button('Wild Shape → L1 Slot',()=>applyResult(useWildResurgence(character,state,'shape-to-slot'))));}
+  const dragonWings=state.resources['sorcerer-dragon-wings'];if(dragonWings&&dragonWings.current<dragonWings.max)box.append(button('3 Sorcery Points → Dragon Wings',()=>applyResult(restoreDragonWings(character,state))));
+  if(state.concentrationChecks.length){const pending=state.concentrationChecks[0];if(pending)box.append(button(`Concentration DC ${pending.dc}`,()=>{const save=resolveSheet(character,state).saves.con;const rules=concentrationSaveMode(character,state);const mode=combinedMode(rules.mode as 'normal'|'advantage'|'disadvantage');const total=d20(save.modifier,mode,'Concentration save');applyResult(resolveConcentrationCheck(state,total));},'button primary'));}
+  if(state.activeTransform?.option.profile==='true-polymorph'&&state.activeTransform.spellConcentration&&!state.activeTransform.permanentUntilDispelled)box.append(button('Complete 1-Hour True Polymorph',()=>applyResult(completeTruePolymorph(state)),'button primary'));
+  if(state.concentration)box.append(button('End Concentration',()=>applyResult(endConcentration(state,'Ended voluntarily.',character))));
+}
+
+function card(title:string,badgeText:string,summary:string){const node=document.createElement('article');node.className='item-card';const head=document.createElement('div');head.className='item-head';head.append(text('strong',title),text('span',badgeText,'badge'));node.append(head,text('p',summary));const options=document.createElement('div');options.className='action-options';node.append(options);const actions=document.createElement('div');actions.className='item-actions';node.append(actions);return {node,options,actions,badge:head.lastElementChild as HTMLElement}}
+type RollMode='normal'|'advantage'|'disadvantage';
+interface D20Result {first:number;second?:number;kept:number;total:number;mode:RollMode;critical:boolean;naturalOne:boolean}
+function rollD20Result(mod:number,mode:RollMode):D20Result{const first=rollDice('1d20').total;const second=mode==='normal'?undefined:rollDice('1d20').total;const kept=mode==='advantage'?Math.max(first,second??first):mode==='disadvantage'?Math.min(first,second??first):first;return {first,...(second===undefined?{}:{second}),kept,total:kept+mod,mode,critical:kept===20,naturalOne:kept===1};}
+function modeText(result:D20Result){return result.mode==='normal'?`d20 ${result.first}`:`${result.mode==='advantage'?'Advantage':'Disadvantage'} ${result.first}, ${result.second}; kept ${result.kept}`;}
+function showRoll(total:number|string,detail:string,title='Roll result'){const panel=$('#latest-roll');$('#roll-title').textContent=title;$('#roll-total').textContent=String(total);$('#roll-detail').textContent=detail;panel.classList.remove('flash');void panel.offsetWidth;panel.classList.add('flash');addActivity(`${title}: ${detail}`);renderLog();}
+function d20(mod:number,mode:RollMode,label:string){const result=rollD20Result(mod,mode);showRoll(result.total,`${modeText(result)} ${signed(mod)} = ${result.total}`,label);return result.total;}
+function combinedMode(rulesMode:RollMode){return rulesMode;}
+function criticalExpression(expression:string){return expression.replace(/(\d+)d(\d+)/gi,(_,count,size)=>`${Number(count)*2}d${size}`);}
+function attackMinimum(action:CreatureAction){if(action.type!=='attack')return 0;return Math.max(0,...sheet.attackDamageModifiers.filter(modifier=>modifier.appliesTo.includes(action.kind as 'weapon'|'unarmed')).map(modifier=>modifier.minimumDamage??0));}
+function packetTotal(packets:DamagePacket[],critical=false,minimum=0){let total=0;const details:string[]=[];for(const packet of packets){const expression=critical&&packet.doubleOnCritical!==false?criticalExpression(packet.expression):packet.expression;const result=rollDice(expression);total+=result.total;details.push(`${packet.label??packet.type}: ${result.total} [${expression}]`);}const raw=total;total=Math.max(minimum,total);if(total!==raw)details.push(`Minimum ${minimum} damage`);return {total,detail:details.join(' + ')};}
+function spendForAction(action:CreatureAction){const error=spendActionCost(state,action.cost,sheet.conditionImmunities);if(error){notify(error);render();return false;}return true;}
+function optionalSet(actionId:string){let set=selectedOptionalBonuses.get(actionId);if(!set){set=new Set<string>();selectedOptionalBonuses.set(actionId,set);}return set;}
+function toggleRow(labelText:string,checked:boolean,onChange:(checked:boolean)=>void){const label=document.createElement('label');label.className='action-toggle';const input=document.createElement('input');input.type='checkbox';input.checked=checked;input.addEventListener('change',()=>onChange(input.checked));label.append(input,text('span',labelText));return label;}
+function markOptionalBonus(label:string|undefined){if(label?.includes('Primal'))markOncePerTurn(state,'primal-strike');if(label?.includes('Lunar'))markOncePerTurn(state,'lunar-form');}
+function resolveAttackAction(action:AttackAction){
+  if(!spendForAction(action))return;sheet=resolveSheet(character,state);
+  const rules=attackRollSources(character,state,action,sheet);const mode=combinedMode(rules.mode as RollMode);const attack=rollD20Result(action.attackBonus,mode);
+  const radiant=radiantActions.has(action.id);const automatic=attackBonuses(character,state,sheet,action).filter(p=>!p.label?.startsWith('Optional'));
+  const selected=optionalSet(action.id);const optional=attackBonuses(character,state,sheet,action).filter(p=>p.label?.startsWith('Optional')&&selected.has(p.label??''));
+  const base=action.damage.map((packet,index)=>radiant&&index===0?{...packet,type:'Radiant' as DamageType}:packet);const allPackets=[...base,...automatic,...optional];const damage=attack.naturalOne?null:packetTotal(allPackets,attack.critical,attackMinimum(action));
+  optional.forEach(packet=>markOptionalBonus(packet.label));declareAttack(state,action);
+  const sources=[...rules.sources.advantage.map(x=>`Advantage: ${x}`),...rules.sources.disadvantage.map(x=>`Disadvantage: ${x}`),...rules.conditional.map(x=>`Conditional: ${x}`)];
+  const attackLine=`${modeText(attack)} ${signed(action.attackBonus)} = ${attack.total}${attack.critical?' — CRITICAL HIT':''}${attack.naturalOne?' — automatic miss':''}`;
+  const damageLine=damage?`${damage.total} damage if the attack hits${attack.critical?' (damage dice doubled)':''}: ${damage.detail}`:'No damage roll on a natural 1.';
+  showRoll(attack.naturalOne?'Natural 1':`${attack.total} to hit · ${damage?.total??0} dmg`,`${attackLine}\n${damageLine}${sources.length?`\n${sources.join(' · ')}`:''}`,action.name);render();
+}
+function resolveSaveAction(action:Extract<CreatureAction,{type:'save'}>){if(!spendForAction(action))return;const fail=packetTotal(action.damageOnFail??[]);const success=packetTotal(action.damageOnSuccess??[]);declareAttack(state,action);const total=fail.total?`${fail.total} fail dmg`:'Effect';const detail=[`Target makes a DC ${action.dc} ${action.saveAbility.toUpperCase()} save.`,fail.detail?`Failed save: ${fail.detail}.`:'Apply the listed failed-save effect.',success.detail?`Successful save: ${success.detail}.`:'',action.effectsOnFail?.length?`Failed-save effects: ${action.effectsOnFail.map(e=>e.condition).join(', ')}.`:''].filter(Boolean).join('\n');showRoll(total,detail,action.name);render();}
+function resolveAutomaticAction(action:Extract<CreatureAction,{type:'automatic'}>){if(!spendForAction(action))return;const result=packetTotal(action.damage??[]);showRoll(result.total||'Activated',result.detail||action.notes||'Effect activated.',action.name);render();}
+function resolveMultiattack(action:Extract<CreatureAction,{type:'multiattack'}>){if(!spendForAction(action))return;const lines:string[]=[];let combinedDamage=0;for(const id of action.sequence){const child=sheet.actions.find(candidate=>candidate.id===id&&candidate.type==='attack');if(!child||child.type!=='attack')continue;const rules=attackRollSources(character,state,child,sheet);const attack=rollD20Result(child.attackBonus,rules.mode as RollMode);const automatic=attackBonuses(character,state,sheet,child).filter(packet=>!packet.label?.startsWith('Optional'));const damage=attack.naturalOne?null:packetTotal([...child.damage,...automatic],attack.critical,attackMinimum(child));combinedDamage+=damage?.total??0;lines.push(`${child.name}: ${attack.naturalOne?'Natural 1 miss':`${attack.total} to hit, ${damage?.total??0} damage${attack.critical?' CRIT':''}`}`);declareAttack(state,child);}showRoll(`${combinedDamage} total dmg`,lines.join('\n'),action.name);render();}
+function renderActions(){
+  const root=$('#tab-content');clear(root);if(sheet.actions.length===0){root.append(text('div','No actions are defined for this form.','empty'));return;}
+  for(const action of sheet.actions){
+    if(action.type==='attack'){
+      const description=`${signed(action.attackBonus)} to hit · ${action.damage.map(packet=>`${packet.expression} ${packet.type}`).join(' + ')}${action.notes?` · ${action.notes}`:''}`;const c=card(action.name,action.kind,description);
+      const radiantEligible=sheet.profile==='wildshape'&&classLevel(character,'Druid')>=6&&action.kind==='beast';if(radiantEligible)c.options.append(toggleRow('Use Radiant damage for this attack',radiantActions.has(action.id),checked=>{checked?radiantActions.add(action.id):radiantActions.delete(action.id);}));
+      for(const bonus of attackBonuses(character,state,sheet,action).filter(packet=>packet.label?.startsWith('Optional'))){const label=bonus.label??'Optional damage';c.options.append(toggleRow(`${label} (${bonus.expression} ${bonus.type})`,optionalSet(action.id).has(label),checked=>{const set=optionalSet(action.id);checked?set.add(label):set.delete(label);}));}
+      c.actions.append(button(`Roll ${action.name}`,()=>resolveAttackAction(action),'button primary action-roll'));root.append(c.node);
+    }else if(action.type==='save'){
+      const damage=action.damageOnFail?.map(packet=>`${packet.expression} ${packet.type}`).join(' + ')||'Effect on failed save';const c=card(action.name,`DC ${action.dc} ${action.saveAbility.toUpperCase()}`,`${damage}${action.recharge?` · Recharge ${action.recharge.min}–${action.recharge.max}`:''}${action.notes?` · ${action.notes}`:''}`);c.actions.append(button(`Use ${action.name}`,()=>resolveSaveAction(action),'button primary action-roll'));root.append(c.node);
+    }else if(action.type==='multiattack'){
+      const names=action.sequence.map(id=>sheet.actions.find(candidate=>candidate.id===id)?.name??id);const c=card(action.name,'Action',`Automatically rolls: ${names.join(' → ')}${action.notes?` · ${action.notes}`:''}`);c.actions.append(button(`Roll ${action.name}`,()=>resolveMultiattack(action),'button primary action-roll'));root.append(c.node);
+    }else{
+      const c=card(action.name,action.cost,`${action.prerequisite??''}${action.notes?` · ${action.notes}`:''}`.trim());c.actions.append(button(`Use ${action.name}`,()=>resolveAutomaticAction(action),'button primary action-roll'));root.append(c.node);
+    }
+  }
+}
+function renderRolls(){
+  const root=$('#tab-content');clear(root);const saveTitle=text('h3','Saving Throws');root.append(saveTitle);const saves=document.createElement('div');saves.className='roll-grid';
+  for(const value of Object.values(sheet.saves)){const row=document.createElement('div');row.className='roll-row';const info=document.createElement('div');const ruleMode=resolveAdvantage({advantage:value.advantageSources??[],disadvantage:value.disadvantageSources??[]}).mode as 'normal'|'advantage'|'disadvantage';const notes=[value.source,...(value.advantageSources?.length?[`Advantage: ${value.advantageSources.join(', ')}`]:[]),...(value.disadvantageSources?.length?[`Disadvantage: ${value.disadvantageSources.join(', ')}`]:[]),...(value.automaticFailure?[value.automaticFailure]:[])];info.append(text('strong',`${value.name} ${signed(value.modifier)}`),text('small',notes.join(' · ')));const roll=button(value.automaticFailure?'Automatic Failure':'Roll',()=>d20(value.modifier,combinedMode(ruleMode),value.name),'button compact');roll.disabled=Boolean(value.automaticFailure);row.append(info,roll);saves.append(row);}root.append(saves,text('h3','Skills'));
+  const skills=document.createElement('div');skills.className='roll-grid';for(const value of Object.values(sheet.skills).sort((a,b)=>a.name.localeCompare(b.name))){const row=document.createElement('div');row.className='roll-row';const info=document.createElement('div');const ruleMode=resolveAdvantage({advantage:value.advantageSources??[],disadvantage:value.disadvantageSources??[]}).mode as 'normal'|'advantage'|'disadvantage';const detail=[value.source,...(value.advantageSources?.length?[`Advantage: ${value.advantageSources.join(', ')}`]:[]),...(value.disadvantageSources?.length?[`Disadvantage: ${value.disadvantageSources.join(', ')}`]:[]),...(value.conditionalSources?.length?[`Conditional: ${value.conditionalSources.join(', ')}`]:[]),...(value.alternate?[`Alternate ${signed(value.alternate.modifier)}: ${value.alternate.source}`]:[])].join(' · ');info.append(text('strong',`${value.name} ${signed(value.modifier)}`),text('small',detail));const actions=document.createElement('div');actions.className='inline-actions';actions.append(button('Roll',()=>d20(value.modifier,combinedMode(ruleMode),value.name),'button compact'));if(value.alternate)actions.append(button('Use STR',()=>d20(value.alternate?.modifier??value.modifier,combinedMode(ruleMode),`${value.name} (Strength)`),'button compact'));row.append(info,actions);skills.append(row);}root.append(skills);
+}
+
+function spellAttackModifier(spell:Spell){const current=Math.floor((sheet.abilities[spell.ability]-10)/2);const base=Math.floor((character.abilities[spell.ability]-10)/2);return spell.attackBonus!==undefined?spell.attackBonus+current-base:proficiencyBonus(character.totalLevel)+current;}
+function spellSaveDc(spell:Spell){const current=Math.floor((sheet.abilities[spell.ability]-10)/2);const base=Math.floor((character.abilities[spell.ability]-10)/2);return spell.saveDc!==undefined?spell.saveDc+current-base:8+proficiencyBonus(character.totalLevel)+current;}
+function resolveSpellEffect(spell:Spell){
+  if(spell.attackBonus!==undefined){const pseudo:AttackAction={id:`spell-${spell.name}`,name:spell.name,type:'attack',cost:'none',attackBonus:spellAttackModifier(spell),ability:spell.ability,kind:'spell',damage:spell.damage??[]};const rules=attackRollSources(character,state,pseudo,sheet);const attack=rollD20Result(pseudo.attackBonus,rules.mode as RollMode);const damage=attack.naturalOne?null:packetTotal(spell.damage??[],attack.critical);declareAttack(state,pseudo);showRoll(attack.naturalOne?'Natural 1':`${attack.total} to hit · ${damage?.total??0} dmg`,`${modeText(attack)} ${signed(pseudo.attackBonus)} = ${attack.total}${attack.critical?' — CRITICAL HIT':''}
+${damage?`${damage.total} damage if hit: ${damage.detail}`:'No damage roll on a natural 1.'}`,spell.name);return;}
+  if(spell.healing){const healing=rollDice(spell.healing);showRoll(`${healing.total} healing`,`${spell.healing} = ${healing.total}. Apply it to the chosen target.`,spell.name);return;}
+  if(spell.damage?.length){const damage=packetTotal(spell.damage);showRoll(`${damage.total} effect dmg`,`Target resolves the spell against DC ${spellSaveDc(spell)}. ${damage.detail}`,spell.name);return;}
+  showRoll('Cast',spell.summary??'Spell effect activated.',spell.name);
+}
+function castAndResolveSpell(spell:Spell&{available:boolean;reason:string}){const result=castSpell(character,state,spell.name);const success=result.message.startsWith('Cast ');applyResult(result);if(!success)return;const immediate=spell.attackBonus!==undefined||Boolean(spell.healing)||(!spell.concentration&&Boolean(spell.damage?.length));if(immediate)resolveSpellEffect(spell);else showRoll('Cast',spell.concentration?'Concentration started. Use Resolve Effect when the spell deals damage or healing.':spell.summary??'Spell activated.',spell.name);}
+function renderSpells(){
+  const root=$('#tab-content');clear(root);if(sheet.spells.length===0){root.append(text('div','No spells were imported for this character.','empty'));return;}
+  for(const spell of sheet.spells){const detail=[spell.summary??'',spell.reason,spell.attackBonus!==undefined?`Spell attack ${signed(spellAttackModifier(spell))}`:'',spell.damage?.length&&spell.attackBonus===undefined?`Save DC ${spellSaveDc(spell)}`:''].filter(Boolean).join(' · ');const c=card(spell.name,spell.available?'Ready':'Unavailable',detail);c.badge.className=`badge ${spell.available?'active':'inactive'}`;const immediate=spell.attackBonus!==undefined||Boolean(spell.healing)||(!spell.concentration&&Boolean(spell.damage?.length));const cast=button(immediate?`Cast & Roll ${spell.name}`:`Cast ${spell.name}`,()=>castAndResolveSpell(spell),spell.available?'button primary action-roll':'button secondary');cast.disabled=!spell.available;c.actions.append(cast);const activeEffect=state.concentration?.name===spell.name&&Boolean(spell.damage?.length||spell.healing);if(activeEffect)c.actions.append(button(`Resolve ${spell.name} Effect`,()=>resolveSpellEffect(spell),'button secondary'));root.append(c.node);}
+}
+function renderFeatures(){
+  const root=$('#tab-content');clear(root);let count=0;
+  if(sheet.form?.traits.length){root.append(text('h3',`${sheet.form.name} form traits`));for(const trait of sheet.form.traits){const c=card(trait.name,'Form trait',trait.summary);c.badge.className='badge active';root.append(c.node);count++;}}
+  if(sheet.features.length){root.append(text('h3','Character features and feats'));for(const feature of sheet.features){const c=card(feature.name,feature.status,`${feature.reason} ${feature.summary}`);c.badge.className=`badge ${feature.status}`;root.append(c.node);count++;}}
+  if(state.overlays.length){root.append(text('h3','Active transformation overlays'));for(const id of state.overlays){const grant=character.transformationGrants?.find(item=>item.id===id);const c=card(grant?.label??id,'Active overlay',grant?`${grant.source}${grant.duration?` · ${grant.duration}`:''}`:'Built-in transformation effect currently applied.');c.badge.className='badge active';root.append(c.node);count++;}}
+  if(count===0)root.append(text('div','No evaluated features or active form traits.','empty'));
+}
+function renderRules(){
+  const root=$('#tab-content');clear(root);root.append(text('h3','Armor Class candidates'));const list=document.createElement('div');list.className='ac-list';for(const candidate of sheet.acCandidates){const row=document.createElement('div');row.className='ac-row'+(candidate.legal?'':' invalid');const info=document.createElement('div');info.append(text('strong',candidate.name),text('div',candidate.reason,'source-note'));row.append(info,text('strong',String(candidate.value)));list.append(row);}root.append(list,text('h3','Current transformation'));const source=document.createElement('div');source.className='item-card';source.append(text('strong',state.activeTransform?.option.label??'Base Form'),text('p',state.activeTransform?`${state.activeTransform.option.source} · ${state.activeTransform.duration}${state.activeTransform.permanentUntilDispelled?' · no Concentration required':''}`:'No replacement transformation is active.'));source.append(text('p',`Creature type: ${sheet.creatureType} · Size: ${sheet.size}`));if(sheet.form)source.append(text('p',`Verified stat block: ${sheet.form.source.page} · ${sheet.form.source.verified}`));root.append(source,text('h3','Current defenses'));const defenses=document.createElement('div');defenses.className='item-card';defenses.append(text('p',`Resistances: ${sheet.resistances.join(', ')||'None'}`),text('p',`Immunities: ${sheet.immunities.join(', ')||'None'}`),text('p',`Senses: ${sheet.senses.join(', ')||'Base character senses'}`),text('p',`Speech: ${sheet.canSpeak?'Yes':'No'} · Spellcasting: ${sheet.canCast?'Yes':'No'} · Concentration: ${sheet.canConcentrate?'Allowed':'Blocked'} · Attack: ${sheet.canAttack?'Yes':'No'} · Manipulate objects: ${sheet.canManipulateObjects?'Yes':'No'}`),text('p',`Condition immunities: ${sheet.conditionImmunities.join(', ')||'None'}`));root.append(defenses,text('h3','Rules databank'));const registry=document.createElement('div');registry.className='item-card';registry.append(text('p',`${registrySnapshot.packs.length} built-in packs and ${installedPacks.length} private local packs are available. The engine, shared rules, private owned content, imported character, and mutable combat state are stored as separate layers.`));renderContentRegistry(registry,true);root.append(registry);
+}
+function renderTab(){sheet=resolveSheet(character,state);if(currentTab==='actions')renderActions();else if(currentTab==='rolls')renderRolls();else if(currentTab==='spells')renderSpells();else if(currentTab==='features')renderFeatures();else renderRules();}
+function renderConditions(){const list=$('#condition-list');clear(list);for(const condition of state.conditions){list.append(button(`${condition} ×`,()=>applyResult(removeCondition(state,condition)),'condition-chip'));}}
+function renderLog(){const root=$('#activity-log');clear(root);if(state.log.length===0){root.append(text('div','No activity yet.','log-row'));return;}for(const item of state.log)root.append(text('div',item,'log-row'));}
+function render(){sheet=resolveSheet(character,state);syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderResources();renderQuickFeatures();renderTab();renderConditions();renderLog();persist();}
+
+function endCurrentForm(){const wasActive=Boolean(state.activeTransform);const recordsExternalEnd=state.activeTransform?.option.profile==='true-polymorph'&&state.activeTransform.permanentUntilDispelled;const result=endTransformation(state,!recordsExternalEnd,character);if(wasActive&&!state.activeTransform){selectedOptionId='base';radiantActions.clear();selectedOptionalBonuses.clear();}applyResult(result);}
+function initializeControls(){
+  const damage=$<HTMLSelectElement>('#damage-type');for(const type of damageTypes){const option=document.createElement('option');option.value=type;option.textContent=type;damage.append(option);}damage.value='Slashing';
+  const conditions=$<HTMLSelectElement>('#condition-select');for(const condition of commonConditions){const option=document.createElement('option');option.value=condition;option.textContent=condition;conditions.append(option);}
+  $('#sample-character').addEventListener('change',event=>{const id=(event.target as HTMLSelectElement).value;const found=characters.find(c=>c.id===id);if(found)setCharacter(found);});
+  $('#form-select').addEventListener('change',event=>{selectedOptionId=(event.target as HTMLSelectElement).value;renderTransformSelector();renderArt();});
+  $('#transform-button').addEventListener('click',()=>{const option=currentOption();if(option)applyResult(startTransformation(character,state,option));});
+  $('#end-form-button').addEventListener('click',endCurrentForm);
+  document.querySelectorAll<HTMLButtonElement>('.tab').forEach(tab=>tab.addEventListener('click',()=>{currentTab=tab.dataset.tab??'actions';document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===tab));renderTab();}));
+  $('#apply-damage').addEventListener('click',()=>{const amount=Number($<HTMLInputElement>('#damage-amount').value);const type=$<HTMLSelectElement>('#damage-type').value as DamageType;applyResult(applyDamage(state,resolveSheet(character,state),amount,type,character));});
+  $('#apply-healing').addEventListener('click',()=>applyResult(heal(state,character,Number($<HTMLInputElement>('#damage-amount').value))));
+  $('#new-turn').addEventListener('click',()=>applyResult(startNewTurn(state)));$('#end-turn').addEventListener('click',()=>applyResult(endTurn(character,state)));$('#short-rest').addEventListener('click',()=>applyResult(shortRest(state)));$('#long-rest').addEventListener('click',()=>applyResult(longRest(character,state)));
+  $('#add-condition').addEventListener('click',()=>applyResult(applyCondition(character,state,$<HTMLSelectElement>('#condition-select').value)));$('#clear-conditions').addEventListener('click',()=>{for(const condition of [...state.conditions])removeCondition(state,condition);notify('Conditions cleared.');render();});
+  $('#import-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{const parsed=parseCharacter(safeJsonParse(await file.text()));const baseIndex=baseCharacters.findIndex(entry=>entry.id===parsed.id);if(baseIndex>=0)baseCharacters[baseIndex]=parsed;else baseCharacters=[parsed,...baseCharacters];baseCharacter=parsed;const result=applyInstalledPacks(parsed);const imported=result.character;rebuildEffectiveCharacterLibrary(false);setCharacter(characters.find(entry=>entry.id===imported.id)??imported);const detail=result.applied?` Matching private packs added ${result.added.transformations} transformations, ${result.added.forms} forms, and ${result.added.features} features.`:'';setImportStatus(`${imported.name} imported successfully.${detail}`);}catch(error){const message=`Import failed: ${error instanceof Error?error.message:'Unknown error'}`;notify(message);setImportStatus(message);}finally{input.value='';}});
+  $('#export-character').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(character,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`${character.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'altered-character'}.json`;a.click();URL.revokeObjectURL(url);});
+  $('#open-import-center').addEventListener('click',()=>{renderInstalledPacks();setImportStatus('Private packs stay on this device unless you export them.');$<HTMLDialogElement>('#import-dialog').showModal();});
+  $('#close-import-center').addEventListener('click',()=>$<HTMLDialogElement>('#import-dialog').close());
+  $('#owned-pack-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{const pack=safeOwnedContentParse(await file.text());const result=await installAndApplyPack(pack);setImportStatus(result.applied?`${pack.metadata.name} installed and applied to ${character.name}. ${packCounts(pack)}.`:`${pack.metadata.name} installed. It does not match ${character.name}, so the current sheet was not changed.`);renderSettings();}catch(error){setImportStatus(`Pack installation failed: ${error instanceof Error?error.message:'Unknown error'}`);}finally{input.value='';}});
+  $('#download-pack-template').addEventListener('click',()=>downloadJson(ownedContentTemplate(character),`${slug(character.name)}-private-content-template.json`));
+  $('#open-transform-builder').addEventListener('click',()=>{populateBuilderClassOptions();setBuilderStatus('The builder creates a validated local pack. Advanced fields are optional.');$<HTMLDialogElement>('#transform-builder-dialog').showModal();});
+  $('#close-transform-builder').addEventListener('click',()=>$<HTMLDialogElement>('#transform-builder-dialog').close());
+  $('#cancel-transform-builder').addEventListener('click',()=>$<HTMLDialogElement>('#transform-builder-dialog').close());
+  $('#transform-builder-form').addEventListener('submit',event=>{event.preventDefault();void (async()=>{try{const pack=createPackFromBuilder();const result=await installAndApplyPack(pack);setBuilderStatus(`${pack.metadata.name} created and installed. ${result.applied?'The transformation is now available on this character.':'The pack was saved but did not match the current character.'}`);setImportStatus(`${pack.metadata.name} installed from the private transformation builder.`);renderSettings();}catch(error){setBuilderStatus(`Could not create transformation: ${error instanceof Error?error.message:'Unknown error'}`);}})();});
+  $('#keep-current-thp').addEventListener('click',()=>{if(pendingTempChoice)resolveTempHpChoice(state,'current',pendingTempChoice.incoming,pendingTempChoice.source);pendingTempChoice=null;$<HTMLDialogElement>('#temp-hp-dialog').close();notify('Kept current Temporary Hit Points.');render();});
+  $('#keep-new-thp').addEventListener('click',()=>{if(pendingTempChoice)resolveTempHpChoice(state,'incoming',pendingTempChoice.incoming,pendingTempChoice.source);pendingTempChoice=null;$<HTMLDialogElement>('#temp-hp-dialog').close();notify('Replaced Temporary Hit Points with the new source.');render();});
+  $('#art-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;const target=artTargetInfo();try{notify(`Optimizing artwork for ${target.label}…`);const optimized=await optimizePortrait(file);await saveArtOverride(character.id,target.targetId,optimized);artOverrideCache.set(artCacheKey(target.targetId),optimized);notify(`Custom artwork saved for ${target.label}.`);renderArt();}catch(error){notify(`Artwork could not be saved: ${error instanceof Error?error.message:'Unknown error'}`);}finally{input.value='';}});
+  $('#reset-art').addEventListener('click',async()=>{const target=artTargetInfo();await removeArtOverride(character.id,target.targetId);artOverrideCache.set(artCacheKey(target.targetId),undefined);notify(`Default artwork restored for ${target.label}.`);renderArt();});
+  $('#open-settings').addEventListener('click',()=>{renderSettings();$<HTMLDialogElement>('#settings-dialog').showModal();});
+  $('#close-settings').addEventListener('click',()=>$<HTMLDialogElement>('#settings-dialog').close());
+  $('#magic-effects-enabled').addEventListener('change',event=>{magicEffectsEnabled=(event.target as HTMLInputElement).checked;void saveBooleanSetting('magic-effects-enabled',magicEffectsEnabled);syncAuraState();});
+  $('#reduce-motion').addEventListener('change',event=>{reduceMotion=(event.target as HTMLInputElement).checked;void saveBooleanSetting('reduce-motion',reduceMotion);syncAuraState();});
+  window.addEventListener('beforeunload',persist);
+  if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
+async function boot(){
+  restore();
+  installedPacks=await listExtensionPacks();
+  rebuildEffectiveCharacterLibrary(true);
+  if(pendingActiveSnapshot?.option?.id){const option=availableTransformations(character,state).find(candidate=>candidate.id===pendingActiveSnapshot?.option?.id);if(option)state.activeTransform={option,startedTurn:Number(pendingActiveSnapshot.startedTurn??state.turn.number),duration:String(pendingActiveSnapshot.duration??''),tempHpSource:Boolean(pendingActiveSnapshot.tempHpSource),...(pendingActiveSnapshot.spellConcentration?{spellConcentration:true}:{}),...(pendingActiveSnapshot.permanentUntilDispelled?{permanentUntilDispelled:true}:{})};}
+  magicEffectsEnabled=await loadBooleanSetting('magic-effects-enabled',true);
+  reduceMotion=await loadBooleanSetting('reduce-motion',reduceMotion);
+  initializeControls();renderSettings();renderInstalledPacks();
+  notify(`Altered loaded for ${character.name}. ${installedPacks.length} private content pack${installedPacks.length===1?'':'s'} available.`);render();
+}
+void boot().catch(error=>{console.error(error);const status=document.querySelector<HTMLElement>('#status-message');if(status)status.textContent=`Altered could not start: ${error instanceof Error?error.message:'Unknown error'}`;});

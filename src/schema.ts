@@ -1,0 +1,241 @@
+import type {Ability,ActionCost,Character,CharacterClass,Creature,CreatureAction,DamagePacket,DamageType,ImportedFeatureRule,ProficiencyRank,ResourcePool,Spell,TransformProfile,TransformationEffects,TransformationGrant} from './types.js';
+import {CREATURES} from './content-registry.js';
+
+const ABILITIES:Ability[]=['str','dex','con','int','wis','cha'];
+const CORE_CLASSES=new Set(['Artificer','Barbarian','Bard','Cleric','Druid','Fighter','Monk','Paladin','Ranger','Rogue','Sorcerer','Warlock','Wizard']);
+const SPECIES=new Set(['Aasimar','Dragonborn','Dwarf','Elf','Gnome','Goliath','Halfling','Human','Orc','Tiefling']);
+const CREATURE_TYPES=['Aberration','Beast','Celestial','Construct','Dragon','Elemental','Fey','Fiend','Giant','Humanoid','Monstrosity','Ooze','Plant','Undead'] as const;
+const canonicalCreatureType=(value:string)=>CREATURE_TYPES.find(type=>type.toLowerCase()===value.trim().toLowerCase())??value.trim();
+const DAMAGE_TYPES=new Set(['Acid','Bludgeoning','Cold','Fire','Force','Lightning','Necrotic','Piercing','Poison','Psychic','Radiant','Slashing','Thunder']);
+const DICE=/^(?:\d{1,3}d\d{1,4}|\d{1,5})(?:[+-](?:\d{1,3}d\d{1,4}|\d{1,5}))*$/i;
+const isObject=(v:unknown):v is Record<string,unknown>=>typeof v==='object'&&v!==null&&!Array.isArray(v);
+const num=(v:unknown,name:string,min:number,max:number):number=>{if(typeof v!=='number'||!Number.isFinite(v)||v<min||v>max)throw new Error(`${name} must be a number from ${min} to ${max}.`);return v};
+const str=(v:unknown,name:string,max=120):string=>{if(typeof v!=='string'||v.trim()===''||v.length>max)throw new Error(`${name} must be non-empty text under ${max} characters.`);return v.trim()};
+const bool=(v:unknown,def=false):boolean=>typeof v==='boolean'?v:def;
+const ACTION_COSTS:ActionCost[]=['action','bonus','reaction','free','magic-action','none'];
+const actionCost=(v:unknown,path:string,defaultValue?:ActionCost):ActionCost=>{
+  if(v==null&&defaultValue)return defaultValue;
+  if(!ACTION_COSTS.includes(v as ActionCost))throw new Error(`${path} must be one of: ${ACTION_COSTS.join(', ')}.`);
+  return v as ActionCost;
+};
+const ability=(v:unknown,name:string):Ability=>{if(!ABILITIES.includes(v as Ability))throw new Error(`${name} must be str, dex, con, int, wis, or cha.`);return v as Ability};
+const rank=(v:unknown):ProficiencyRank=>v===2?2:v===1?1:0;
+
+function parseDamage(v:unknown,path:string):DamagePacket[]{
+  if(v==null)return [];
+  if(!Array.isArray(v))throw new Error(`${path} must be an array.`);
+  return v.map((x,i)=>{if(!isObject(x))throw new Error(`${path}[${i}] must be an object.`);const expression=str(x.expression,`${path}[${i}].expression`,40).replace(/\s+/g,'');if(!DICE.test(expression))throw new Error(`${path}[${i}].expression is not a safe dice expression.`);const type=str(x.type,`${path}[${i}].type`,30);if(!DAMAGE_TYPES.has(type))throw new Error(`${path}[${i}].type is not a supported damage type.`);return {expression,type:type as DamagePacket['type'],...(typeof x.label==='string'?{label:x.label.slice(0,80)}:{}),...(typeof x.doubleOnCritical==='boolean'?{doubleOnCritical:x.doubleOnCritical}:{})};});
+}
+
+const SIZES=new Set(['Tiny','Small','Medium','Large','Huge','Gargantuan']);
+const PROFILES:TransformProfile[]=['wildshape','polymorph','true-polymorph','shapechange','animal-shapes','overlay','custom'];
+const parseDamageTypes=(value:unknown,path:string):DamageType[]=>{
+  if(value==null)return [];
+  if(!Array.isArray(value))throw new Error(`${path} must be an array.`);
+  return [...new Set(value.map((entry,j)=>{const type=str(entry,`${path}[${j}]`,30);if(!DAMAGE_TYPES.has(type))throw new Error(`${path}[${j}] is not a supported damage type.`);return type as DamageType;}))];
+};
+function parseSpeeds(v:unknown,path:string){
+  if(v==null)return {};
+  if(!isObject(v))throw new Error(`${path} must be an object.`);
+  const out:Record<string,number>={};
+  for(const key of ['walk','climb','swim','fly','burrow'])if(v[key]!=null)out[key]=num(v[key],`${path}.${key}`,0,500);
+  return out;
+}
+function parseConditionEffects(v:unknown,path:string){
+  if(v==null)return undefined;
+  if(!Array.isArray(v))throw new Error(`${path} must be an array.`);
+  return v.slice(0,20).map((entry,i)=>{
+    if(!isObject(entry))throw new Error(`${path}[${i}] must be an object.`);
+    const out:{condition:string;duration?:string;escapeDc?:number;targetSizeMax?:string;note?:string}={condition:str(entry.condition,`${path}[${i}].condition`,80)};
+    if(typeof entry.duration==='string')out.duration=entry.duration.slice(0,120);
+    if(typeof entry.escapeDc==='number')out.escapeDc=num(entry.escapeDc,`${path}[${i}].escapeDc`,1,40);
+    if(typeof entry.targetSizeMax==='string')out.targetSizeMax=entry.targetSizeMax.slice(0,30);
+    if(typeof entry.note==='string')out.note=entry.note.slice(0,300);
+    return out;
+  });
+}
+function parseAction(v:unknown,path:string):CreatureAction{
+  if(!isObject(v))throw new Error(`${path} must be an object.`);
+  const id=str(v.id,`${path}.id`);const name=str(v.name,`${path}.name`);const type=str(v.type,`${path}.type`,30);
+  if(type==='attack'){
+    const kind=['beast','weapon','unarmed','spell'].includes(String(v.kind))?v.kind as 'beast'|'weapon'|'unarmed'|'spell':'beast';
+    const out:CreatureAction={id,name,type:'attack',cost:actionCost(v.cost,`${path}.cost`,'action'),attackBonus:num(v.attackBonus,`${path}.attackBonus`,-20,40),ability:ability(v.ability,`${path}.ability`),kind,damage:parseDamage(v.damage,`${path}.damage`)};
+    if(typeof v.reach==='number')out.reach=num(v.reach,`${path}.reach`,0,1000);if(typeof v.range==='string')out.range=v.range.slice(0,80);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);const effects=parseConditionEffects(v.effects,`${path}.effects`);if(effects)out.effects=effects;return out;
+  }
+  if(type==='save'){
+    const out:CreatureAction={id,name,type:'save',cost:actionCost(v.cost,`${path}.cost`,'action'),saveAbility:ability(v.saveAbility,`${path}.saveAbility`),dc:num(v.dc,`${path}.dc`,1,40)};
+    if(typeof v.range==='string')out.range=v.range.slice(0,80);if(v.damageOnFail!=null)out.damageOnFail=parseDamage(v.damageOnFail,`${path}.damageOnFail`);if(v.damageOnSuccess!=null)out.damageOnSuccess=parseDamage(v.damageOnSuccess,`${path}.damageOnSuccess`);const effects=parseConditionEffects(v.effectsOnFail,`${path}.effectsOnFail`);if(effects)out.effectsOnFail=effects;if(isObject(v.recharge))out.recharge={min:num(v.recharge.min,`${path}.recharge.min`,1,6),max:num(v.recharge.max,`${path}.recharge.max`,1,6)};if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);return out;
+  }
+  if(type==='automatic'){
+    const out:CreatureAction={id,name,type:'automatic',cost:actionCost(v.cost,`${path}.cost`,'action')};if(v.damage!=null)out.damage=parseDamage(v.damage,`${path}.damage`);const effects=parseConditionEffects(v.effects,`${path}.effects`);if(effects)out.effects=effects;if(typeof v.prerequisite==='string')out.prerequisite=v.prerequisite.slice(0,300);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);return out;
+  }
+  if(type==='multiattack'){
+    if(!Array.isArray(v.sequence)||v.sequence.length===0||v.sequence.length>20)throw new Error(`${path}.sequence must be a non-empty array under 20 entries.`);
+    return {id,name,type:'multiattack',cost:'action',sequence:v.sequence.map((entry,i)=>str(entry,`${path}.sequence[${i}]`,120)),...(typeof v.notes==='string'?{notes:v.notes.slice(0,500)}:{})};
+  }
+  throw new Error(`${path}.type must be attack, save, automatic, or multiattack.`);
+}
+function parseCreature(v:unknown,i:number):Creature{
+  const path=`customForms[${i}]`;if(!isObject(v))throw new Error(`${path} must be an object.`);
+  const a=v.abilities;if(!isObject(a))throw new Error(`${path}.abilities must be an object.`);
+  const abilities={str:num(a.str,`${path}.abilities.str`,1,30),dex:num(a.dex,`${path}.abilities.dex`,1,30),con:num(a.con,`${path}.abilities.con`,1,30),int:num(a.int,`${path}.abilities.int`,1,30),wis:num(a.wis,`${path}.abilities.wis`,1,30),cha:num(a.cha,`${path}.abilities.cha`,1,30)};
+  const saves:Partial<Record<Ability,number>>={};if(isObject(v.saves))for(const key of ABILITIES)if(typeof v.saves[key]==='number')saves[key]=num(v.saves[key],`${path}.saves.${key}`,-20,40);
+  const skills:Record<string,number>={};if(isObject(v.skills))for(const [key,value] of Object.entries(v.skills)){if(key.length>80)continue;skills[key]=num(value,`${path}.skills.${key}`,-20,40);}
+  const size=str(v.size,`${path}.size`,30);if(!SIZES.has(size))throw new Error(`${path}.size must be a standard creature size.`);
+  const sourceRaw=isObject(v.source)?v.source:{};
+  return {id:str(v.id,`${path}.id`),name:str(v.name,`${path}.name`),type:canonicalCreatureType(str(v.type,`${path}.type`,50)),...(Array.isArray(v.tags)?{tags:v.tags.filter((x):x is string=>typeof x==='string').slice(0,30).map(x=>x.slice(0,60))}:{}),cr:num(v.cr,`${path}.cr`,0,30),size,ac:num(v.ac,`${path}.ac`,1,40),hp:num(v.hp,`${path}.hp`,1,9999),hitDice:str(v.hitDice,`${path}.hitDice`,40),abilities,saves,skills,speeds:parseSpeeds(v.speeds,`${path}.speeds`),senses:Array.isArray(v.senses)?v.senses.filter((x):x is string=>typeof x==='string').slice(0,30).map(x=>x.slice(0,120)):[],resistances:parseDamageTypes(v.resistances,`${path}.resistances`),immunities:parseDamageTypes(v.immunities,`${path}.immunities`),vulnerabilities:parseDamageTypes(v.vulnerabilities,`${path}.vulnerabilities`),...(Array.isArray(v.conditionImmunities)?{conditionImmunities:[...new Set(v.conditionImmunities.filter((x):x is string=>typeof x==='string'&&x.trim().length>0).slice(0,50).map(x=>x.trim().slice(0,80)))]}:{}),traits:Array.isArray(v.traits)?v.traits.filter(isObject).slice(0,50).map((x,j)=>({name:str(x.name,`${path}.traits[${j}].name`),summary:str(x.summary,`${path}.traits[${j}].summary`,500)})):[],actions:Array.isArray(v.actions)?v.actions.slice(0,100).map((x,j)=>parseAction(x,`${path}.actions[${j}]`)):[],artKey:typeof v.artKey==='string'?v.artKey.slice(0,80):'base',source:{ruleset:typeof sourceRaw.ruleset==='string'?sourceRaw.ruleset.slice(0,120):'User-imported content',page:typeof sourceRaw.page==='string'?sourceRaw.page.slice(0,180):'Private character data',verified:typeof sourceRaw.verified==='string'?sourceRaw.verified.slice(0,30):'Unverified'}};
+}
+function parseEffects(v:unknown,path:string):TransformationEffects|undefined{
+  if(v==null)return undefined;if(!isObject(v))throw new Error(`${path} must be an object.`);const out:TransformationEffects={};
+  if(typeof v.size==='string'){const size=v.size.slice(0,30);if(!SIZES.has(size))throw new Error(`${path}.size must be a standard creature size.`);out.size=size;}
+  if(typeof v.creatureType==='string')out.creatureType=canonicalCreatureType(str(v.creatureType,`${path}.creatureType`,50));
+  const parseAbilityMap=(raw:unknown,name:string,min:number,max:number)=>{if(!isObject(raw))return undefined;const result:Partial<Record<Ability,number>>={};for(const key of ABILITIES)if(raw[key]!=null)result[key]=num(raw[key],`${path}.${name}.${key}`,min,max);return result;};
+  const abilitySet=parseAbilityMap(v.abilitySet,'abilitySet',1,30);if(abilitySet)out.abilitySet=abilitySet;const abilityMinimum=parseAbilityMap(v.abilityMinimum,'abilityMinimum',1,30);if(abilityMinimum)out.abilityMinimum=abilityMinimum;const abilityBonus=parseAbilityMap(v.abilityBonus,'abilityBonus',-20,20);if(abilityBonus)out.abilityBonus=abilityBonus;
+  if(v.speedSet!=null)out.speedSet=parseSpeeds(v.speedSet,`${path}.speedSet`);if(v.speedBonus!=null)out.speedBonus=parseSpeeds(v.speedBonus,`${path}.speedBonus`);
+  if(Array.isArray(v.speedEqualToWalk)){const allowed=new Set(['climb','swim','fly','burrow']);out.speedEqualToWalk=[...new Set(v.speedEqualToWalk.map((entry,i)=>{if(typeof entry!=='string'||!allowed.has(entry))throw new Error(`${path}.speedEqualToWalk[${i}] must be climb, swim, fly, or burrow.`);return entry as 'climb'|'swim'|'fly'|'burrow';}))];}
+  if(typeof v.acBonus==='number')out.acBonus=num(v.acBonus,`${path}.acBonus`,-20,20);
+  if(isObject(v.acFormula)){if(!Array.isArray(v.acFormula.abilities)||v.acFormula.abilities.length>3)throw new Error(`${path}.acFormula.abilities must be an array under 4 entries.`);out.acFormula={base:num(v.acFormula.base,`${path}.acFormula.base`,0,30),abilities:v.acFormula.abilities.map((entry,i)=>ability(entry,`${path}.acFormula.abilities[${i}]`))};}
+  out.resistances=parseDamageTypes(v.resistances,`${path}.resistances`);out.immunities=parseDamageTypes(v.immunities,`${path}.immunities`);out.vulnerabilities=parseDamageTypes(v.vulnerabilities,`${path}.vulnerabilities`);
+  if(Array.isArray(v.senses))out.senses=v.senses.filter((x):x is string=>typeof x==='string').slice(0,30).map(x=>x.slice(0,120));if(Array.isArray(v.actions))out.actions=v.actions.slice(0,100).map((x,i)=>parseAction(x,`${path}.actions[${i}]`));
+  if(Array.isArray(v.checkAdvantage))out.checkAdvantage=v.checkAdvantage.map((x,i)=>ability(x,`${path}.checkAdvantage[${i}]`));if(Array.isArray(v.checkDisadvantage))out.checkDisadvantage=v.checkDisadvantage.map((x,i)=>ability(x,`${path}.checkDisadvantage[${i}]`));if(Array.isArray(v.saveAdvantage))out.saveAdvantage=v.saveAdvantage.map((x,i)=>ability(x,`${path}.saveAdvantage[${i}]`));if(Array.isArray(v.saveDisadvantage))out.saveDisadvantage=v.saveDisadvantage.map((x,i)=>ability(x,`${path}.saveDisadvantage[${i}]`));
+  if(Array.isArray(v.conditionImmunities))out.conditionImmunities=[...new Set(v.conditionImmunities.filter((x):x is string=>typeof x==='string'&&Boolean(x.trim())).slice(0,30).map(x=>x.trim().slice(0,80)))];
+  for(const key of ['canSpeak','canCast','canConcentrate','canAttack','canManipulateObjects','endsAtZeroHp','endsAtZeroTemporaryHp','endsOnIncapacitated'] as const)if(typeof v[key]==='boolean')out[key]=v[key];
+  if(isObject(v.attackDamageModifier)){const expression=str(v.attackDamageModifier.expression,`${path}.attackDamageModifier.expression`,40).replace(/\s+/g,'');if(!DICE.test(expression))throw new Error(`${path}.attackDamageModifier.expression is not a safe dice expression.`);const mode=String(v.attackDamageModifier.mode);if(mode!=='add'&&mode!=='subtract')throw new Error(`${path}.attackDamageModifier.mode must be add or subtract.`);if(!Array.isArray(v.attackDamageModifier.appliesTo)||v.attackDamageModifier.appliesTo.length===0)throw new Error(`${path}.attackDamageModifier.appliesTo must list weapon or unarmed.`);const appliesTo=[...new Set(v.attackDamageModifier.appliesTo.map((entry,i)=>{if(entry!=='weapon'&&entry!=='unarmed')throw new Error(`${path}.attackDamageModifier.appliesTo[${i}] must be weapon or unarmed.`);return entry as 'weapon'|'unarmed';}))];const modifier:{expression:string;mode:'add'|'subtract';appliesTo:('weapon'|'unarmed')[];minimumDamage?:number}={expression,mode:mode as 'add'|'subtract',appliesTo};if(v.attackDamageModifier.minimumDamage!==undefined)modifier.minimumDamage=num(v.attackDamageModifier.minimumDamage,`${path}.attackDamageModifier.minimumDamage`,0,999);out.attackDamageModifier=modifier;}
+  if(isObject(v.temporaryHp)){const mode=String(v.temporaryHp.mode);if(!['fixed','form-hp','expression'].includes(mode))throw new Error(`${path}.temporaryHp.mode is unsupported.`);const temp:{mode:'fixed'|'form-hp'|'expression';value?:number;expression?:string}={mode:mode as 'fixed'|'form-hp'|'expression'};if(mode==='fixed')temp.value=num(v.temporaryHp.value,`${path}.temporaryHp.value`,0,9999);if(mode==='expression'){const expression=str(v.temporaryHp.expression,`${path}.temporaryHp.expression`,40).replace(/\s+/g,'');if(!DICE.test(expression))throw new Error(`${path}.temporaryHp.expression is not a safe dice expression.`);temp.expression=expression;}out.temporaryHp=temp;}
+  return out;
+}
+function parseGrant(v:unknown,i:number,forms:Record<string,Creature>):TransformationGrant{
+  const path=`transformationGrants[${i}]`;if(!isObject(v))throw new Error(`${path} must be an object.`);if(!PROFILES.includes(v.profile as TransformProfile))throw new Error(`${path}.profile is unsupported.`);
+  const formIds=Array.isArray(v.formIds)?[...new Set(v.formIds.filter((x):x is string=>typeof x==='string'&&(x in CREATURES||x in forms)))]:[];
+  const out:TransformationGrant={id:str(v.id,`${path}.id`),label:str(v.label,`${path}.label`),profile:v.profile as TransformProfile,formIds,source:str(v.source,`${path}.source`),actionCost:actionCost(v.actionCost,`${path}.actionCost`,'action')};
+  if(v.endActionCost!=null)out.endActionCost=actionCost(v.endActionCost,`${path}.endActionCost`);if(typeof v.duration==='string')out.duration=v.duration.slice(0,120);if(typeof v.resourceId==='string')out.resourceId=v.resourceId.slice(0,120);if(typeof v.resourceCost==='number')out.resourceCost=num(v.resourceCost,`${path}.resourceCost`,1,999);if(typeof v.concentration==='boolean')out.concentration=v.concentration;if(typeof v.spellName==='string')out.spellName=v.spellName.slice(0,120);if(typeof v.spellLevel==='number')out.spellLevel=num(v.spellLevel,`${path}.spellLevel`,0,9);if(typeof v.switchGroup==='string')out.switchGroup=v.switchGroup.slice(0,120);
+  if(Array.isArray(v.availableProfiles))out.availableProfiles=v.availableProfiles.map((entry,j)=>{if(!PROFILES.includes(entry as TransformProfile)&&entry!=='base')throw new Error(`${path}.availableProfiles[${j}] is unsupported.`);return entry as TransformProfile;});
+  if(isObject(v.retention)){out.retention={};for(const key of ['hp','hitDice','mentalAbilities','proficiencies','creatureType','classFeatures','feats','spellcasting','speech'] as const)if(typeof v.retention[key]==='boolean')out.retention[key]=v.retention[key];}
+  const effects=parseEffects(v.effects,`${path}.effects`);if(effects)out.effects=effects;
+  if(out.profile==='custom'&&formIds.length===0&&!out.effects)throw new Error(`${path} custom transformations require a form or explicit effects.`);
+  if(out.profile!=='overlay'&&out.profile!=='custom'&&formIds.length===0)throw new Error(`${path} requires at least one formId.`);
+  return out;
+}
+
+function parseSpell(v:unknown,i:number):Spell{
+  if(!isObject(v))throw new Error(`spells[${i}] must be an object.`);
+  const out:Spell={name:str(v.name,`spells[${i}].name`),level:num(v.level,`spells[${i}].level`,0,9),sourceClass:str(v.sourceClass,`spells[${i}].sourceClass`),ability:ability(v.ability,`spells[${i}].ability`),castingTime:actionCost(v.castingTime,`spells[${i}].castingTime`)};
+  if(typeof v.id==='string')out.id=v.id.slice(0,120);
+  if(typeof v.prepared==='boolean')out.prepared=v.prepared;
+  if(typeof v.concentration==='boolean')out.concentration=v.concentration;
+  if(typeof v.components==='string')out.components=v.components.slice(0,80);
+  if(typeof v.materialCost==='boolean')out.materialCost=v.materialCost;
+  if(typeof v.materialConsumed==='boolean')out.materialConsumed=v.materialConsumed;
+  if(typeof v.attackBonus==='number')out.attackBonus=num(v.attackBonus,`spells[${i}].attackBonus`,-20,30);
+  if(typeof v.saveDc==='number')out.saveDc=num(v.saveDc,`spells[${i}].saveDc`,1,40);
+  if(v.damage!=null)out.damage=parseDamage(v.damage,`spells[${i}].damage`);
+  if(typeof v.healing==='string'){const healing=v.healing.replace(/\s+/g,'').slice(0,40);if(!DICE.test(healing))throw new Error(`spells[${i}].healing is not a safe dice expression.`);out.healing=healing;}
+  if(typeof v.slotLevel==='number')out.slotLevel=num(v.slotLevel,`spells[${i}].slotLevel`,0,9);
+  if(typeof v.summary==='string')out.summary=v.summary.slice(0,300);
+  return out;
+}
+function parseFeature(v:unknown,i:number):ImportedFeatureRule{
+  if(!isObject(v))throw new Error(`features[${i}] must be an object.`);
+  const out:ImportedFeatureRule={id:str(v.id,`features[${i}].id`),name:str(v.name,`features[${i}].name`),source:str(v.source,`features[${i}].source`),summary:str(v.summary,`features[${i}].summary`,500)};
+  if(typeof v.level==='number')out.level=num(v.level,`features[${i}].level`,1,20);
+  if(isObject(v.retention))out.retention={wildshape:bool(v.retention.wildshape),polymorph:bool(v.retention.polymorph),'true-polymorph':bool(v.retention['true-polymorph']),shapechange:bool(v.retention.shapechange),'animal-shapes':bool(v.retention['animal-shapes']),overlay:bool(v.retention.overlay),custom:bool(v.retention.custom)};
+  if(isObject(v.requires))out.requires={spellcasting:bool(v.requires.spellcasting),concentration:bool(v.requires.concentration),speech:bool(v.requires.speech),weapon:bool(v.requires.weapon),unarmed:bool(v.requires.unarmed),strengthAttack:bool(v.requires.strengthAttack),noArmor:bool(v.requires.noArmor),noShield:bool(v.requires.noShield)};
+  if(isObject(v.grants)){
+    const grants:NonNullable<ImportedFeatureRule['grants']>={};
+    if(typeof v.grants.speedBonus==='number')grants.speedBonus=num(v.grants.speedBonus,`features[${i}].grants.speedBonus`,-100,200);
+    const parseTypes=(value:unknown,path:string):DamageType[]=>{
+      if(value==null)return [];
+      if(!Array.isArray(value))throw new Error(`${path} must be an array.`);
+      return [...new Set(value.map((entry,j)=>{const type=str(entry,`${path}[${j}]`,30);if(!DAMAGE_TYPES.has(type))throw new Error(`${path}[${j}] is not a supported damage type.`);return type as DamageType;}))];
+    };
+    if(v.grants.resistances!=null)grants.resistances=parseTypes(v.grants.resistances,`features[${i}].grants.resistances`);
+    if(v.grants.immunities!=null)grants.immunities=parseTypes(v.grants.immunities,`features[${i}].grants.immunities`);
+    if(v.grants.saveBonusAbility!=null)grants.saveBonusAbility=ability(v.grants.saveBonusAbility,`features[${i}].grants.saveBonusAbility`);
+    if(v.grants.saveBonusFromAbility!=null)grants.saveBonusFromAbility=ability(v.grants.saveBonusFromAbility,`features[${i}].grants.saveBonusFromAbility`);
+    if(isObject(v.grants.acFormula)){
+      if(!Array.isArray(v.grants.acFormula.abilities)||v.grants.acFormula.abilities.length>3)throw new Error(`features[${i}].grants.acFormula.abilities must be an array with at most 3 abilities.`);
+      grants.acFormula={base:num(v.grants.acFormula.base,`features[${i}].grants.acFormula.base`,0,30),abilities:v.grants.acFormula.abilities.map((entry,j)=>ability(entry,`features[${i}].grants.acFormula.abilities[${j}]`))};
+    }
+    out.grants=grants;
+  }
+  if(typeof v.activation==='string')out.activation=actionCost(v.activation,`features[${i}].activation`);
+  return out;
+}
+function parseResource(v:unknown,i:number):ResourcePool{
+  if(!isObject(v))throw new Error(`resources[${i}] must be an object.`);
+  const max=num(v.max,`resources[${i}].max`,0,999);const current=num(v.current,`resources[${i}].current`,0,max);
+  const recovery=['short-one','short-all','long-all','manual'].includes(String(v.recovery))?v.recovery as ResourcePool['recovery']:'manual';
+  return {id:str(v.id,`resources[${i}].id`),name:str(v.name,`resources[${i}].name`),current,max,recovery};
+}
+function parseClasses(v:unknown):CharacterClass[]{
+  if(!Array.isArray(v)||v.length===0||v.length>12)throw new Error('classes must be a non-empty array with at most 12 entries.');
+  const seen=new Set<string>();
+  const result=v.map((x,i)=>{if(!isObject(x))throw new Error(`classes[${i}] must be an object.`);const rawName=str(x.name,`classes[${i}].name`);const name=[...CORE_CLASSES].find(value=>value.toLowerCase()===rawName.toLowerCase())??rawName;if(name.length>80)throw new Error(`classes[${i}].name is too long.`);const identity=name.toLowerCase();if(seen.has(identity))throw new Error(`Duplicate class: ${name}.`);seen.add(identity);const c:CharacterClass={name,level:num(x.level,`classes[${i}].level`,1,20)};if(typeof x.subclass==='string'&&x.subclass.trim())c.subclass=x.subclass.trim().slice(0,120);else c.subclass=null;return c;});
+  return result;
+}
+function normalizeProficiencies(v:unknown):Character['proficiencies']{
+  const saves:Partial<Record<Ability,ProficiencyRank>>={};const skills:Record<string,ProficiencyRank>={};
+  if(isObject(v)){
+    if(Array.isArray(v.saves)){for(const s of v.saves){if(typeof s!=='string')continue;const key=s.slice(0,3).toLowerCase() as Ability;if(ABILITIES.includes(key))saves[key]=1;}}
+    else if(isObject(v.saves)){for(const key of ABILITIES)saves[key]=rank(v.saves[key]);}
+    if(Array.isArray(v.skills)){for(const s of v.skills)if(typeof s==='string'&&s.length<80)skills[s]=1;}
+    else if(isObject(v.skills)){for(const [k,val] of Object.entries(v.skills))if(k.length<80)skills[k]=rank(val);}
+  }
+  return {saves,skills};
+}
+function defaultResources(classes:CharacterClass[],abilities:Character['abilities'],species:string,totalLevel:number):ResourcePool[]{
+  const level=(name:string)=>classes.find(c=>c.name.trim().toLowerCase()===name.toLowerCase())?.level??0;const pools:ResourcePool[]=[];
+  const d=level('Druid');if(d>=2){const max=d>=17?4:d>=6?3:2;pools.push({id:'wild-shape',name:'Wild Shape',current:max,max,recovery:'short-one'});}if(d>=5)pools.push({id:'wild-resurgence-slot',name:'Wild Resurgence Slot Exchange',current:1,max:1,recovery:'long-all'});
+  const b=level('Barbarian');if(b){const max=b>=17?6:b>=12?5:b>=6?4:b>=3?3:2;pools.push({id:'rage',name:'Rage',current:max,max,recovery:'short-one'});}
+  const f=level('Fighter');if(f>=1){const max=f>=10?4:f>=4?3:2;pools.push({id:'second-wind',name:'Second Wind',current:max,max,recovery:'short-one'});}if(f>=2){const max=f>=17?2:1;pools.push({id:'action-surge',name:'Action Surge',current:max,max,recovery:'short-all'});}
+  const m=level('Monk');if(m>=2)pools.push({id:'focus',name:'Focus Points',current:m,max:m,recovery:'short-all'});
+  const p=level('Paladin');if(p>=1)pools.push({id:'lay-on-hands',name:'Lay On Hands',current:p*5,max:p*5,recovery:'long-all'});
+  const bard=level('Bard');if(bard){const max=Math.max(1,Math.floor((abilities.cha-10)/2));pools.push({id:'bardic-inspiration',name:'Bardic Inspiration',current:max,max,recovery:bard>=5?'short-all':'long-all'});}
+  const sorcerer=level('Sorcerer');if(sorcerer>=2)pools.push({id:'sorcery-points',name:'Sorcery Points',current:sorcerer,max:sorcerer,recovery:'long-all'});
+  if(species.toLowerCase()==='goliath'&&totalLevel>=5)pools.push({id:'goliath-large-form',name:'Large Form',current:1,max:1,recovery:'long-all'});
+  if(species.toLowerCase()==='dragonborn'&&totalLevel>=5)pools.push({id:'dragonborn-draconic-flight',name:'Draconic Flight',current:1,max:1,recovery:'long-all'});
+  const draconic=classes.find(entry=>entry.name.toLowerCase()==='sorcerer'&&(entry.subclass??'').toLowerCase()==='draconic sorcery');if(draconic&&draconic.level>=14)pools.push({id:'sorcerer-dragon-wings',name:'Dragon Wings',current:1,max:1,recovery:'long-all'});
+  return pools;
+}
+
+export function parseCharacter(input:unknown):Character{
+  if(!isObject(input))throw new Error('Character file must contain one JSON object.');
+  const classes=parseClasses(input.classes);const total=classes.reduce((n,c)=>n+c.level,0);
+  const suppliedTotal=input.totalLevel==null?total:num(input.totalLevel,'totalLevel',1,20);if(suppliedTotal!==total)throw new Error(`totalLevel ${suppliedTotal} does not equal the sum of class levels ${total}.`);
+  const a=input.abilities;if(!isObject(a))throw new Error('abilities must be an object.');
+  const abilities={str:num(a.str,'abilities.str',1,30),dex:num(a.dex,'abilities.dex',1,30),con:num(a.con,'abilities.con',1,30),int:num(a.int,'abilities.int',1,30),wis:num(a.wis,'abilities.wis',1,30),cha:num(a.cha,'abilities.cha',1,30)};
+  const hp=input.hp;if(!isObject(hp))throw new Error('hp must be an object.');const maxHp=num(hp.max,'hp.max',1,9999);const currentHp=num(hp.current,'hp.current',0,maxHp);
+  const speciesRaw=typeof input.species==='string'?input.species:typeof input.race==='string'?input.race:'Human';const parsedSpecies=str(speciesRaw,'species');const species=[...SPECIES].find(value=>value.toLowerCase()===parsedSpecies.toLowerCase())??parsedSpecies;
+  const customForms:Record<string,Creature>={};if(Array.isArray(input.customForms)){for(const [i,raw] of input.customForms.slice(0,200).entries()){const form=parseCreature(raw,i);if(form.id in CREATURES||form.id in customForms)throw new Error(`Duplicate or reserved custom form id: ${form.id}.`);customForms[form.id]=form;}}
+  const hasForm=(id:string)=>id in CREATURES||id in customForms;const formById=(id:string)=>customForms[id]??CREATURES[id];
+  const knownForms=[...new Set(Array.isArray(input.knownForms)?input.knownForms.filter((x):x is string=>typeof x==='string'&&hasForm(x)):[])];
+  const seenForms=[...new Set(Array.isArray(input.seenForms)?input.seenForms.filter((x):x is string=>typeof x==='string'&&hasForm(x)).slice(0,500):knownForms)];
+  const druid=classes.find(c=>c.name.trim().toLowerCase()==='druid');
+  const knownLimit=!druid||druid.level<2?0:druid.level>=8?8:druid.level>=4?6:4;
+  if(knownForms.length>knownLimit)throw new Error(`knownForms contains ${knownForms.length} forms, but this Druid level permits ${knownLimit}.`);
+  if(knownForms.length&&knownLimit===0)throw new Error('knownForms requires a Druid with Wild Shape.');
+  if(druid){
+    const moon=druid.subclass?.trim().toLowerCase()==='circle of the moon'&&druid.level>=3;
+    const maxCr=moon?Math.floor(druid.level/3):druid.level>=8?1:druid.level>=4?.5:.25;
+    const fly=druid.level>=8;
+    for(const id of knownForms){const form=formById(id);if(!form)continue;if(form.type.toLowerCase()!=='beast'||form.cr>maxCr||Boolean(form.speeds.fly)&&!fly)throw new Error(`${form.name} is not a legal known Wild Shape form for this Druid level and subclass.`);}
+  }
+  const defaults=defaultResources(classes,abilities,species,total);const imported=Array.isArray(input.resources)?input.resources.map(parseResource):[];const resourceMap=new Map(defaults.map(r=>[r.id,r]));for(const r of imported)resourceMap.set(r.id,r);const resources=[...resourceMap.values()];
+  const spellSlots:Character['spellSlots']={};if(isObject(input.spellSlots)){for(const [k,v] of Object.entries(input.spellSlots)){if(!/^[1-9]$/.test(k)||!isObject(v))continue;const max=num(v.max,`spellSlots.${k}.max`,0,20);spellSlots[k]={max,current:num(v.current,`spellSlots.${k}.current`,0,max)};}}
+  const equipmentRaw=isObject(input.equipment)?input.equipment:{};const armor=['none','light','medium','heavy'].includes(String(equipmentRaw.armorCategory))?equipmentRaw.armorCategory as Character['equipment']['armorCategory']:'none';const behavior=['merge','drop','wear'].includes(String(equipmentRaw.transformBehavior))?equipmentRaw.transformBehavior as Character['equipment']['transformBehavior']:'merge';
+  const sizeRaw=typeof input.size==='string'?input.size:'Medium';if(!SIZES.has(sizeRaw))throw new Error('size must be a standard creature size.');
+  const creatureType=typeof input.creatureType==='string'?canonicalCreatureType(str(input.creatureType,'creatureType',50)):'Humanoid';
+  const character:Character={schemaVersion:1,id:typeof input.id==='string'?input.id.slice(0,120):cryptoRandomId(),name:str(input.name,'name'),species,creatureType,size:sizeRaw,totalLevel:total,classes,abilities,hp:{current:currentHp,max:maxHp},ac:num(input.ac??10,'ac',1,40),speed:num(input.speed??30,'speed',0,200),proficiencies:normalizeProficiencies(input.proficiencies),knownForms,seenForms,spells:Array.isArray(input.spells)?input.spells.slice(0,200).map(parseSpell):[],spellSlots,feats:Array.isArray(input.feats)?input.feats.filter((x):x is string=>typeof x==='string').slice(0,100).map(x=>x.slice(0,120)):[],features:Array.isArray(input.features)?input.features.slice(0,500).map(parseFeature):[],resources,equipment:{armorCategory:armor,shield:bool(equipmentRaw.shield),transformBehavior:behavior,...(typeof equipmentRaw.formCanWear==='boolean'?{formCanWear:equipmentRaw.formCanWear}:{})},customForms};
+  if(!SPECIES.has(species))character.legacyRace=species;
+  if(isObject(input.skillBonuses))character.skillBonuses=Object.fromEntries(Object.entries(input.skillBonuses).filter(([,v])=>typeof v==='number').map(([k,v])=>[k,Number(v)]));
+  if(isObject(input.saveBonuses)){const out:Partial<Record<Ability,number>>={};for(const key of ABILITIES)if(typeof input.saveBonuses[key]==='number')out[key]=Number(input.saveBonuses[key]);character.saveBonuses=out;}
+  const transformationGrants:Array<TransformationGrant>=Array.isArray(input.transformationGrants)?input.transformationGrants.slice(0,200).map((g,i)=>parseGrant(g,i,customForms)):[];
+  if(species.toLowerCase()==='goliath'&&total>=5&&!transformationGrants.some(g=>g.id==='goliath-large-form'))transformationGrants.push({id:'goliath-large-form',label:'Large Form',profile:'overlay',formIds:[],source:'Goliath species trait',actionCost:'bonus',endActionCost:'none',duration:'10 minutes',resourceId:'goliath-large-form',resourceCost:1,availableProfiles:['base','overlay'],effects:{size:'Large',speedBonus:{walk:10},checkAdvantage:['str']}});
+  if(species.toLowerCase()==='dragonborn'&&total>=5&&!transformationGrants.some(g=>g.id==='dragonborn-draconic-flight'))transformationGrants.push({id:'dragonborn-draconic-flight',label:'Draconic Flight',profile:'overlay',formIds:[],source:'Dragonborn species trait',actionCost:'bonus',endActionCost:'none',duration:'10 minutes',resourceId:'dragonborn-draconic-flight',resourceCost:1,availableProfiles:['base','overlay'],effects:{speedEqualToWalk:['fly'],endsOnIncapacitated:true}});
+  const draconicSorcerer=classes.find(entry=>entry.name.toLowerCase()==='sorcerer'&&(entry.subclass??'').toLowerCase()==='draconic sorcery');if(draconicSorcerer&&draconicSorcerer.level>=14&&!transformationGrants.some(g=>g.id==='sorcerer-dragon-wings'))transformationGrants.push({id:'sorcerer-dragon-wings',label:'Dragon Wings',profile:'overlay',formIds:[],source:'Draconic Sorcery subclass feature',actionCost:'bonus',endActionCost:'none',duration:'1 hour',resourceId:'sorcerer-dragon-wings',resourceCost:1,effects:{speedSet:{fly:60}}});
+  if(transformationGrants.length)character.transformationGrants=transformationGrants;
+  return character;
+}
+
+function cryptoRandomId():string{const uuid=globalThis.crypto?.randomUUID?.();if(uuid)return `character-${uuid}`;return `character-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,12)}`}
+export function safeJsonParse(text:string):unknown{if(text.length>1_000_000)throw new Error('Character file exceeds the 1 MB safety limit.');return JSON.parse(text)}

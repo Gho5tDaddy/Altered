@@ -1,0 +1,18 @@
+{
+  "name": "altered-rules-engine",
+  "version": "0.18.1",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run clean && tsc && node scripts/build.mjs",
+    "serve": "node scripts/serve.mjs",
+    "start": "npm run build && npm run serve",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "verify": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
+  }
+}

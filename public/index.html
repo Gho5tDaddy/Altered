@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#161a1d">
+  <title>Altered — 2024 Transformation Character Sheet</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <div class="brand-mark" aria-hidden="true">A</div>
+      <div class="brand-copy"><h1>ALTERED</h1><p>Rules-aware transformation character sheet</p></div>
+      <div class="top-actions">
+        <button id="open-import-center" class="button secondary" type="button">Import & Content</button>
+        <button id="export-character" class="button secondary" type="button">Export</button>
+        <button id="open-settings" class="button secondary" type="button">Settings</button>
+      </div>
+    </header>
+
+    <section class="character-strip panel">
+      <div>
+        <label for="sample-character">Character</label>
+        <select id="sample-character"></select>
+      </div>
+      <div class="character-title"><strong id="character-name"></strong><span id="character-build"></span></div>
+      <div id="rules-badge" class="rules-badge"></div>
+    </section>
+
+    <main class="main-grid">
+      <section class="sheet panel">
+        <div class="hero-grid">
+          <div id="form-art" class="form-art" aria-live="polite"></div>
+          <div class="transform-panel">
+            <label for="form-select">Choose form</label>
+            <select id="form-select"></select>
+            <div class="transform-buttons">
+              <button id="transform-button" class="button primary" type="button">Transform</button>
+              <button id="end-form-button" class="button secondary" type="button">End Form</button>
+            </div>
+            <div class="art-manager">
+              <label class="button secondary compact file-button">Upload Art<input id="art-file" type="file" accept="image/*"></label>
+              <button id="reset-art" class="button secondary compact" type="button">Reset Art</button>
+              <span id="art-target-label" class="art-target-label"></span>
+            </div>
+            <p id="form-reason" class="helper"></p>
+            <div id="status-message" class="status" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div id="metric-grid" class="metric-grid"></div>
+        <div id="action-economy" class="action-economy"></div>
+        <div id="quick-features" class="quick-features"></div>
+        <div id="resource-strip" class="resource-strip"></div>
+
+        <nav class="tabs" aria-label="Character sheet sections">
+          <button class="tab active" data-tab="actions" type="button">Actions</button>
+          <button class="tab" data-tab="rolls" type="button">Saves & Skills</button>
+          <button class="tab" data-tab="spells" type="button">Spells</button>
+          <button class="tab" data-tab="features" type="button">Features</button>
+          <button class="tab" data-tab="rules" type="button">Why?</button>
+        </nav>
+        <section id="latest-roll" class="latest-roll" aria-live="polite">
+          <div class="latest-roll-copy"><span>Latest result</span><strong id="roll-title">Ready</strong></div>
+          <div class="latest-roll-value"><strong id="roll-total">—</strong><span id="roll-detail">Press an attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically.</span></div>
+        </section>
+        <section id="tab-content" class="tab-content"></section>
+      </section>
+
+      <aside class="side-column">
+        <section class="panel">
+          <h2>Damage Received & Healing</h2>
+          <p class="panel-help">Use this when your character takes damage. Damage dealt by your attacks and spells is rolled from their action buttons.</p>
+          <div class="two-col">
+            <div><label for="damage-amount">Damage received</label><input id="damage-amount" type="number" min="0" value="5"></div>
+            <div><label for="damage-type">Damage type</label><select id="damage-type"></select></div>
+          </div>
+          <div class="two-col button-row"><button id="apply-damage" class="button danger" type="button">Take Damage</button><button id="apply-healing" class="button secondary" type="button">Heal</button></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title"><h2>Turn & Rest</h2><span id="turn-number"></span></div>
+          <div class="two-col button-row"><button id="new-turn" class="button primary" type="button">New Turn</button><button id="end-turn" class="button secondary" type="button">End Turn</button></div>
+          <div class="two-col button-row"><button id="short-rest" class="button secondary" type="button">Short Rest</button><button id="long-rest" class="button secondary" type="button">Long Rest</button></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title"><h2>Conditions</h2><button id="clear-conditions" class="text-button" type="button">Clear</button></div>
+          <div class="two-col"><select id="condition-select"></select><button id="add-condition" class="button secondary" type="button">Add</button></div>
+          <div id="condition-list" class="chip-list"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Recent activity</h2>
+          <div id="activity-log" class="activity-log"></div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+
+
+
+  <dialog id="import-dialog" class="wide-dialog">
+    <div class="dialog-card import-center">
+      <div class="section-title"><h2>Import & Private Content</h2><button id="close-import-center" class="text-button" type="button">Close</button></div>
+      <p class="import-intro">Character data and private owned-content packs are kept separate. Packs stay on this device and are applied only when their character, class, subclass, level, or species match.</p>
+      <div class="import-grid">
+        <section class="import-block">
+          <h3>Character file</h3>
+          <p>Import an Altered character JSON file. Installed matching packs are applied automatically after validation.</p>
+          <label class="button primary file-button">Import Character JSON<input id="import-file" type="file" accept="application/json,.json"></label>
+          <p class="source-note">D&amp;D Beyond can export a form-fillable PDF, but PDFs do not reliably contain every executable rule needed for paid transformations. Altered therefore uses validated JSON for calculations and treats the PDF or owned book as the source you consult while creating a private pack.</p>
+        </section>
+        <section class="import-block">
+          <h3>Owned-content pack</h3>
+          <p>Install private mechanics for subclasses, species, spells, magic items, creature forms, and other transformations. No account credentials or web scraping are used.</p>
+          <label class="button primary file-button">Install Private Pack<input id="owned-pack-file" type="file" accept="application/json,.json"></label>
+          <div class="inline-actions import-actions">
+            <button id="download-pack-template" class="button secondary" type="button">Download Template</button>
+            <button id="open-transform-builder" class="button secondary" type="button">Create Transformation</button>
+          </div>
+        </section>
+      </div>
+      <section class="installed-packs-section">
+        <div class="section-title"><h3>Installed private packs</h3><span id="installed-pack-count"></span></div>
+        <div id="installed-pack-list" class="installed-pack-list"></div>
+      </section>
+      <div id="import-status" class="status" role="status" aria-live="polite"></div>
+    </div>
+  </dialog>
+
+  <dialog id="transform-builder-dialog" class="wide-dialog">
+    <form id="transform-builder-form" class="dialog-card builder-card">
+      <div class="section-title"><h2>Create Private Transformation</h2><button id="close-transform-builder" class="text-button" type="button">Close</button></div>
+      <p class="import-intro">Enter only the mechanical values from content you own. The resulting pack remains local and can be exported as your private backup.</p>
+      <div class="builder-grid">
+        <div><label for="builder-pack-name">Pack name</label><input id="builder-pack-name" value="My Private Transformations" required></div>
+        <div><label for="builder-source">Source reference</label><input id="builder-source" value="Content I own" required></div>
+        <div><label for="builder-label">Transformation name</label><input id="builder-label" required placeholder="Example: Starry Form — Dragon"></div>
+        <div><label for="builder-profile">Rules profile</label><select id="builder-profile"><option value="overlay">Modify current statistics</option><option value="custom">Custom replacement or special form</option><option value="wildshape">Wild Shape replacement</option><option value="polymorph">Polymorph replacement</option><option value="true-polymorph">True Polymorph replacement</option><option value="shapechange">Shapechange replacement</option><option value="animal-shapes">Animal Shapes replacement</option></select></div>
+        <div><label for="builder-retention">Custom form retention</label><select id="builder-retention"><option value="class-form">Retain character and class capabilities</option><option value="wildshape-like">Wild Shape-like; spellcasting blocked</option><option value="full-replacement">Full replacement; retain HP and Hit Dice only</option><option value="shapechange-like">Shapechange-like</option></select></div>
+        <div><label for="builder-action">Activation</label><select id="builder-action"><option value="bonus">Bonus Action</option><option value="action">Action</option><option value="magic-action">Magic action</option><option value="reaction">Reaction</option><option value="free">No action</option></select></div>
+        <div><label for="builder-end-action">End form</label><select id="builder-end-action"><option value="bonus">Bonus Action</option><option value="action">Action</option><option value="none">No action</option></select></div>
+        <div><label for="builder-duration">Duration</label><input id="builder-duration" value="10 minutes"></div>
+        <div><label for="builder-resource-id">Resource ID</label><input id="builder-resource-id" placeholder="Optional, such as wild-shape"></div>
+        <div><label for="builder-resource-cost">Resource cost</label><input id="builder-resource-cost" type="number" min="1" max="99" value="1"></div>
+        <div><label for="builder-resource-max">Resource maximum</label><input id="builder-resource-max" type="number" min="1" max="999" value="1"></div>
+        <div><label for="builder-resource-recovery">Resource recovery</label><select id="builder-resource-recovery"><option value="long-all">Long Rest</option><option value="short-all">Short Rest — all</option><option value="short-one">Short Rest — one</option><option value="manual">Manual</option></select></div>
+        <div><label for="builder-size">Size</label><select id="builder-size"><option value="">Unchanged</option><option>Tiny</option><option>Small</option><option>Medium</option><option>Large</option><option>Huge</option><option>Gargantuan</option></select></div>
+        <div><label for="builder-creature-type">Creature type</label><select id="builder-creature-type"><option value="">Unchanged / retained</option><option>Aberration</option><option>Beast</option><option>Celestial</option><option>Construct</option><option>Dragon</option><option>Elemental</option><option>Fey</option><option>Fiend</option><option>Giant</option><option>Humanoid</option><option>Monstrosity</option><option>Ooze</option><option>Plant</option><option>Undead</option></select></div>
+        <div><label for="builder-ac-bonus">AC bonus</label><input id="builder-ac-bonus" type="number" min="-20" max="20" value="0"></div>
+        <div><label for="builder-temp-hp">Temporary HP</label><input id="builder-temp-hp" type="number" min="0" max="9999" value="0"></div>
+      </div>
+      <h3>Ability changes</h3>
+      <div class="ability-builder-grid">
+        <div><label for="builder-str-set">STR becomes</label><input id="builder-str-set" type="number" min="1" max="30" placeholder="Unchanged"></div>
+        <div><label for="builder-dex-set">DEX becomes</label><input id="builder-dex-set" type="number" min="1" max="30" placeholder="Unchanged"></div>
+        <div><label for="builder-con-set">CON becomes</label><input id="builder-con-set" type="number" min="1" max="30" placeholder="Unchanged"></div>
+        <div><label for="builder-int-set">INT becomes</label><input id="builder-int-set" type="number" min="1" max="30" placeholder="Unchanged"></div>
+        <div><label for="builder-wis-set">WIS becomes</label><input id="builder-wis-set" type="number" min="1" max="30" placeholder="Unchanged"></div>
+        <div><label for="builder-cha-set">CHA becomes</label><input id="builder-cha-set" type="number" min="1" max="30" placeholder="Unchanged"></div>
+      </div>
+      <h3>Movement and defenses</h3>
+      <div class="builder-grid">
+        <div><label for="builder-walk-bonus">Walking speed bonus</label><input id="builder-walk-bonus" type="number" min="0" max="500" value="0"></div>
+        <div><label for="builder-fly-speed">Set flying speed</label><input id="builder-fly-speed" type="number" min="0" max="500" placeholder="None"></div>
+        <div><label for="builder-swim-speed">Set swimming speed</label><input id="builder-swim-speed" type="number" min="0" max="500" placeholder="None"></div>
+        <div><label for="builder-climb-speed">Set climbing speed</label><input id="builder-climb-speed" type="number" min="0" max="500" placeholder="None"></div>
+        <div class="builder-wide"><label for="builder-resistances">Resistances</label><input id="builder-resistances" placeholder="Comma-separated: Necrotic, Poison"></div>
+        <div class="builder-wide"><label for="builder-immunities">Immunities</label><input id="builder-immunities" placeholder="Comma-separated: Frightened is a condition, not a damage type"></div>
+      </div>
+      <h3>Capabilities</h3>
+      <div class="builder-grid">
+        <div><label for="builder-speak">Can speak</label><select id="builder-speak"><option value="inherit">Inherit</option><option value="true">Yes</option><option value="false">No</option></select></div>
+        <div><label for="builder-cast">Can cast spells</label><select id="builder-cast"><option value="inherit">Inherit</option><option value="true">Yes</option><option value="false">No</option></select></div>
+        <div><label for="builder-concentrate">Can concentrate</label><select id="builder-concentrate"><option value="inherit">Inherit</option><option value="true">Yes</option><option value="false">No</option></select></div><div><label for="builder-attack">Can attack</label><select id="builder-attack"><option value="inherit">Inherit</option><option value="true">Yes</option><option value="false">No</option></select></div><div><label for="builder-manipulate">Can manipulate objects</label><select id="builder-manipulate"><option value="inherit">Inherit</option><option value="true">Yes</option><option value="false">No</option></select></div>
+        <div><label for="builder-match">Apply to</label><select id="builder-match"><option value="character">Current character only</option><option value="subclass">Current class and subclass</option><option value="class">Current class</option><option value="all">Every character</option></select></div>
+        <div><label for="builder-match-class">Class used for matching</label><select id="builder-match-class"></select></div>
+      </div>
+      <details class="advanced-builder"><summary>Advanced mechanics JSON</summary><p>Optional values here are merged into the effects object and can define ability minimums or bonuses, AC formulas, actions, senses, saving throw advantages, or other supported effects.</p><textarea id="builder-advanced-effects" rows="8" placeholder='{"abilityMinimum":{"str":18},"saveAdvantage":["wis"]}'></textarea></details>
+      <details class="advanced-builder"><summary>Custom replacement form JSON</summary><p>Required only when the transformation assumes a stat block that is not already in Altered. Enter one private creature object, then reference its ID below.</p><textarea id="builder-custom-form" rows="12" placeholder='{"id":"my-private-form","name":"My Private Form","type":"Undead","cr":5,"size":"Medium","ac":16,"hp":60,"hitDice":"8d8+24","abilities":{"str":16,"dex":14,"con":16,"int":10,"wis":12,"cha":14},"saves":{},"skills":{},"speeds":{"walk":30},"senses":["Darkvision 60 ft."],"resistances":["Necrotic"],"immunities":[],"vulnerabilities":[],"traits":[],"actions":[],"source":{"ruleset":"Private owned content","page":"My book","verified":"User-entered"}}'></textarea>
+        <div><label for="builder-form-id">Replacement form ID</label><input id="builder-form-id" placeholder="Must match the custom form id"></div>
+      </details>
+      <div class="dialog-actions builder-actions"><button id="cancel-transform-builder" class="button secondary" type="button">Cancel</button><button class="button primary" type="submit">Create & Install Pack</button></div>
+      <div id="builder-status" class="status" role="status" aria-live="polite"></div>
+    </form>
+  </dialog>
+
+  <dialog id="settings-dialog">
+    <div class="dialog-card settings-card">
+      <div class="section-title"><h2>Altered Settings</h2><button id="close-settings" class="text-button" type="button">Close</button></div>
+      <label class="setting-row" for="magic-effects-enabled"><span><strong>Magical form aura</strong><small>Keep a subtle changing glow and pulse around the interface while a form is active.</small></span><input id="magic-effects-enabled" type="checkbox"></label>
+      <label class="setting-row" for="reduce-motion"><span><strong>Reduce motion</strong><small>Keep a static transformed glow without pulsing or burst animations.</small></span><input id="reduce-motion" type="checkbox"></label>
+      <div class="settings-data">
+        <h3>Rules databank</h3>
+        <p id="content-registry-summary"></p>
+        <div id="content-pack-list" class="content-pack-list"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="temp-hp-dialog">
+    <form method="dialog" class="dialog-card">
+      <h2>Temporary Hit Points do not stack</h2>
+      <p id="temp-hp-copy"></p>
+      <div class="dialog-actions"><button id="keep-current-thp" class="button secondary" value="cancel" type="button"></button><button id="keep-new-thp" class="button primary" value="default" type="button"></button></div>
+    </form>
+  </dialog>
+
+  <script src="app.bundle.js"></script>
+</body>
+</html>

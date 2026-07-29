@@ -1,0 +1,364 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import type {Character} from '../src/types.js';
+import {CREATURES} from '../src/content-registry.js';
+import {parseCharacter} from '../src/schema.js';
+import {
+  applyCondition,applyDamage,attackBonuses,attackRollSources,availableTransformations,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,declareRecklessAttack,
+  endConcentration,endTransformation,endTurn,extendRage,longRest,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildShapeLimits
+} from '../src/engine.js';
+
+function must<T>(value:T|undefined):T{if(value===undefined)throw new Error('Expected value was missing.');return value}
+function character(overrides:Record<string,unknown>={}):Character{
+  const base:Record<string,unknown>={
+    schemaVersion:1,id:'test',name:'Test Druid',species:'Human',
+    classes:[{name:'Druid',level:6,subclass:'Circle of the Moon'},{name:'Barbarian',level:2}],
+    abilities:{str:12,dex:14,con:16,int:10,wis:18,cha:8},hp:{current:60,max:60},ac:15,speed:30,
+    proficiencies:{saves:{wis:1,int:1},skills:{Perception:1,Athletics:1}},
+    knownForms:['dire-wolf','brown-bear','giant-spider','giant-constrictor-snake','polar-bear','giant-toad'],
+    seenForms:['dire-wolf','brown-bear','giant-spider','giant-constrictor-snake','polar-bear','giant-toad'],
+    spells:[
+      {name:'Moonbeam',level:2,slotLevel:2,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action',concentration:true,damage:[{expression:'2d10',type:'Radiant'}]},
+      {name:'Polymorph',level:4,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action',concentration:true},
+      {name:'Shapechange',level:9,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action',concentration:true}
+    ],
+    spellSlots:{'2':{current:2,max:2},'4':{current:1,max:1},'9':{current:1,max:1}},
+    feats:[],features:[],equipment:{armorCategory:'none',shield:false,transformBehavior:'merge'},
+    ...overrides
+  };
+  if(Object.hasOwn(overrides,'classes')&&!Object.hasOwn(overrides,'knownForms'))base.knownForms=[];
+  return parseCharacter(base);
+}
+
+test('verified 2024 creature golden values are locked',()=>{
+  assert.equal(must(CREATURES['dire-wolf']).hp,22);
+  assert.equal(must(CREATURES['dire-wolf']).ac,14);
+  assert.equal(must(CREATURES['brown-bear']).abilities.dex,12);
+  assert.equal(must(CREATURES['giant-spider']).hp,26);
+  const web=must(CREATURES['giant-spider']).actions.find(a=>a.id==='web');
+  assert.equal(web?.type,'save');
+  assert.equal(web?.type==='save'?web.dc:0,13);
+  const constrict=must(CREATURES['giant-constrictor-snake']).actions.find(a=>a.id==='constrict');
+  assert.equal(constrict?.type,'save');
+  assert.equal(constrict?.type==='save'?constrict.dc:0,14);
+});
+
+test('Moon Druid legal forms use Druid level and known forms',()=>{
+  const c=character();
+  assert.deepEqual(wildShapeLimits(c),{known:6,maxCr:2,fly:false,moon:true});
+  const state=createInitialState(c);
+  const forms=availableTransformations(c,state).filter(o=>o.profile==='wildshape');
+  assert.equal(forms.length,6);
+  assert.ok(forms.some(f=>f.formId==='polar-bear'));
+});
+
+test('Land Druid level 6 rejects illegal known forms and lists legal ones',()=>{
+  assert.throws(()=>character({classes:[{name:'Druid',level:6,subclass:'Circle of the Land'}],totalLevel:6,knownForms:['black-bear','dire-wolf']}),/not a legal known Wild Shape form/);
+  const c=character({classes:[{name:'Druid',level:6,subclass:'Circle of the Land'}],totalLevel:6,knownForms:['black-bear','giant-goat']});
+  const forms=availableTransformations(c,createInitialState(c)).filter(o=>o.profile==='wildshape');
+  assert.deepEqual(forms.map(f=>f.formId).sort(),['black-bear','giant-goat']);
+});
+
+test('Wild Shape merges mental scores, skills, saves, Moon AC, and Moon THP',()=>{
+  const c=character();const state=createInitialState(c);
+  const wolf=availableTransformations(c,state).find(o=>o.formId==='dire-wolf'&&o.profile==='wildshape');
+  assert.ok(wolf);startTransformation(c,state,wolf);
+  const sheet=resolveSheet(c,state);
+  assert.equal(sheet.abilities.str,17);assert.equal(sheet.abilities.wis,18);
+  assert.equal(sheet.ac,17);assert.equal(sheet.acSource,'Circle Forms');assert.equal(state.tempHp,18);
+  assert.equal(must(sheet.skills.Perception).modifier,7); // retained proficiency uses current Wisdom and character PB
+  assert.equal(sheet.saves.con.modifier,6); // beast Con +2, then Improved Circle Forms +4
+});
+
+test('Rage cannot share the same Bonus Action turn with Wild Shape and ends Concentration',()=>{
+  const c=character();const state=createInitialState(c);
+  state.concentration={name:'Moonbeam',source:'Druid'};
+  const result=startRage(c,state);assert.match(result.message,/Rage started/);assert.equal(state.concentration,undefined);
+  const wolf=availableTransformations(c,state).find(o=>o.formId==='dire-wolf'&&o.profile==='wildshape');
+  assert.ok(wolf);const blocked=startTransformation(c,state,wolf);assert.match(blocked.message,/Bonus Action already used/);
+});
+
+test('failed transformation does not spend action or resource',()=>{
+  const c=character();const state=createInitialState(c);must(state.resources['wild-shape']).current=0;
+  const option={id:'x',label:'Dire Wolf',profile:'wildshape' as const,formId:'dire-wolf',source:'Wild Shape',actionCost:'bonus' as const,usable:true};
+  const result=startTransformation(c,state,option);assert.match(result.message,/No Wild Shape/);
+  assert.equal(state.turn.bonusRemaining,1);assert.equal(must(state.resources['wild-shape']).current,0);
+});
+
+test('switching Wild Shape directly is legal and spends another use',()=>{
+  const c=character();const state=createInitialState(c);
+  const options=availableTransformations(c,state);const wolf=options.find(o=>o.formId==='dire-wolf'&&o.profile==='wildshape');assert.ok(wolf);
+  startTransformation(c,state,wolf);assert.equal(must(state.resources['wild-shape']).current,2);
+  state.turn.bonusRemaining=1;
+  const bear=availableTransformations(c,state).find(o=>o.formId==='brown-bear'&&o.profile==='wildshape');assert.ok(bear);
+  state.tempHp=5;state.tempHpSource='Dire Wolf';const result=startTransformation(c,state,bear);assert.equal(result.choice,undefined);assert.equal(state.tempHp,18);assert.equal(state.tempHpSource,'Brown Bear');assert.equal(state.activeTransform?.option.formId,'brown-bear');assert.equal(must(state.resources['wild-shape']).current,1);
+});
+
+test('voluntary Wild Shape exit costs a Bonus Action',()=>{
+  const c=character();const state=createInitialState(c);const wolf=availableTransformations(c,state).find(o=>o.formId==='dire-wolf'&&o.profile==='wildshape');assert.ok(wolf);
+  startTransformation(c,state,wolf);state.turn.bonusRemaining=0;
+  assert.match(endTransformation(state,true).message,/Bonus Action already used/);
+  assert.ok(state.activeTransform);
+});
+
+test('Polymorph ends automatically when transformation THP reaches zero',()=>{
+  const c=character({classes:[{name:'Wizard',level:8}],totalLevel:8});const state=createInitialState(c);
+  const option=availableTransformations(c,state).find(o=>o.profile==='polymorph'&&o.formId==='dire-wolf');assert.ok(option);
+  startTransformation(c,state,option);assert.equal(state.tempHp,22);const sheet=resolveSheet(c,state);
+  applyDamage(state,sheet,22,'Force');assert.equal(state.activeTransform,undefined);assert.equal(state.concentration,undefined);
+});
+
+test('Shapechange retains spellcasting but Polymorph does not',()=>{
+  const c=character({classes:[{name:'Wizard',level:17}],totalLevel:17});
+  const shapeState=createInitialState(c);const shape=availableTransformations(c,shapeState).find(o=>o.profile==='shapechange'&&o.formId==='polar-bear');assert.ok(shape);startTransformation(c,shapeState,shape);assert.equal(resolveSheet(c,shapeState).canCast,true);
+  const polyState=createInitialState(c);const poly=availableTransformations(c,polyState).find(o=>o.profile==='polymorph'&&o.formId==='polar-bear');assert.ok(poly);startTransformation(c,polyState,poly);assert.equal(resolveSheet(c,polyState).canCast,false);
+});
+
+test('Rage resistance applies damage after resistance and before HP',()=>{
+  const c=character();const state=createInitialState(c);startRage(c,state);const sheet=resolveSheet(c,state);
+  applyDamage(state,sheet,9,'Slashing');assert.equal(state.hp,56);
+});
+
+test('Reckless Attack must be declared and advantage/disadvantage can cancel',()=>{
+  const c=character();const state=createInitialState(c);startRage(c,state);assert.match(declareRecklessAttack(c,state).message,/declared/);
+  assert.equal(state.rage.recklessDeclared,true);
+});
+
+test('Moonbeam is visible and castable in Moon Wild Shape, but Rage blocks it',()=>{
+  const c=character();const state=createInitialState(c);const wolf=availableTransformations(c,state).find(o=>o.formId==='dire-wolf'&&o.profile==='wildshape');assert.ok(wolf);startTransformation(c,state,wolf);
+  const moonbeam=resolveSheet(c,state).spells.find(s=>s.name==='Moonbeam');assert.equal(moonbeam?.available,true);
+  state.turn.bonusRemaining=1;startRage(c,state);assert.equal(resolveSheet(c,state).spells.find(s=>s.name==='Moonbeam')?.available,false);
+});
+
+test('castSpell consumes action, slot, and starts Concentration',()=>{
+  const c=character();const state=createInitialState(c);const result=castSpell(c,state,'Moonbeam');assert.match(result.message,/Cast Moonbeam/);
+  assert.equal(state.turn.actionsRemaining,0);assert.equal(must(state.spellSlots['2']).current,1);assert.equal(state.concentration?.name,'Moonbeam');
+});
+
+
+test('Reckless Attack can be declared without Rage',()=>{
+  const c=character();const state=createInitialState(c);const result=declareRecklessAttack(c,state);assert.match(result.message,/declared/);assert.equal(state.rage.recklessDeclared,true);
+});
+
+test('Action Surge is limited to once per turn',()=>{
+  const c=character({classes:[{name:'Fighter',level:17}],totalLevel:17});const state=createInitialState(c);assert.match(useActionSurge(c,state).message,/added one action/);assert.match(useActionSurge(c,state).message,/only once/);assert.equal(state.turn.surgeActionsRemaining,1);
+});
+
+test('ending Polymorph clears its transformation THP',()=>{
+  const c=character({classes:[{name:'Wizard',level:8}],totalLevel:8});const state=createInitialState(c);const option=availableTransformations(c,state).find(o=>o.profile==='polymorph'&&o.formId==='dire-wolf');assert.ok(option);startTransformation(c,state,option);assert.equal(state.tempHp,22);const result=endTransformation(state,true);assert.match(result.message,/Base Form/);assert.equal(state.tempHp,0);
+});
+
+
+test('ordinary Bonus Actions do not extend Rage; the explicit extend action does',()=>{
+  const c=character();const state=createInitialState(c);startRage(c,state);startNewTurn(state);
+  spendActionCost(state,'bonus');assert.equal(state.rage.extendedThisTurn,false);
+  assert.match(endTurn(c,state).message,/not extended/);assert.equal(state.rage.active,false);
+  const next=createInitialState(c);startRage(c,next);startNewTurn(next);assert.match(extendRage(c,next).message,/extended/);assert.equal(next.rage.extendedThisTurn,true);assert.match(endTurn(c,next).message,/ended\./);assert.equal(next.rage.active,true);
+});
+
+test('Persistent Rage does not require round-by-round extension and ends on Unconscious',()=>{
+  const c=character({classes:[{name:'Barbarian',level:15}],totalLevel:15});const state=createInitialState(c);startRage(c,state);startNewTurn(state);assert.equal(endTurn(c,state).message,'Turn 2 ended.');assert.equal(state.rage.active,true);
+  applyCondition(c,state,'Incapacitated');assert.equal(state.rage.active,true);
+  applyCondition(c,state,'Unconscious');assert.equal(state.rage.active,false);
+});
+
+test('Incapacitated ends Wild Shape and Concentration',()=>{
+  const c=character();const state=createInitialState(c);const wolf=availableTransformations(c,state).find(o=>o.profile==='wildshape'&&o.formId==='dire-wolf');assert.ok(wolf);startTransformation(c,state,wolf);state.concentration={name:'Moonbeam',source:'Druid'};
+  applyCondition(c,state,'Incapacitated');assert.equal(state.activeTransform,undefined);assert.equal(state.concentration,undefined);
+});
+
+test('damage queues separate Concentration checks and failure ends the effect',()=>{
+  const c=character();const state=createInitialState(c);state.concentration={name:'Moonbeam',source:'Druid'};const sheet=resolveSheet(c,state);
+  applyDamage(state,sheet,5,'Force');applyDamage(state,sheet,22,'Fire');assert.deepEqual(state.concentrationChecks.map(x=>x.dc),[10,11]);
+  assert.match(resolveConcentrationCheck(state,15).message,/maintained/);assert.equal(state.concentrationChecks.length,1);assert.ok(state.concentration);
+  assert.match(resolveConcentrationCheck(state,3).message,/failed/);assert.equal(state.concentration,undefined);assert.equal(state.concentrationChecks.length,0);
+});
+
+test('War Caster and imported Eldritch Mind affect Concentration roll mode',()=>{
+  const c=character({feats:['War Caster'],features:[{id:'eldritch-mind',name:'Eldritch Mind',source:'Invocation',summary:'Advantage on Concentration saves.'}]});const state=createInitialState(c);
+  assert.equal(concentrationSaveMode(c,state).mode,'advantage');state.conditions.push('Poisoned');assert.equal(concentrationSaveMode(c,state).mode,'advantage');
+});
+
+test('Beast Spells does not make an unprepared spell available',()=>{
+  const c=character({classes:[{name:'Druid',level:18,subclass:'Circle of the Land'}],totalLevel:18,knownForms:['dire-wolf'],spells:[{name:'Cure Wounds',level:1,sourceClass:'Druid',ability:'wis',prepared:false,castingTime:'magic-action'}]});const state=createInitialState(c);const wolf=availableTransformations(c,state).find(o=>o.profile==='wildshape');assert.ok(wolf);startTransformation(c,state,wolf);assert.equal(resolveSheet(c,state).spells[0]?.available,false);
+});
+
+test('Rage and Danger Sense add save advantages and Primal Knowledge adds Strength alternatives',()=>{
+  const c=character({classes:[{name:'Barbarian',level:3},{name:'Druid',level:2,subclass:'Circle of the Land'}],totalLevel:5,knownForms:['constrictor-snake']});const state=createInitialState(c);startRage(c,state);const sheet=resolveSheet(c,state);
+  assert.ok(sheet.saves.str.advantageSources?.includes('Rage'));assert.ok(sheet.saves.dex.advantageSources?.includes('Danger Sense'));assert.ok(must(sheet.skills.Perception).alternate);
+});
+
+test('Wild Resurgence enforces once-per-turn and once-per-long-rest exchanges',()=>{
+  const c=character();const state=createInitialState(c);must(state.resources['wild-shape']).current=0;
+  assert.match(useWildResurgence(c,state,'slot-to-shape').message,/regain one Wild Shape/);must(state.resources['wild-shape']).current=0;assert.match(useWildResurgence(c,state,'slot-to-shape').message,/only once on a turn/);
+  startNewTurn(state);must(state.resources['wild-shape']).current=1;must(state.spellSlots['1']??(state.spellSlots['1']={current:0,max:1})).current=0;assert.match(useWildResurgence(c,state,'shape-to-slot').message,/regain a level 1/);must(state.resources['wild-shape']).current=1;assert.match(useWildResurgence(c,state,'shape-to-slot').message,/Long Rest/);
+});
+
+test('Second Wind and Lay On Hands spend resources and respect Bonus Actions',()=>{
+  const fighter=character({classes:[{name:'Fighter',level:5}],totalLevel:5,hp:{current:20,max:50}});const fs=createInitialState(fighter);assert.match(useSecondWind(fighter,fs,6).message,/restored 11/);assert.equal(fs.hp,31);assert.equal(fs.turn.bonusRemaining,0);
+  const paladin=character({classes:[{name:'Paladin',level:4}],totalLevel:4,hp:{current:10,max:40}});const ps=createInitialState(paladin);assert.match(useLayOnHands(paladin,ps,12).message,/restored 12/);assert.equal(ps.hp,22);assert.equal(must(ps.resources['lay-on-hands']).current,8);
+});
+
+test('conditions block actions, zero speed, and apply automatic save effects',()=>{
+  const c=character();const state=createInitialState(c);applyCondition(c,state,'Stunned');const sheet=resolveSheet(c,state);
+  assert.equal(sheet.speeds.walk,0);assert.ok(sheet.saves.str.automaticFailure);assert.ok(sheet.saves.dex.automaticFailure);
+  assert.match(startRage(c,state).message,/Incapacitated/);
+});
+
+test('Restrained affects Dexterity saves while Poisoned affects checks and attacks, not Concentration saves',()=>{
+  const c=character();const state=createInitialState(c);state.conditions.push('Restrained','Poisoned','Blinded','Prone');const sheet=resolveSheet(c,state);
+  assert.ok(sheet.saves.dex.disadvantageSources?.includes('Restrained'));
+  assert.ok(must(sheet.skills.Perception).disadvantageSources?.includes('Poisoned'));
+  const bite=must(CREATURES['dire-wolf']).actions.find(a=>a.id==='bite');assert.ok(bite);assert.deepEqual(attackRollSources(c,state,bite).mode,'disadvantage');
+  assert.equal(concentrationSaveMode(c,state).mode,'normal');
+});
+
+test('Concentration DC is capped at 30',()=>{assert.equal(concentrationCheckDc(200),30);assert.equal(concentrationCheckDc(21),10);assert.equal(concentrationCheckDc(22),11);});
+
+test('Polymorph lists bundled legal Beasts without requiring seenForms',()=>{
+  const c=character({classes:[{name:'Wizard',level:8}],totalLevel:8,seenForms:[]});const forms=availableTransformations(c,createInitialState(c)).filter(o=>o.profile==='polymorph');assert.ok(forms.some(o=>o.formId==='dire-wolf'));
+});
+
+test('Short Rest ends Rage and Long Rest preserves unresolved conditions',()=>{
+  const c=character();const state=createInitialState(c);startRage(c,state);state.conditions.push('Poisoned');shortRest(state);assert.equal(state.rage.active,false);longRest(c,state);assert.ok(state.conditions.includes('Poisoned'));
+});
+
+test('new Temporary Hit Points always require a choice when a pool already exists',()=>{
+  const c=character();const state=createInitialState(c);state.tempHp=30;state.tempHpSource='Aid-like effect';const wolf=availableTransformations(c,state).find(o=>o.profile==='wildshape'&&o.formId==='dire-wolf');assert.ok(wolf);const result=startTransformation(c,state,wolf);assert.equal(result.choice?.current,30);assert.equal(result.choice?.incoming,18);assert.equal(state.tempHp,30);
+});
+
+test('Primal Strike is not invented unless selected on the imported sheet',()=>{
+  const base=character({classes:[{name:'Druid',level:8,subclass:'Circle of the Land'}],totalLevel:8,knownForms:['dire-wolf']});const state=createInitialState(base);const wolf=availableTransformations(base,state).find(o=>o.profile==='wildshape');assert.ok(wolf);startTransformation(base,state,wolf);const bite=resolveSheet(base,state).actions.find(a=>a.id==='bite');assert.ok(bite);assert.equal(attackBonuses(base,state,resolveSheet(base,state),bite).some(p=>p.label?.includes('Primal Strike')),false);
+});
+
+test('Wild Shape Temporary Hit Points vanish when the form ends or Incapacitation ends it',()=>{
+  const c=character();const state=createInitialState(c);const wolf=availableTransformations(c,state).find(o=>o.profile==='wildshape'&&o.formId==='dire-wolf');assert.ok(wolf);
+  startTransformation(c,state,wolf);assert.equal(state.tempHp,18);state.turn.bonusRemaining=1;endTransformation(state,true,c);assert.equal(state.tempHp,0);assert.equal(state.tempHpSource,undefined);
+  state.turn.bonusRemaining=1;const again=availableTransformations(c,state).find(o=>o.profile==='wildshape'&&o.formId==='dire-wolf');assert.ok(again);startTransformation(c,state,again);applyCondition(c,state,'Stunned');assert.equal(state.activeTransform,undefined);assert.equal(state.tempHp,0);
+});
+
+test('Shapechange grants form HP as Temporary HP only for the first form and does not end at zero',()=>{
+  const c=character({classes:[{name:'Wizard',level:17}],totalLevel:17});const state=createInitialState(c);
+  const first=availableTransformations(c,state).find(o=>o.profile==='shapechange'&&o.formId==='polar-bear');assert.ok(first);startTransformation(c,state,first);assert.equal(state.tempHp,42);
+  startNewTurn(state);const second=availableTransformations(c,state).find(o=>o.profile==='shapechange'&&o.formId==='dire-wolf');assert.ok(second);startTransformation(c,state,second);assert.equal(state.tempHp,42);
+  applyDamage(state,resolveSheet(c,state),42,'Force',c);assert.ok(state.activeTransform);assert.equal(state.tempHp,0);assert.ok(state.concentration);
+  endConcentration(state,'Test ended.',c);assert.equal(state.activeTransform,undefined);assert.equal(state.tempHp,0);
+});
+
+test('Animal Shapes switches forms without refreshing Temporary HP and zero THP does not end it',()=>{
+  const c=character({classes:[{name:'Druid',level:15}],totalLevel:15,spells:[{name:'Animal Shapes',level:8,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action'}],spellSlots:{'8':{current:1,max:1}}});const state=createInitialState(c);
+  const first=availableTransformations(c,state).find(o=>o.profile==='animal-shapes'&&o.formId==='polar-bear');assert.ok(first);startTransformation(c,state,first);assert.equal(state.tempHp,42);assert.equal(state.concentration,undefined);
+  startNewTurn(state);const second=availableTransformations(c,state).find(o=>o.profile==='animal-shapes'&&o.formId==='dire-wolf');assert.ok(second);startTransformation(c,state,second);assert.equal(state.tempHp,42);
+  applyDamage(state,resolveSheet(c,state),42,'Force',c);assert.ok(state.activeTransform);assert.equal(state.activeTransform?.option.profile,'animal-shapes');
+});
+
+test('True Polymorph supports non-Beast private forms and does not end when THP reaches zero',()=>{
+  const c=character({classes:[{name:'Wizard',level:17}],totalLevel:17,spells:[{name:'True Polymorph',level:9,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true}],spellSlots:{'9':{current:1,max:1}},customForms:[{id:'private-fiend',name:'Private Fiend',type:'Fiend',cr:10,size:'Large',ac:17,hp:95,hitDice:'10d10+40',abilities:{str:20,dex:14,con:18,int:12,wis:14,cha:16},saves:{},skills:{},speeds:{walk:40},senses:['Darkvision 120 ft.'],resistances:['Fire'],immunities:[],vulnerabilities:[],traits:[],actions:[],source:{ruleset:'Private',page:'Owned content',verified:'User-entered'}}]});const state=createInitialState(c);
+  const option=availableTransformations(c,state).find(o=>o.profile==='true-polymorph'&&o.formId==='private-fiend');assert.ok(option);startTransformation(c,state,option);assert.equal(state.tempHp,95);assert.equal(resolveSheet(c,state).canCast,false);
+  applyDamage(state,resolveSheet(c,state),95,'Force',c);assert.ok(state.activeTransform);assert.equal(state.tempHp,0);
+});
+
+test('Alter Self exposes all natural-weapon damage choices and switches without another slot',()=>{
+  const c=character({classes:[{name:'Wizard',level:5}],totalLevel:5,spells:[{name:'alter self',level:2,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true}],spellSlots:{'2':{current:1,max:1}}});const state=createInitialState(c);
+  const options=availableTransformations(c,state);assert.ok(options.some(o=>o.id==='spell:alter-self:weapons-slashing'));assert.ok(options.some(o=>o.id==='spell:alter-self:weapons-piercing'));assert.ok(options.some(o=>o.id==='spell:alter-self:weapons-bludgeoning'));
+  const slash=options.find(o=>o.id==='spell:alter-self:weapons-slashing');assert.ok(slash);startTransformation(c,state,slash);assert.equal(state.spellSlots['2']?.current,0);startNewTurn(state);
+  const pierce=availableTransformations(c,state).find(o=>o.id==='spell:alter-self:weapons-piercing');assert.ok(pierce);startTransformation(c,state,pierce);assert.equal(state.spellSlots['2']?.current,0);assert.ok(resolveSheet(c,state).actions.some(a=>a.id.includes('piercing')));
+});
+
+test('Enlarge and Reduce apply size, Strength modes, and attack-damage modifiers',()=>{
+  const c=character({classes:[{name:'Wizard',level:5}],totalLevel:5,spells:[{name:'Enlarge/Reduce',level:2,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true}],spellSlots:{'2':{current:2,max:2}}});const enlargeState=createInitialState(c);const enlarge=availableTransformations(c,enlargeState).find(o=>o.id==='spell:enlarge-reduce:enlarge');assert.ok(enlarge);startTransformation(c,enlargeState,enlarge);let sheet=resolveSheet(c,enlargeState);assert.equal(sheet.size,'Large');assert.ok(sheet.saves.str.advantageSources?.length);const unarmed=sheet.actions.find(a=>a.type==='attack'&&a.kind==='unarmed');assert.ok(unarmed);assert.ok(attackBonuses(c,enlargeState,sheet,unarmed).some(p=>p.expression==='1d4'));
+  const reduceState=createInitialState(c);const reduce=availableTransformations(c,reduceState).find(o=>o.id==='spell:enlarge-reduce:reduce');assert.ok(reduce);startTransformation(c,reduceState,reduce);sheet=resolveSheet(c,reduceState);assert.equal(sheet.size,'Small');assert.ok(sheet.saves.str.disadvantageSources?.length);const reduced=sheet.actions.find(a=>a.type==='attack'&&a.kind==='unarmed');assert.ok(reduced);const penalty=attackBonuses(c,reduceState,sheet,reduced).find(p=>p.label?.startsWith('Reduce'));assert.equal(penalty?.expression,'-1d4');assert.equal(penalty?.doubleOnCritical,false);
+});
+
+test('Gaseous Form blocks ordinary actions, grants immunity to Prone, and ends at 0 HP',()=>{
+  const c=character({classes:[{name:'Wizard',level:5}],totalLevel:5,hp:{current:8,max:8},spells:[{name:'Gaseous Form',level:3,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true}],spellSlots:{'3':{current:1,max:1}}});const state=createInitialState(c);const gaseous=availableTransformations(c,state).find(o=>o.id==='spell:gaseous-form');assert.ok(gaseous);startTransformation(c,state,gaseous);let sheet=resolveSheet(c,state);assert.equal(sheet.canAttack,false);assert.equal(sheet.canCast,false);assert.equal(sheet.canSpeak,false);assert.equal(sheet.speeds.fly,10);assert.equal(sheet.actions.length,1);assert.equal(sheet.actions[0]?.id,'gaseous-form-dash');assert.match(applyCondition(c,state,'Prone').message,/immune/);assert.equal(state.conditions.includes('Prone'),false);
+  applyDamage(state,sheet,8,'Force',c);sheet=resolveSheet(c,state);assert.equal(state.overlays.includes('spell:gaseous-form'),false);assert.equal(state.concentration,undefined);assert.equal(sheet.canAttack,true);
+});
+
+test('private overlay mechanics can end at zero HP without hard-coded spell identifiers',()=>{
+  const c=character({transformationGrants:[{id:'private-mist',label:'Private Mist',profile:'overlay',formIds:[],source:'Owned content',actionCost:'bonus',endActionCost:'none',effects:{canAttack:false,endsAtZeroHp:true}}]});const state=createInitialState(c);state.hp=1;const option=availableTransformations(c,state).find(o=>o.grantId==='private-mist');assert.ok(option);startTransformation(c,state,option);assert.ok(state.overlays.includes('private-mist'));applyDamage(state,resolveSheet(c,state),1,'Force',c);assert.equal(state.overlays.includes('private-mist'),false);
+});
+
+
+test('a spellcasting-valid transformed form can replace Shapechange with Polymorph',()=>{
+  const c=character({classes:[{name:'Wizard',level:17}],totalLevel:17,spells:[
+    {name:'Polymorph',level:4,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true},
+    {name:'Shapechange',level:9,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true}
+  ],spellSlots:{'4':{current:1,max:1},'9':{current:1,max:1}}});
+  const state=createInitialState(c);const shape=availableTransformations(c,state).find(o=>o.profile==='shapechange'&&o.formId==='polar-bear');assert.ok(shape);startTransformation(c,state,shape);assert.equal(state.concentration?.name,'Shapechange');
+  startNewTurn(state);const poly=availableTransformations(c,state).find(o=>o.profile==='polymorph'&&o.formId==='dire-wolf');assert.ok(poly);assert.equal(poly.usable,true);const result=startTransformation(c,state,poly);assert.equal(result.choice,undefined);assert.equal(state.activeTransform?.option.profile,'polymorph');assert.equal(state.concentration?.name,'Polymorph');assert.equal(state.tempHp,22);
+});
+
+test('True Polymorph can complete its full hour without ending the transformed state',()=>{
+  const privateForm={id:'private-undead',name:'Private Undead',type:'undead',cr:10,size:'Medium',ac:16,hp:80,hitDice:'10d8+30',abilities:{str:16,dex:14,con:16,int:10,wis:12,cha:14},saves:{},skills:{},speeds:{walk:30},senses:['Darkvision 60 ft.'],resistances:['Necrotic'],immunities:[],vulnerabilities:[],traits:[],actions:[],artKey:'base',source:{ruleset:'Private',page:'Owned content',verified:'User-entered'}};
+  const c=character({classes:[{name:'Wizard',level:17}],totalLevel:17,customForms:[privateForm],seenForms:['private-undead'],spells:[{name:'True Polymorph',level:9,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true}],spellSlots:{'9':{current:1,max:1}}});
+  const state=createInitialState(c);const option=availableTransformations(c,state).find(o=>o.profile==='true-polymorph'&&o.formId==='private-undead');assert.ok(option);startTransformation(c,state,option);assert.equal(resolveSheet(c,state).creatureType,'Undead');const result=completeTruePolymorph(state);assert.match(result.message,/lasts until dispelled/);assert.equal(state.concentration,undefined);assert.equal(state.activeTransform?.permanentUntilDispelled,true);assert.equal(state.activeTransform?.duration,'Until dispelled');assert.equal(state.activeTransform?.option.formId,'private-undead');
+});
+
+test('official replacement profiles retain or replace creature type correctly',()=>{
+  const c=character({creatureType:'Humanoid'});const wildState=createInitialState(c);const wolf=availableTransformations(c,wildState).find(o=>o.profile==='wildshape'&&o.formId==='dire-wolf');assert.ok(wolf);startTransformation(c,wildState,wolf);assert.equal(resolveSheet(c,wildState).creatureType,'Humanoid');
+  const wizard=character({classes:[{name:'Wizard',level:17}],totalLevel:17,creatureType:'Humanoid'});const polyState=createInitialState(wizard);const poly=availableTransformations(wizard,polyState).find(o=>o.profile==='polymorph'&&o.formId==='dire-wolf');assert.ok(poly);startTransformation(wizard,polyState,poly);assert.equal(resolveSheet(wizard,polyState).creatureType,'Humanoid');
+  const shapeState=createInitialState(wizard);const shape=availableTransformations(wizard,shapeState).find(o=>o.profile==='shapechange'&&o.formId==='dire-wolf');assert.ok(shape);startTransformation(wizard,shapeState,shape);assert.equal(resolveSheet(wizard,shapeState).creatureType,'Humanoid');
+  const druid=character({classes:[{name:'Druid',level:15}],totalLevel:15,creatureType:'Humanoid',spells:[{name:'Animal Shapes',level:8,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action'}],spellSlots:{'8':{current:1,max:1}}});const animalState=createInitialState(druid);const animal=availableTransformations(druid,animalState).find(o=>o.profile==='animal-shapes'&&o.formId==='dire-wolf');assert.ok(animal);startTransformation(druid,animalState,animal);assert.equal(resolveSheet(druid,animalState).creatureType,'Humanoid');
+});
+
+test('Animal Shapes can be cast from a form that validly retains spellcasting',()=>{
+  const c=character({classes:[{name:'Druid',level:18,subclass:'Circle of the Land'}],totalLevel:18,knownForms:['dire-wolf'],spells:[{name:'Animal Shapes',level:8,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action'}],spellSlots:{'8':{current:1,max:1}}});const state=createInitialState(c);
+  const wolf=availableTransformations(c,state).find(o=>o.profile==='wildshape'&&o.formId==='dire-wolf');assert.ok(wolf);startTransformation(c,state,wolf);
+  const animal=availableTransformations(c,state).find(o=>o.profile==='animal-shapes'&&o.formId==='brown-bear');assert.ok(animal);assert.equal(animal.usable,true);startTransformation(c,state,animal);assert.equal(state.activeTransform?.option.profile,'animal-shapes');assert.equal(state.spellSlots['8']?.current,0);
+});
+
+test('permanent True Polymorph requires an external ending event',()=>{
+  const privateForm={id:'private-fiend-external',name:'Private Fiend',type:'Fiend',cr:10,size:'Medium',ac:16,hp:80,hitDice:'10d8+30',abilities:{str:16,dex:14,con:16,int:10,wis:12,cha:14},saves:{},skills:{},speeds:{walk:30},senses:[],resistances:[],immunities:[],vulnerabilities:[],traits:[],actions:[],source:{ruleset:'Private',page:'Owned content',verified:'User-entered'}};
+  const c=character({classes:[{name:'Wizard',level:17}],totalLevel:17,customForms:[privateForm],spells:[{name:'True Polymorph',level:9,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true}],spellSlots:{'9':{current:1,max:1}}});const state=createInitialState(c);const option=availableTransformations(c,state).find(o=>o.profile==='true-polymorph'&&o.formId==='private-fiend-external');assert.ok(option);startTransformation(c,state,option);completeTruePolymorph(state);
+  assert.match(endTransformation(state,true,c).message,/cannot be ended voluntarily/);assert.ok(state.activeTransform);assert.match(endTransformation(state,false,c).message,/Base Form restored/);assert.equal(state.activeTransform,undefined);
+});
+
+
+test('Long Rest preserves only transformations whose rules can outlast the rest',()=>{
+  const animalCharacter=character({classes:[{name:'Druid',level:15}],totalLevel:15,hp:{current:20,max:80},spells:[{name:'Animal Shapes',level:8,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action'}],spellSlots:{'8':{current:1,max:1}}});const animalState=createInitialState(animalCharacter);const animal=availableTransformations(animalCharacter,animalState).find(o=>o.profile==='animal-shapes'&&o.formId==='dire-wolf');assert.ok(animal);startTransformation(animalCharacter,animalState,animal);assert.equal(animalState.tempHp,22);longRest(animalCharacter,animalState);assert.equal(animalState.activeTransform?.option.profile,'animal-shapes');assert.equal(animalState.tempHp,0);assert.equal(animalState.hp,80);
+  const wildCharacter=character();const wildState=createInitialState(wildCharacter);const wolf=availableTransformations(wildCharacter,wildState).find(o=>o.profile==='wildshape'&&o.formId==='dire-wolf');assert.ok(wolf);startTransformation(wildCharacter,wildState,wolf);longRest(wildCharacter,wildState);assert.equal(wildState.activeTransform,undefined);assert.equal(wildState.tempHp,0);
+});
+
+test('Long Rest does not erase permanent True Polymorph',()=>{
+  const form={id:'lasting-fiend',name:'Lasting Fiend',type:'Fiend',cr:10,size:'Medium',ac:16,hp:80,hitDice:'10d8+30',abilities:{str:16,dex:14,con:16,int:10,wis:12,cha:14},saves:{},skills:{},speeds:{walk:30},senses:[],resistances:[],immunities:[],vulnerabilities:[],traits:[],actions:[],source:{ruleset:'Private',page:'Owned content',verified:'User-entered'}};
+  const c=character({classes:[{name:'Wizard',level:17}],totalLevel:17,hp:{current:50,max:100},customForms:[form],spells:[{name:'True Polymorph',level:9,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true}],spellSlots:{'9':{current:1,max:1}}});const state=createInitialState(c);const option=availableTransformations(c,state).find(o=>o.profile==='true-polymorph'&&o.formId==='lasting-fiend');assert.ok(option);startTransformation(c,state,option);completeTruePolymorph(state);longRest(c,state);assert.equal(state.activeTransform?.permanentUntilDispelled,true);assert.equal(state.activeTransform?.option.formId,'lasting-fiend');assert.equal(state.tempHp,0);assert.equal(state.hp,100);
+});
+
+
+test('Dragonborn Draconic Flight uses a species resource, matches current Speed, and ends on Incapacitation',()=>{
+  const c=character({species:'Dragonborn',classes:[{name:'Fighter',level:5}],totalLevel:5,knownForms:[],seenForms:[],spells:[],spellSlots:{},speed:35});const state=createInitialState(c);
+  const flight=availableTransformations(c,state).find(option=>option.grantId==='dragonborn-draconic-flight');assert.ok(flight);assert.equal(flight.actionCost,'bonus');startTransformation(c,state,flight);assert.equal(resolveSheet(c,state).speeds.fly,35);assert.equal(state.resources['dragonborn-draconic-flight']?.current,0);
+  applyCondition(c,state,'Incapacitated');assert.equal(state.overlays.includes('dragonborn-draconic-flight'),false);
+});
+
+test('Goliath Large Form can continue through Wild Shape but cannot be activated after transforming',()=>{
+  const c=character({species:'Goliath'});const state=createInitialState(c);const large=availableTransformations(c,state).find(option=>option.grantId==='goliath-large-form');assert.ok(large);startTransformation(c,state,large);state.turn.bonusRemaining=1;const wolf=availableTransformations(c,state).find(option=>option.profile==='wildshape'&&option.formId==='dire-wolf');assert.ok(wolf);startTransformation(c,state,wolf);assert.equal(resolveSheet(c,state).size,'Large');
+  const fresh=createInitialState(c);const wolfFirst=availableTransformations(c,fresh).find(option=>option.profile==='wildshape'&&option.formId==='dire-wolf');assert.ok(wolfFirst);startTransformation(c,fresh,wolfFirst);assert.equal(availableTransformations(c,fresh).some(option=>option.grantId==='goliath-large-form'&&!option.deactivate),false);
+});
+
+test('Draconic Sorcery Dragon Wings can be restored with 3 Sorcery Points',()=>{
+  const c=character({classes:[{name:'Sorcerer',level:14,subclass:'Draconic Sorcery'}],totalLevel:14,knownForms:[],seenForms:[],spells:[],spellSlots:{}});const state=createInitialState(c);const wings=availableTransformations(c,state).find(option=>option.grantId==='sorcerer-dragon-wings');assert.ok(wings);startTransformation(c,state,wings);assert.equal(resolveSheet(c,state).speeds.fly,60);assert.equal(state.resources['sorcerer-dragon-wings']?.current,0);assert.equal(state.resources['sorcery-points']?.current,14);
+  restoreDragonWings(c,state);assert.equal(state.resources['sorcerer-dragon-wings']?.current,1);assert.equal(state.resources['sorcery-points']?.current,11);
+});
+
+test('overlay forms preserve imported save and skill totals while adjusting for changed abilities',()=>{
+  const c=character({classes:[{name:'Wizard',level:5}],totalLevel:5,knownForms:[],seenForms:[],spells:[],spellSlots:{},abilities:{str:10,dex:14,con:12,int:18,wis:10,cha:10},saveBonuses:{str:3,dex:7},skillBonuses:{Athletics:4,Stealth:8},transformationGrants:[{id:'strength-overlay',label:'Strength Overlay',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',effects:{abilitySet:{str:18,dex:10}}}]});const state=createInitialState(c);const option=availableTransformations(c,state).find(entry=>entry.grantId==='strength-overlay');assert.ok(option);startTransformation(c,state,option);const sheet=resolveSheet(c,state);
+  assert.equal(sheet.saves.str.modifier,7);assert.equal(sheet.saves.dex.modifier,5);assert.equal(sheet.skills.Athletics?.modifier,8);assert.equal(sheet.skills.Stealth?.modifier,6);
+});
+
+test('condition immunity suppresses condition penalties and Frightened is surfaced without guessing line of sight',()=>{
+  const c=character({classes:[{name:'Fighter',level:5}],totalLevel:5,knownForms:[],seenForms:[],spells:[],spellSlots:{},transformationGrants:[{id:'fearless',label:'Fearless Form',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',effects:{conditionImmunities:['Frightened']}}]});const state=createInitialState(c);state.conditions.push('Frightened');let sheet=resolveSheet(c,state);const attack=sheet.actions.find(action=>action.type==='attack');assert.ok(attack);const baseRules=attackRollSources(c,state,attack,sheet);assert.equal(baseRules.mode,'normal');assert.equal(baseRules.conditional.length,1);assert.equal(sheet.skills.Athletics?.conditionalSources?.length,1);
+  const option=availableTransformations(c,state).find(entry=>entry.grantId==='fearless');assert.ok(option);startTransformation(c,state,option);sheet=resolveSheet(c,state);const transformedAttack=sheet.actions.find(action=>action.type==='attack');assert.ok(transformedAttack);assert.equal(attackRollSources(c,state,transformedAttack,sheet).conditional.length,0);assert.equal(sheet.skills.Athletics?.conditionalSources?.length??0,0);
+});
+
+test('Invisible grants attack Advantage and transformed condition immunity can suppress an existing incapacitating condition',()=>{
+  const form={id:'unstunnable-form',name:'Unstunnable Form',type:'Construct',cr:2,size:'Medium',ac:15,hp:30,hitDice:'4d8+12',abilities:{str:16,dex:12,con:16,int:8,wis:10,cha:6},saves:{},skills:{},speeds:{walk:30},senses:[],resistances:[],immunities:[],vulnerabilities:[],conditionImmunities:['Stunned'],traits:[],actions:[{id:'slam',name:'Slam',type:'attack',cost:'action',attackBonus:5,ability:'str',kind:'beast',damage:[{expression:'1d8+3',type:'Bludgeoning'}]}],artKey:'base',source:{ruleset:'Private',page:'Fixture',verified:'Test'}};
+  const c=character({classes:[{name:'Fighter',level:5}],totalLevel:5,knownForms:[],seenForms:[],spells:[],spellSlots:{},customForms:[form],transformationGrants:[{id:'unstunnable',label:'Unstunnable Form',profile:'custom',formIds:['unstunnable-form'],source:'Fixture',actionCost:'free',retention:{hp:true,hitDice:true,mentalAbilities:false,proficiencies:false,creatureType:false,classFeatures:false,feats:false,spellcasting:false,speech:false}}]});
+  const invisible=createInitialState(c);invisible.conditions.push('Invisible');let sheet=resolveSheet(c,invisible);const attack=sheet.actions.find(action=>action.type==='attack');assert.ok(attack);assert.equal(attackRollSources(c,invisible,attack,sheet).mode,'advantage');
+  const state=createInitialState(c);state.conditions.push('Stunned');const option=availableTransformations(c,state).find(entry=>entry.grantId==='unstunnable');assert.ok(option);startTransformation(c,state,option);sheet=resolveSheet(c,state);assert.equal(sheet.canAttack,true);assert.ok(sheet.conditionImmunities.includes('Stunned'));assert.equal(spendActionCost(state,'action',sheet.conditionImmunities),null);
+});
+
+test('overlay ability changes update base-form attack calculations',()=>{
+  const c=character({classes:[{name:'Fighter',level:5}],totalLevel:5,knownForms:[],seenForms:[],spells:[],spellSlots:{},abilities:{str:10,dex:12,con:12,int:10,wis:10,cha:10},transformationGrants:[{id:'mighty',label:'Mighty Form',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',effects:{abilitySet:{str:18}}}]});const state=createInitialState(c);const option=availableTransformations(c,state).find(entry=>entry.grantId==='mighty');assert.ok(option);startTransformation(c,state,option);const unarmed=resolveSheet(c,state).actions.find(action=>action.id==='unarmed');assert.ok(unarmed&&unarmed.type==='attack');assert.equal(unarmed.attackBonus,7);assert.equal(unarmed.damage[0]?.expression,'5');
+});

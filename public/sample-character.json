@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "id": "kaelen-thorn",
+  "name": "Kaelen Thorn",
+  "species": "Orc",
+  "classes": [
+    {
+      "name": "Druid",
+      "level": 6,
+      "subclass": "Circle of the Moon"
+    },
+    {
+      "name": "Barbarian",
+      "level": 2,
+      "subclass": null
+    }
+  ],
+  "abilities": {
+    "str": 12,
+    "dex": 14,
+    "con": 16,
+    "int": 10,
+    "wis": 18,
+    "cha": 8
+  },
+  "hp": {
+    "current": 68,
+    "max": 68
+  },
+  "ac": 15,
+  "speed": 30,
+  "proficiencies": {
+    "saves": {
+      "str": 1,
+      "con": 1,
+      "int": 1,
+      "wis": 1
+    },
+    "skills": {
+      "Athletics": 1,
+      "Animal Handling": 1,
+      "Nature": 1,
+      "Perception": 1,
+      "Survival": 1
+    }
+  },
+  "knownForms": [
+    "dire-wolf",
+    "brown-bear",
+    "giant-spider",
+    "giant-constrictor-snake",
+    "polar-bear",
+    "giant-toad"
+  ],
+  "seenForms": [
+    "cat",
+    "constrictor-snake",
+    "panther",
+    "riding-horse",
+    "giant-bat",
+    "black-bear",
+    "giant-goat",
+    "dire-wolf",
+    "brown-bear",
+    "giant-spider",
+    "giant-toad",
+    "giant-constrictor-snake",
+    "polar-bear"
+  ],
+  "spells": [
+    {
+      "name": "Starry Wisp",
+      "level": 0,
+      "sourceClass": "Druid",
+      "ability": "wis",
+      "prepared": true,
+      "castingTime": "magic-action",
+      "attackBonus": 7,
+      "damage": [
+        {
+          "expression": "2d8",
+          "type": "Radiant"
+        }
+      ],
+      "summary": "Ranged spell attack that deals Radiant damage and interferes with invisibility."
+    },
+    {
+      "name": "Cure Wounds",
+      "level": 1,
+      "sourceClass": "Druid",
+      "ability": "wis",
+      "prepared": true,
+      "castingTime": "magic-action",
+      "healing": "2d8+4",
+      "summary": "Touch a creature to restore Hit Points."
+    },
+    {
+      "name": "Moonbeam",
+      "level": 2,
+      "sourceClass": "Druid",
+      "ability": "wis",
+      "prepared": true,
+      "castingTime": "magic-action",
+      "concentration": true,
+      "damage": [
+        {
+          "expression": "2d10",
+          "type": "Radiant"
+        }
+      ],
+      "summary": "Concentration cylinder that deals Radiant damage on a Constitution save."
+    },
+    {
+      "name": "Conjure Animals",
+      "level": 3,
+      "sourceClass": "Druid",
+      "ability": "wis",
+      "prepared": true,
+      "castingTime": "magic-action",
+      "concentration": true,
+      "summary": "Creates the 2024 spectral pack effect."
+    },
+    {
+      "name": "Fount of Moonlight",
+      "level": 4,
+      "sourceClass": "Druid",
+      "ability": "wis",
+      "prepared": true,
+      "castingTime": "bonus",
+      "concentration": true,
+      "summary": "Moonlit melee enhancement and defensive effect."
+    },
+    {
+      "name": "Polymorph",
+      "level": 4,
+      "sourceClass": "Druid",
+      "ability": "wis",
+      "prepared": true,
+      "castingTime": "magic-action",
+      "concentration": true,
+      "summary": "Replace a target\u2019s statistics with an eligible Beast stat block."
+    },
+    {
+      "name": "Healing Word",
+      "level": 1,
+      "sourceClass": "Druid",
+      "ability": "wis",
+      "prepared": true,
+      "castingTime": "bonus",
+      "healing": "2d4+4",
+      "summary": "Bonus Action ranged healing; not a Circle of the Moon form spell."
+    }
+  ],
+  "spellSlots": {
+    "1": {
+      "current": 4,
+      "max": 4
+    },
+    "2": {
+      "current": 3,
+      "max": 3
+    },
+    "3": {
+      "current": 3,
+      "max": 3
+    },
+    "4": {
+      "current": 2,
+      "max": 2
+    }
+  },
+  "feats": [
+    "Tough"
+  ],
+  "features": [],
+  "equipment": {
+    "armorCategory": "medium",
+    "shield": true,
+    "transformBehavior": "merge"
+  }
+}
