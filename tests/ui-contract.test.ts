@@ -97,6 +97,7 @@ test('the exact hosted build executes before optional mobile storage hydration',
   assert.match(worker,/api\.open5e\.com/);
   assert.match(source,/credentials:'same-origin'/);
   assert.match(worker,/fetch\(String\(url\)/);
+  assert.match(worker,/redirect:'manual'/);
   assert.ok(!worker.includes('Live imports are unavailable'));
 });
 

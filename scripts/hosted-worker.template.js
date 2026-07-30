@@ -43,7 +43,10 @@ function json(status,body){
 async function boundedUpstreamJson(url,signal,maxBytes=maxSrdResponseBytes){
   // Cloudflare's Worker fetch accepts a URL string or Request. Normalizing URL
   // objects here keeps the same code valid in both Node preview and production.
-  const upstream=await fetch(String(url),{headers:{Accept:'application/json'},redirect:'error',signal});
+  // The edge runtime supports manual redirect handling rather than the
+  // browser-only "error" mode. Non-2xx responses (including redirects) are
+  // rejected below, so no request can escape the fixed upstream host.
+  const upstream=await fetch(String(url),{headers:{Accept:'application/json'},redirect:'manual',signal});
   if(!upstream.ok){
     const error=new Error(`upstream status ${upstream.status}`);
     error.status=upstream.status;
