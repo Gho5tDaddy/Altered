@@ -4,9 +4,9 @@ Altered is a rules-aware adaptive character sheet for 2024 fifth-edition transfo
 
 ## Use it now
 
-### Private hosted app
+### Hosted app
 
-Open [Altered](https://altered-ferocitus.ghostdaddy.chatgpt.site) from a phone, tablet, or computer. The hosted build is the recommended test route because it does not depend on the PC being awake, Windows localhost, or a particular Wi-Fi network. Access remains limited to the owner's ChatGPT account; invited testers must use the exact ChatGPT account email added to the site's allowlist.
+Open [Altered](https://altered-ferocitus.ghostdaddy.chatgpt.site) from a phone, tablet, or computer. The hosted build is the recommended test route because it does not depend on the PC being awake, Windows localhost, or a particular Wi-Fi network. Anyone with the link can open the app; character saves, combat state, settings, artwork overrides, and private packs remain in that person's browser and are not shared with other visitors.
 
 ### Android
 
@@ -88,7 +88,7 @@ Open one of the `http://192.168.x.x:4173` addresses printed by the server on the
 
 The automated D&D Beyond fetch requires the local/hosted Altered server. A standalone HTML file can still import a previously reviewed Altered JSON backup, but it cannot safely proxy D&D Beyond on its own. D&D Beyond's structured character service is undocumented, so Altered validates its response and leaves unsupported mechanics for review instead of guessing. Altered records private item identity and equipped/attuned state without copying paid descriptions or applying imported totals twice. Clearly Legacy or mixed-rules characters are blocked because this app is intentionally 2024-only.
 
-The hosted app exposes the same bounded import route as the local server: numeric character IDs only, a fixed D&D Beyond host, no forwarded credentials, response limits, timeouts, and `no-store` caching. A character must still be Public during import; it can be made Private again after an Altered backup is exported.
+The hosted app exposes the same bounded import route as the local server: numeric character IDs only, a fixed D&D Beyond host, no forwarded credentials, response limits, timeouts, `no-store` caching, same-origin application-request checks, and best-effort per-address rate limits. A character must still be Public during import; it can be made Private again after an Altered backup is exported.
 
 ### Legal rules support
 

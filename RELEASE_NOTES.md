@@ -1,4 +1,10 @@
-# Altered v0.24.1 release notes
+# Altered v0.24.2 release notes
+
+Altered can now be opened by anyone who has its link. Each visitor receives an independent local sheet: character saves, combat state, settings, artwork overrides, and private owned-content packs remain in that visitor's browser and are not uploaded to an Altered database.
+
+The public support routes remain narrow and non-caching. Public D&D Beyond imports accept numeric character IDs only and contact one fixed upstream host; SRD lookups accept only the verified catalog domains and document. Both now require same-origin application requests and apply bounded best-effort per-address rate limits in addition to their existing response-size and timeout controls.
+
+## Previous v0.24.1 notes
 
 The recommended test build is now the private hosted app at [altered-ferocitus.ghostdaddy.chatgpt.site](https://altered-ferocitus.ghostdaddy.chatgpt.site). It works independently of the development PC and local Wi-Fi. The owner remains the only allowed account until specific tester ChatGPT account emails are added.
 

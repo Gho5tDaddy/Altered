@@ -1,4 +1,11 @@
-# Altered v0.24.1 QA report
+# Altered v0.24.2 QA report
+
+## v0.24.2 public-link security verification
+
+- Public access changes only the site gate; application saves and private packs remain browser-local and retain their existing schemas.
+- D&D Beyond and SRD routes require the app's same-origin request marker, reject cross-site browser requests, apply bounded best-effort per-address request limits, and return `no-store` responses.
+- Upstream routes remain fixed-host, numeric/source constrained, response-size limited, timed out, non-credentialed, and excluded from the service-worker cache.
+- Cross-origin opener/resource policies and existing content, framing, referrer, permissions, and transport security headers are applied by the hosted worker.
 
 ## v0.24.1 hosted-release verification
 

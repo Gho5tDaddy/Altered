@@ -349,7 +349,7 @@ function renderDdbReview(report:DdbImportReport){
 }
 async function loadSrdCreature(name:string){
   const params=new URLSearchParams({domain:'creatures',q:name,exact:'1'});
-  const response=await fetch(`/api/srd/catalog?${params}`,{headers:{Accept:'application/json'},cache:'no-store'});
+  const response=await fetch(`/api/srd/catalog?${params}`,{headers:{Accept:'application/json','X-Altered-Request':'app'},cache:'no-store'});
   const payload=await response.json() as unknown;if(!response.ok)throw new Error('SRD support catalog request failed.');
   const page=parseSrdCatalogPage(payload,'creatures');const exact=page.results.find(record=>String(record.name??'').toLowerCase()===name.toLowerCase());
   return exact?normalizeSrdCreature(exact):null;
@@ -357,7 +357,7 @@ async function loadSrdCreature(name:string){
 async function refreshSrdCatalogStatus(){
   srdCatalogMessage='Checking the live legal SRD support catalog...';renderSettings();
   try{
-    const response=await fetch('/api/srd/status',{headers:{Accept:'application/json'},cache:'no-store'});const payload=await response.json() as unknown;
+    const response=await fetch('/api/srd/status',{headers:{Accept:'application/json','X-Altered-Request':'app'},cache:'no-store'});const payload=await response.json() as unknown;
     if(!response.ok)throw new Error('Catalog status request failed.');srdCatalogStatus=parseSrdCatalogStatus(payload);
     srdCatalogMessage=srdCatalogStatus.healthy?'The legal SRD support catalog is current.':'The catalog changed and needs validation before new records affect transformations.';
   }catch{srdCatalogStatus=null;srdCatalogMessage='Live SRD catalog unavailable. Altered is using its validated offline transformation rules; try Check now when connected.';}
@@ -373,7 +373,7 @@ async function fetchDdbCharacter(explicitSource?:string){
     // edge. The worker never forwards the incoming request or its cookies to
     // D&D Beyond, so sending credentials only to Altered is both necessary and
     // contained.
-    const response=await fetch(`/api/dndbeyond/character/${id}`,{headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store'});
+    const response=await fetch(`/api/dndbeyond/character/${id}`,{headers:{Accept:'application/json','X-Altered-Request':'app'},credentials:'same-origin',cache:'no-store'});
     const body=await response.text();let payload:unknown;try{payload=JSON.parse(body);}catch{throw new Error(response.ok?'The import service returned invalid data.':'The local Altered server does not support D&D Beyond import. Restart Altered and try again.');}
     if(!response.ok){const error=typeof payload==='object'&&payload!==null&&typeof (payload as {error?:unknown}).error==='string'?(payload as {error:string}).error:`Import service returned status ${response.status}.`;throw new Error(error);}
     let report=importDdbCharacter(payload,id);

@@ -96,8 +96,13 @@ test('the exact hosted build executes before optional mobile storage hydration',
   assert.match(worker,/character-service\.dndbeyond\.com/);
   assert.match(worker,/api\.open5e\.com/);
   assert.match(source,/credentials:'same-origin'/);
+  assert.equal((source.match(/'X-Altered-Request':'app'/g)??[]).length,3);
   assert.match(worker,/fetch\(String\(url\)/);
   assert.match(worker,/redirect:'manual'/);
+  assert.match(worker,/guardApiRequest\(request,'ddb',12\)/);
+  assert.match(worker,/guardApiRequest\(request,'srd-status',30\)/);
+  assert.match(worker,/guardApiRequest\(request,'srd-catalog',90\)/);
+  assert.match(worker,/Cross-Origin-Resource-Policy/);
   assert.ok(!worker.includes('Live imports are unavailable'));
 });
 

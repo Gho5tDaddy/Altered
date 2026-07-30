@@ -5,6 +5,7 @@ const ICONS=__ALTERED_ICONS__;
 
 let pageBytes;
 let srdStatusCache;
+const apiRateWindows=new Map();
 const encoder=new TextEncoder();
 const ddbRoute=/^\/api\/dndbeyond\/character\/(\d{5,15})$/;
 const ddbOrigin='https://character-service.dndbeyond.com';
@@ -18,6 +19,7 @@ const srdDomains=Object.freeze({
   weapons:38,armor:13,creatures:331,spells:339,weaponproperties:17,
 });
 const contentSecurityPolicy="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+const apiWindowMs=10*60*1000;
 
 function headers(contentType,cacheControl='no-cache'){
   return {
@@ -26,6 +28,9 @@ function headers(contentType,cacheControl='no-cache'){
     'Content-Security-Policy':contentSecurityPolicy,
     'Permissions-Policy':'camera=(), microphone=(), geolocation=()',
     'Referrer-Policy':'no-referrer',
+    'Cross-Origin-Opener-Policy':'same-origin',
+    'Cross-Origin-Resource-Policy':'same-origin',
+    'Strict-Transport-Security':'max-age=31536000; includeSubDomains',
     'X-Content-Type-Options':'nosniff',
     'X-Frame-Options':'DENY',
   };
@@ -36,8 +41,33 @@ function decodeBase64(value){
   return Uint8Array.from(binary,character=>character.charCodeAt(0));
 }
 
-function json(status,body){
-  return new Response(JSON.stringify(body),{status,headers:headers('application/json; charset=utf-8','no-store')});
+function json(status,body,extraHeaders={}){
+  return new Response(JSON.stringify(body),{status,headers:{...headers('application/json; charset=utf-8','no-store'),...extraHeaders}});
+}
+
+function guardApiRequest(request,kind,limit){
+  const fetchSite=request.headers.get('Sec-Fetch-Site');
+  if(request.headers.get('X-Altered-Request')!=='app'||(fetchSite&&fetchSite!=='same-origin')){
+    return json(403,{error:'This endpoint is available only to the Altered application.'});
+  }
+  const address=(request.headers.get('CF-Connecting-IP')??'local').slice(0,64);
+  const key=`${kind}:${address}`;
+  const now=Date.now();
+  let window=apiRateWindows.get(key);
+  if(!window||now>=window.resetAt){
+    window={count:0,resetAt:now+apiWindowMs};
+    apiRateWindows.set(key,window);
+  }
+  if(window.count>=limit){
+    const retryAfter=Math.max(1,Math.ceil((window.resetAt-now)/1000));
+    return json(429,{error:'Too many requests. Wait a few minutes and try again.'},{'Retry-After':String(retryAfter)});
+  }
+  window.count+=1;
+  if(apiRateWindows.size>512){
+    const oldest=apiRateWindows.keys().next().value;
+    if(oldest&&oldest!==key)apiRateWindows.delete(oldest);
+  }
+  return null;
 }
 
 async function boundedUpstreamJson(url,signal,maxBytes=maxSrdResponseBytes){
@@ -149,9 +179,18 @@ export default {
     }
     const url=new URL(request.url);
     const ddbMatch=url.pathname.match(ddbRoute);
-    if(ddbMatch?.[1])return request.method==='HEAD'?new Response(null,{status:204,headers:headers('application/json; charset=utf-8','no-store')}):proxyDdbCharacter(ddbMatch[1]);
-    if(url.pathname==='/api/srd/status')return request.method==='HEAD'?new Response(null,{status:204,headers:headers('application/json; charset=utf-8','no-store')}):proxySrdStatus();
-    if(url.pathname==='/api/srd/catalog')return request.method==='HEAD'?new Response(null,{status:204,headers:headers('application/json; charset=utf-8','no-store')}):proxySrdCatalog(url);
+    if(ddbMatch?.[1]){
+      const blocked=guardApiRequest(request,'ddb',12);
+      return blocked??(request.method==='HEAD'?new Response(null,{status:204,headers:headers('application/json; charset=utf-8','no-store')}):proxyDdbCharacter(ddbMatch[1]));
+    }
+    if(url.pathname==='/api/srd/status'){
+      const blocked=guardApiRequest(request,'srd-status',30);
+      return blocked??(request.method==='HEAD'?new Response(null,{status:204,headers:headers('application/json; charset=utf-8','no-store')}):proxySrdStatus());
+    }
+    if(url.pathname==='/api/srd/catalog'){
+      const blocked=guardApiRequest(request,'srd-catalog',90);
+      return blocked??(request.method==='HEAD'?new Response(null,{status:204,headers:headers('application/json; charset=utf-8','no-store')}):proxySrdCatalog(url));
+    }
     if(url.pathname==='/manifest.json')return new Response(request.method==='HEAD'?null:MANIFEST,{headers:headers('application/manifest+json; charset=utf-8','no-cache')});
     if(url.pathname==='/sw.js')return new Response(request.method==='HEAD'?null:SERVICE_WORKER,{headers:headers('application/javascript; charset=utf-8','no-cache')});
     if(url.pathname in ICONS){

@@ -1,6 +1,12 @@
-# Altered v0.24.1 audit gap register
+# Altered v0.24.2 audit gap register
 
 This register distinguishes an incorrect result from a deliberately conditional or reference-only result. Altered must never present a reference-only mechanic as calculated.
+
+## Resolved in v0.24.2
+
+| Finding | Severity | Resolution | Regression evidence |
+|---|---:|---|---|
+| Public link access could expose bounded proxy routes to casual cross-site use or excessive repeated requests | High | Added same-origin app-request checks, best-effort per-address limits, fixed upstream allowlists, `no-store`, and cross-origin security headers | hosted worker runtime audit and `SRD support proxy is fixed-host...` |
 
 ## Resolved in v0.24.1
 

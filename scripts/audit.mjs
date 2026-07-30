@@ -22,9 +22,20 @@ const hostedServiceWorkerResponse=await hostedWorker.fetch(new Request('https://
 if(hostedServiceWorkerResponse.status!==200||!(await hostedServiceWorkerResponse.text()).includes("url.pathname.startsWith('/api/')")){
   throw new Error('Hosted service worker could cache private API data.');
 }
-const invalidCatalogResponse=await hostedWorker.fetch(new Request('https://altered.audit/api/srd/catalog?domain=unknown'));
+const untrustedCatalogResponse=await hostedWorker.fetch(new Request('https://altered.audit/api/srd/catalog?domain=unknown'));
+if(untrustedCatalogResponse.status!==403||untrustedCatalogResponse.headers.get('cache-control')!=='no-store'){
+  throw new Error('Hosted API application-request guard failed.');
+}
+const invalidCatalogResponse=await hostedWorker.fetch(new Request('https://altered.audit/api/srd/catalog?domain=unknown',{headers:{'X-Altered-Request':'app'}}));
 if(invalidCatalogResponse.status!==400||invalidCatalogResponse.headers.get('cache-control')!=='no-store'){
   throw new Error('Hosted SRD route validation or no-store policy failed.');
+}
+for(let requestCount=1;requestCount<90;requestCount+=1){
+  await hostedWorker.fetch(new Request('https://altered.audit/api/srd/catalog?domain=unknown',{headers:{'X-Altered-Request':'app'}}));
+}
+const limitedCatalogResponse=await hostedWorker.fetch(new Request('https://altered.audit/api/srd/catalog?domain=unknown',{headers:{'X-Altered-Request':'app'}}));
+if(limitedCatalogResponse.status!==429||!limitedCatalogResponse.headers.has('retry-after')){
+  throw new Error('Hosted API rate-limit guard failed.');
 }
 const missingResponse=await hostedWorker.fetch(new Request('https://altered.audit/not-a-route'));
 if(missingResponse.status!==404)throw new Error('Hosted route allowlist failed.');

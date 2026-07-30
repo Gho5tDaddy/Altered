@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.24.2
+
+- Enabled public link access while keeping every visitor's saves, combat state, settings, artwork, and private packs isolated in that browser.
+- Added same-origin application-request guards and bounded best-effort per-address rate limits to the public D&D Beyond and SRD support routes.
+- Added cross-origin isolation headers, retained the fixed upstream allowlists and response limits, and continued excluding every API response from browser caches.
+- Added runtime audit coverage for rejected direct API requests and kept all existing character, backup, private-pack, and standalone formats compatible.
+
 ## v0.24.1
 
 - Fixed a production-only blank page caused by replacement-token expansion while assembling the standalone and hosted bundles.
