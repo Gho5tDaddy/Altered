@@ -1,7 +1,7 @@
 {
   "artifact": "Altered D&D 5e 2024 rules audit evidence",
-  "version": "0.24.0",
-  "generatedAt": "2026-07-30T21:28:19.585Z",
+  "version": "0.24.1",
+  "generatedAt": "2026-07-30T22:22:33.866Z",
   "rules": {
     "rules": 48,
     "functions": 16,
@@ -23,14 +23,14 @@
       "product": 2
     },
     "verifiedThrough": "2026-07-30",
-    "ledgerSha256": "faae8c8fde7fe9379c4e9a2d5317b538c06cb1dcc3eb0857f6f03b1c20a98ea4"
+    "ledgerSha256": "25cdad986f94e30740f21dd4eb41edd75ba0ef015660f1e20cddc0eb210c4ab1"
   },
   "content": {
     "packs": [
       {
         "id": "altered-srd-creatures",
         "domain": "creatures",
-        "version": "0.24.0",
+        "version": "0.24.1",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-07-30",
         "records": 16,
@@ -39,7 +39,7 @@
       {
         "id": "altered-core-class-features",
         "domain": "class-features",
-        "version": "0.24.0",
+        "version": "0.24.1",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-07-30",
         "records": 93,
@@ -48,7 +48,7 @@
       {
         "id": "altered-core-species-features",
         "domain": "species-features",
-        "version": "0.24.0",
+        "version": "0.24.1",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-07-30",
         "records": 11,
@@ -57,7 +57,7 @@
       {
         "id": "altered-core-feat-hooks",
         "domain": "feats",
-        "version": "0.24.0",
+        "version": "0.24.1",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-07-30",
         "records": 1,
@@ -66,7 +66,7 @@
       {
         "id": "altered-spell-hooks",
         "domain": "spells",
-        "version": "0.24.0",
+        "version": "0.24.1",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-07-30",
         "records": 13,
@@ -75,7 +75,7 @@
       {
         "id": "altered-item-hooks",
         "domain": "items",
-        "version": "0.24.0",
+        "version": "0.24.1",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-07-30",
         "records": 0,
@@ -84,7 +84,7 @@
       {
         "id": "altered-core-conditions",
         "domain": "conditions",
-        "version": "0.24.0",
+        "version": "0.24.1",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-07-30",
         "records": 15,
@@ -93,7 +93,7 @@
       {
         "id": "altered-transformation-profiles",
         "domain": "transformation-profiles",
-        "version": "0.24.0",
+        "version": "0.24.1",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-07-30",
         "records": 8,
@@ -101,7 +101,7 @@
       }
     ],
     "totalRecords": 157,
-    "manifestSha256": "13707d97156c24bde072677f4cbf7709afb5c5dfddda151ff0383976127d7b5c"
+    "manifestSha256": "14910a4a15a4c8bb8d4cff0ea807214a925eb457684893246d2efd9915c8cdd5"
   },
   "interactionMatrix": [
     {
@@ -534,7 +534,9 @@
       "TypeScript strict typecheck",
       "Node rules-engine and schema tests",
       "content registry and provenance tests",
-      "static UI, PWA, proxy, storage, and security contract tests"
+      "executable desktop and phone browser startup",
+      "hosted PWA and proxy runtime",
+      "static UI, storage, and security contract tests"
     ]
   },
   "legalBoundary": "SRD 5.2.1 mechanics are redistributable under CC BY 4.0. Public and user-owned D&D Beyond data is normalized for private use without copying paid descriptive text."

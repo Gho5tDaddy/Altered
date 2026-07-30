@@ -1,6 +1,14 @@
-# Altered v0.24.0 audit gap register
+# Altered v0.24.1 audit gap register
 
 This register distinguishes an incorrect result from a deliberately conditional or reference-only result. Altered must never present a reference-only mechanic as calculated.
+
+## Resolved in v0.24.1
+
+| Finding | Severity | Resolution | Regression evidence |
+|---|---:|---|---|
+| The generated hosted/standalone script could be corrupted by JavaScript replacement tokens and open as a blank page | Critical | Replaced string-substitution callbacks, rendered bundled data before optional storage hydration, and added exact-worker browser execution checks | `the exact hosted build executes before optional mobile storage hydration` and `browser:audit` |
+| Hosted use lacked local-server parity for public D&D Beyond import and live SRD support | Critical | Added bounded fixed-host worker routes with numeric/source validation, timeouts, response limits, and no API caching | `D&D Beyond proxy is fixed-host...` and `SRD support proxy is fixed-host...` |
+| Transformation-spell THP endings could be compared against superseded printed text | High | Re-verified the four affected spells against current official PHB errata and locked their distinct behaviors | `post-printing transformation corrections remain sourced to official errata` |
 
 ## Resolved in v0.24.0
 

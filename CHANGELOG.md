@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.24.1
+
+- Fixed a production-only blank page caused by replacement-token expansion while assembling the standalone and hosted bundles.
+- Made first paint independent of optional IndexedDB/private-pack hydration, with explicit ready/error startup markers and a bundled Ferocitus fallback.
+- Added a dedicated hosted worker with bounded, fixed-host D&D Beyond and SRD 5.2.1 routes so public character import and live catalog support work away from the development PC.
+- Split the hosted service worker from the local one and kept all `/api/` responses out of offline caches.
+- Added an executable browser audit that starts the exact generated worker and verifies a ready Ferocitus sheet at desktop and 390 × 844 phone dimensions.
+- Rechecked Polymorph, True Polymorph, Shapechange, and Animal Shapes against the current official 2024 Player's Handbook errata and locked their distinct Temporary HP endings in regression tests.
+- Live-tested Ferocitus import, Brown Bear Multiattack rolls, Barkskin, Wild Shape, Rage, Moon spell access, Help, settings, Initiative, resource spending, and active-form aura behavior.
+- Expanded the deterministic suite to 149 passing tests and retained the existing save, import/export, standalone, and private-pack formats.
+
 ## v0.24.0
 
 - Bundled the validated Ferocitus character as the fresh-install default with full resources and all six selected forms, so the standalone phone file no longer depends on an earlier local import.

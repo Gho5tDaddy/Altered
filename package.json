@@ -1,6 +1,6 @@
 {
   "name": "altered-rules-engine",
-  "version": "0.24.0",
+  "version": "0.24.1",
   "private": true,
   "type": "commonjs",
   "scripts": {
@@ -8,12 +8,14 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run clean && tsc && node scripts/build.mjs",
     "serve": "node scripts/serve.mjs",
+    "serve:hosted": "node scripts/serve-hosted.mjs",
     "serve:lan": "node scripts/serve.mjs --lan",
     "start": "npm run build && npm run serve",
     "start:lan": "npm run build && npm run serve:lan",
     "test": "npm run build && node --test dist/tests/*.test.js",
     "verify": "npm run typecheck && npm test",
-    "audit": "npm run verify && node scripts/audit.mjs"
+    "browser:audit": "node scripts/browser-audit.mjs",
+    "audit": "npm run verify && npm run browser:audit && node scripts/audit.mjs"
   },
   "devDependencies": {
     "typescript": "5.8.3"

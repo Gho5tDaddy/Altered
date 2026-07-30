@@ -7,7 +7,7 @@ import {RULES_VERSION} from './rules-data.js';
 const SRD='https://media.dndbeyond.com/compendium-images/srd/5.2/SRD_CC_v5.2.1.pdf';
 const BASIC='https://www.dndbeyond.com/sources/dnd/br-2024';
 const GLOSSARY='https://www.dndbeyond.com/sources/dnd/br-2024/rules-glossary';
-const ERRATA='https://www.dndbeyond.com/sources/dnd/sae';
+const ERRATA='https://www.dndbeyond.com/sources/dnd/sae/players-handbook';
 const REVIEWED=RULES_VERSION.reviewed;
 
 function source(kind:RuleSourceKind,title:string,url:string):RuleSourceReference{
@@ -95,8 +95,8 @@ export const RULE_LEDGER:ReadonlyArray<RuleLedgerEntry>=Object.freeze([
   rule('form.true-polymorph','True Polymorph','forms','calculated',errata('True Polymorph errata'),
     'Supports creature-to-creature mode, replacement statistics, one-hour Concentration, reviewed THP behavior, and permanence until dispelled.',
     ['engine.availableTransformations','engine.completeTruePolymorph'],['engine: True Polymorph lifecycle']),
-  rule('form.shapechange','Shapechange','forms','calculated',srd('Shapechange'),
-    'Enforces seen forms, CR, excluded types, retained statistics and Spellcasting, first-form THP, and later Magic-action switches.',
+  rule('form.shapechange','Shapechange','forms','calculated',errata('Shapechange errata'),
+    'Enforces seen forms, CR, excluded types, retained statistics and Spellcasting, errata-correct first-form THP, and later Magic-action switches.',
     ['engine.availableTransformations','engine.resolveSheet','engine.startTransformation'],['engine: Shapechange lifecycle']),
   rule('form.animal-shapes','Animal Shapes','forms','calculated',errata('Animal Shapes errata'),
     'Enforces Beast CR/size, retained statistics, first-form THP after errata, later Magic-action switches, and Bonus Action ending.',

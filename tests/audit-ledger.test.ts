@@ -31,6 +31,12 @@ test('all twelve 2024 base classes have an audit entry',()=>{
   for(const name of expected)assert.ok(ruleById(`class.${name}`),`missing ${name}`);
 });
 
+test('post-printing transformation corrections remain sourced to official errata',()=>{
+  for(const id of ['form.polymorph','form.true-polymorph','form.shapechange','form.animal-shapes']){
+    assert.equal(ruleById(id)?.source.kind,'errata',`${id} must not regress to superseded printed wording`);
+  }
+});
+
 test('audit snapshot reports every automation state and rules domain',()=>{
   const snapshot=rulesAuditSnapshot();
   assert.equal(snapshot.rules,RULE_LEDGER.length);

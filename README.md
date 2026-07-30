@@ -4,6 +4,10 @@ Altered is a rules-aware adaptive character sheet for 2024 fifth-edition transfo
 
 ## Use it now
 
+### Private hosted app
+
+Open [Altered](https://altered-ferocitus.ghostdaddy.chatgpt.site) from a phone, tablet, or computer. The hosted build is the recommended test route because it does not depend on the PC being awake, Windows localhost, or a particular Wi-Fi network. Access remains limited to the owner's ChatGPT account; invited testers must use the exact ChatGPT account email added to the site's allowlist.
+
 ### Android
 
 Download `altered-standalone.html`, open it from Downloads, and choose Chrome or Samsung Internet.
@@ -16,7 +20,7 @@ Double-click `altered-standalone.html` and open it in Edge, Chrome, or Firefox.
 
 Open `altered-standalone.html` in Safari, Chrome, or Firefox.
 
-The same standalone file is used on all three platforms. The `dist` directory is the hostable Progressive Web App version.
+The same standalone file is used on all three platforms. The `dist` directory contains the hostable Progressive Web App and its bounded server worker.
 
 Fresh downloads open with the validated Ferocitus character already loaded at full resources. The specially named `altered-ferocitus.html` package is identical to the main standalone build and is provided to make the phone-ready download unambiguous.
 
@@ -83,6 +87,8 @@ Open one of the `http://192.168.x.x:4173` addresses printed by the server on the
 5. Set the D&D Beyond character private again if desired and export an Altered JSON backup.
 
 The automated D&D Beyond fetch requires the local/hosted Altered server. A standalone HTML file can still import a previously reviewed Altered JSON backup, but it cannot safely proxy D&D Beyond on its own. D&D Beyond's structured character service is undocumented, so Altered validates its response and leaves unsupported mechanics for review instead of guessing. Altered records private item identity and equipped/attuned state without copying paid descriptions or applying imported totals twice. Clearly Legacy or mixed-rules characters are blocked because this app is intentionally 2024-only.
+
+The hosted app exposes the same bounded import route as the local server: numeric character IDs only, a fixed D&D Beyond host, no forwarded credentials, response limits, timeouts, and `no-store` caching. A character must still be Public during import; it can be made Private again after an Altered backup is exported.
 
 ### Legal rules support
 

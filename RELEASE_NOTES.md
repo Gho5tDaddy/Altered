@@ -1,4 +1,16 @@
-# Altered v0.24.0 release notes
+# Altered v0.24.1 release notes
+
+The recommended test build is now the private hosted app at [altered-ferocitus.ghostdaddy.chatgpt.site](https://altered-ferocitus.ghostdaddy.chatgpt.site). It works independently of the development PC and local Wi-Fi. The owner remains the only allowed account until specific tester ChatGPT account emails are added.
+
+This maintenance release fixes the hosted blank-screen failure and gives the hosted build feature parity with the local server for public D&D Beyond character import and live SRD 5.2.1 support. The proxy routes remain fixed-host, numeric/source constrained, bounded, timed out, non-caching, and credential-free.
+
+Startup now renders the bundled Ferocitus data before optional browser-storage hydration. A browser audit executes the exact generated hosted worker at both desktop and phone dimensions, preventing a syntactically valid but non-running bundle from passing release checks.
+
+The 2024 transformation-spell behavior was rechecked against the current official Player's Handbook errata. Polymorph still ends when its Temporary HP reaches 0; True Polymorph, Shapechange, and Animal Shapes use their corrected distinct endings, and Shapechange/Animal Shapes do not refresh transformation Temporary HP on later form changes.
+
+The verified release passes strict TypeScript checking, reproducible builds, 149 automated tests, exact-worker desktop/phone startup checks, and live Ferocitus interaction testing.
+
+## Previous v0.24.0 notes
 
 Fresh installations and standalone downloads now open with the validated Ferocitus character already loaded at full resources. Ferocitus remains a local, rules-safe character record without copied source-book text and includes the six selected Wild Shape forms.
 

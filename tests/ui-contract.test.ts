@@ -13,6 +13,17 @@ test('static shell exposes accessible tabs, dialogs, and condition input',()=>{
   }
 });
 
+test('every static button is connected to an application control path',()=>{
+  const html=readFileSync('public/index.html','utf8');
+  const source=readFileSync('src/app.ts','utf8');
+  const ids=Array.from(html.matchAll(/<button\b[^>]*\bid="([^"]+)"/g),match=>match[1]).filter((id):id is string=>Boolean(id));
+  assert.ok(ids.length>30);
+  for(const id of ids){
+    const connected=id.startsWith('tab-')?source.includes("document.querySelectorAll<HTMLButtonElement>('.tab')"):source.includes(`#${id}`);
+    assert.ok(connected,`${id} has no application control path`);
+  }
+});
+
 test('help and first-launch walkthrough remain optional, searchable, and restartable',()=>{
   const html=readFileSync('public/index.html','utf8');
   const source=readFileSync('src/app.ts','utf8');
@@ -64,9 +75,27 @@ test('the six current forms ship with app-ready artwork in both builds',()=>{
   }
   assert.match(source,/alt=`Built-in artwork for \$\{label\}`/);
   assert.match(standalone,/data:image\/jpeg;base64,/);
+  assert.equal((standalone.match(/<\/script>/gi)??[]).length,1,'standalone must contain exactly one executable script block');
+  assert.ok(!standalone.includes('<script src="app.bundle.js"></script>'),'standalone bundle must not be re-injected by replacement tokens');
   const ferocitusStandalone=readFileSync('dist/altered-ferocitus.html','utf8');
   assert.match(ferocitusStandalone,/name:\s*'Ferocitus'/);
   assert.match(ferocitusStandalone,/data:image\/jpeg;base64,/);
+});
+
+test('the exact hosted build executes before optional mobile storage hydration',()=>{
+  const source=readFileSync('src/app.ts','utf8');
+  const build=readFileSync('scripts/build.mjs','utf8');
+  const worker=readFileSync('scripts/hosted-worker.template.js','utf8');
+  const pkg=JSON.parse(readFileSync('package.json','utf8')) as {scripts?:Record<string,string>};
+  assert.match(source,/Built-in rules and forms are ready\.`\);render\(\);\s*document\.documentElement\.dataset\.alteredReady='true';\s*installedPacks=await/);
+  assert.match(build,/replace\('<script src="app\.bundle\.js"><\/script>',\(\)=>/);
+  assert.equal(pkg.scripts?.['browser:audit'],'node scripts/browser-audit.mjs');
+  assert.ok(worker.includes(String.raw`\/api\/dndbeyond\/character`));
+  assert.ok(worker.includes("url.pathname==='/api/srd/status'"));
+  assert.ok(worker.includes("url.pathname==='/api/srd/catalog'"));
+  assert.match(worker,/character-service\.dndbeyond\.com/);
+  assert.match(worker,/api\.open5e\.com/);
+  assert.ok(!worker.includes('Live imports are unavailable'));
 });
 
 test('recent activity exposes a clear control that preserves non-log state',()=>{

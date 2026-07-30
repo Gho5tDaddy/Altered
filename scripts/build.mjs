@@ -27,31 +27,40 @@ for(const name of moduleNames){
 const bundle=`(function(){\n'use strict';\nconst modules={${entries.join(',\n')}};\nconst cache={};\nfunction resolve(from,request){if(!request.startsWith('.'))return request;const parts=from.split('/');parts.pop();for(const part of request.split('/')){if(part==='.'||part==='')continue;if(part==='..')parts.pop();else parts.push(part);}return parts.join('/');}\nfunction load(id){if(cache[id])return cache[id].exports;if(!modules[id])throw new Error('Module not found: '+id);const module={exports:{}};cache[id]=module;const localRequire=request=>load(resolve(id,request));modules[id](localRequire,module,module.exports);return module.exports;}\nload('/src/app.js');\n})();\n`;
 await writeFile(path.join(dist,'app.bundle.js'),bundle);
 
-let html=await readFile(path.join(dist,'index.html'),'utf8');
+let hostedHtml=await readFile(path.join(dist,'index.html'),'utf8');
 const css=await readFile(path.join(dist,'styles.css'),'utf8');
-html=html.replace('<link rel="stylesheet" href="styles.css">',`<style>\n${css}\n</style>`).replace('<script src="app.bundle.js"></script>',`<script>\n${bundle.replaceAll('</script>','<\\/script>')}\n</script>`).replace('<link rel="manifest" href="manifest.json">','');
+hostedHtml=hostedHtml
+  .replace('<link rel="stylesheet" href="styles.css">',()=>`<style>\n${css}\n</style>`)
+  // Compiled source can legitimately contain replacement tokens such as "$&".
+  // A function replacement keeps those tokens literal instead of corrupting
+  // the standalone script with the matched external script tag.
+  .replace('<script src="app.bundle.js"></script>',()=>`<script>\n${bundle.replaceAll('</script>','<\\/script>')}\n</script>`);
 for(const name of publicNames.filter(name=>/^form-.*\.jpg$/i.test(name))){
   const image=await readFile(path.join(root,'public',name));
-  html=html.replaceAll(name,`data:image/jpeg;base64,${image.toString('base64')}`);
+  hostedHtml=hostedHtml.replaceAll(name,`data:image/jpeg;base64,${image.toString('base64')}`);
 }
+const standaloneHtml=hostedHtml.replace('<link rel="manifest" href="manifest.json">','');
 await Promise.all([
-  writeFile(path.join(dist,'altered-standalone.html'),html),
-  writeFile(path.join(dist,'altered-ferocitus.html'),html),
+  writeFile(path.join(dist,'altered-standalone.html'),standaloneHtml),
+  writeFile(path.join(dist,'altered-ferocitus.html'),standaloneHtml),
 ]);
 
-// Sites hosting uses a tiny Cloudflare-compatible worker around the same
-// self-contained standalone build. No second application implementation is
-// introduced, and owner-only hosting never needs separate image assets.
+// Sites hosting serves the same embedded application plus the minimal PWA
+// surface and guarded data routes needed for feature parity away from the PC.
 await mkdir(path.join(dist,'server'),{recursive:true});
 await writeFile(path.join(dist,'server','package.json'),'{"type":"module"}\n');
-const hostedPage=Buffer.from(html,'utf8').toString('base64');
-const hostedWorker=`const PAGE=${JSON.stringify(hostedPage)};
-let bytes;
-function pageBytes(){if(bytes)return bytes;const binary=atob(PAGE);bytes=Uint8Array.from(binary,character=>character.charCodeAt(0));return bytes;}
-const headers={'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer'};
-export default{async fetch(request){const url=new URL(request.url);if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
-if(url.pathname.startsWith('/api/'))return Response.json({error:'Live imports are unavailable in the private phone build. Ferocitus and the verified built-in rules remain available.'},{status:503,headers:{'Cache-Control':'no-store'}});
-if(url.pathname==='/sw.js')return new Response('',{status:404,headers:{'Content-Type':'application/javascript','Cache-Control':'no-store'}});
-return new Response(request.method==='HEAD'?null:pageBytes(),{status:200,headers});}};\n`;
+const hostedPage=Buffer.from(hostedHtml,'utf8').toString('base64');
+const manifest=await readFile(path.join(root,'public','manifest.json'),'utf8');
+const hostedServiceWorker=await readFile(path.join(root,'public','sw-hosted.js'),'utf8');
+const icons=Object.fromEntries(await Promise.all(['icon-192.png','icon-512.png'].map(async name=>[
+  `/${name}`,
+  {type:'image/png',data:(await readFile(path.join(root,'public',name))).toString('base64')},
+])));
+const workerTemplate=await readFile(path.join(root,'scripts','hosted-worker.template.js'),'utf8');
+const hostedWorker=workerTemplate
+  .replace('__ALTERED_PAGE_BASE64__',()=>JSON.stringify(hostedPage))
+  .replace('__ALTERED_MANIFEST__',()=>JSON.stringify(manifest))
+  .replace('__ALTERED_SERVICE_WORKER__',()=>JSON.stringify(hostedServiceWorker))
+  .replace('__ALTERED_ICONS__',()=>JSON.stringify(icons));
 await writeFile(path.join(dist,'server','index.js'),hostedWorker);
 console.log(`Built ${dist}`);

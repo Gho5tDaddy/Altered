@@ -1,4 +1,4 @@
-# Rules coverage — v0.24.0
+# Rules coverage — v0.24.1
 
 ## Fully calculated in the bundled rules pack
 
@@ -7,7 +7,7 @@
 - Circle of the Moon Challenge Rating, Temporary HP, Circle Forms Armor Class, Improved Circle Forms Constitution-save bonus, Radiant damage option, always-prepared Circle spell restoration, and legal Circle spellcasting while Wild Shaped.
 - Wild Shape replacement of physical abilities and retention of mental abilities, character HP, Proficiency Bonus, skill/save proficiencies, class features, and feats.
 - Higher creature-versus-character skill and saving-throw modifier selection.
-- Polymorph and Shapechange core profiles and their transformation Temporary HP endings.
+- Polymorph ends when its transformation Temporary HP reaches 0. Under the current official Player's Handbook errata, True Polymorph's Temporary HP vanish when the spell ends, while Shapechange and Animal Shapes grant transformation Temporary HP only for the first form and do not end merely because that pool reaches 0.
 - Polymorph form eligibility without a seen-form requirement; Shapechange retains its separate seen-form restriction.
 - Rage activation, resource use, physical damage resistance, Strength-check/save Advantage, weapon-or-Unarmed-Strike Rage Damage limits, spellcasting/Concentration conflict, duration extension, Persistent Rage, and rest behavior.
 - Reckless Attack qualification for Strength-based attack rolls, including advantage/disadvantage cancellation.
@@ -53,7 +53,7 @@ These remain visible and receive active, conditional, inactive, or table-ruling 
 
 ## Not yet automated
 
-- Private or account-authenticated D&D Beyond characters; the current structured adapter requires the character's privacy setting to be Public during import.
+- Private or account-authenticated D&D Beyond characters; both the hosted and local structured adapters require the character's privacy setting to be Public during import.
 - PDF character-sheet extraction. The primary workflow is a temporary-public D&D Beyond link/ID or an Altered JSON backup.
 - Complete paid-book subclass, feat, spell, and magic-item automation.
 - Nested replacement transformations.

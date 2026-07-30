@@ -786,7 +786,7 @@ function renderTab(){sheet=resolveSheet(character,state);syncTabState();if(curre
 function activateTab(tab:HTMLButtonElement,focus=false){currentTab=tab.dataset.tab??'actions';renderTab();if(focus)tab.focus();}
 function renderConditions(){const list=$('#condition-list');clear(list);for(const condition of state.conditions){const label=condition==='Exhaustion'?`Exhaustion ${state.exhaustionLevel} −1`:`${condition} ×`;const chip=button(label,()=>applyResult(removeCondition(state,condition)),'condition-chip');chip.setAttribute('aria-label',condition==='Exhaustion'?`Reduce Exhaustion from level ${state.exhaustionLevel}`:`Remove ${condition} condition`);list.append(chip);}}
 function renderLog(){const root=$('#activity-log');clear(root);$<HTMLButtonElement>('#clear-activity').disabled=state.log.length===0;if(state.log.length===0){root.append(text('div','No activity yet.','log-row'));return;}for(const item of state.log)root.append(text('div',item,'log-row'));}
-function render(){sheet=resolveSheet(character,state);syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderResources();renderQuickFeatures();renderActiveEffects();renderTab();renderConditions();renderLog();persist();}
+function render(){sheet=resolveSheet(character,state);document.documentElement.dataset.alteredCharacter=character.name;syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderResources();renderQuickFeatures();renderActiveEffects();renderTab();renderConditions();renderLog();persist();}
 
 function endCurrentForm(){const wasActive=Boolean(state.activeTransform);const recordsExternalEnd=state.activeTransform?.option.profile==='true-polymorph'&&state.activeTransform.permanentUntilDispelled;const result=endTransformation(state,!recordsExternalEnd,character);if(wasActive&&!state.activeTransform){selectedOptionId='base';radiantActions.clear();selectedOptionalBonuses.clear();selectedRollModes.clear();selectedMultiattackVariants.clear();}applyResult(result);}
 function initializeControls(){
@@ -842,16 +842,22 @@ function initializeControls(){
 
 async function boot(){
   restore();
+  // Paint a complete built-in sheet before waiting on IndexedDB. Some mobile
+  // browsers can delay storage initialization after an authenticated redirect;
+  // the core app must remain usable while private packs and settings hydrate.
+  initializeControls();filterHelpTopics();renderSettings();renderInstalledPacks();
+  notify(`Altered loaded for ${character.name}. Built-in rules and forms are ready.`);render();
+  document.documentElement.dataset.alteredReady='true';
   installedPacks=await loadValidatedInstalledPacks();
   rebuildEffectiveCharacterLibrary(true);
   if(pendingActiveSnapshot?.option?.id){const option=availableTransformations(character,state).find(candidate=>candidate.id===pendingActiveSnapshot?.option?.id);if(option)state.activeTransform={option,startedTurn:boundedWhole(pendingActiveSnapshot.startedTurn,state.turn.number,1,1_000_000),duration:safeSavedText(pendingActiveSnapshot.duration,'',200),tempHpSource:Boolean(pendingActiveSnapshot.tempHpSource),...(pendingActiveSnapshot.spellConcentration?{spellConcentration:true}:{}),...(pendingActiveSnapshot.permanentUntilDispelled?{permanentUntilDispelled:true}:{})};}
   magicEffectsEnabled=await loadBooleanSetting('magic-effects-enabled',true);
   reduceMotion=await loadBooleanSetting('reduce-motion',reduceMotion);
   const walkthroughCompleted=await loadBooleanSetting(WALKTHROUGH_SETTING,false);
-  initializeControls();filterHelpTopics();renderSettings();renderInstalledPacks();
+  renderSettings();renderInstalledPacks();
   const repairNote=invalidPackCount?` ${invalidPackCount} damaged private pack${invalidPackCount===1?' was':'s were'} removed safely.`:'';
   notify(`Altered loaded for ${character.name}. ${installedPacks.length} private content pack${installedPacks.length===1?'':'s'} available.${repairNote}`);render();
   if(!walkthroughCompleted)startWalkthrough();
   void refreshSrdCatalogStatus();
 }
-void boot().catch(error=>{console.error(error);const status=document.querySelector<HTMLElement>('#status-message');if(status)status.textContent=`Altered could not start: ${error instanceof Error?error.message:'Unknown error'}`;});
+void boot().catch(error=>{console.error(error);document.documentElement.dataset.alteredReady='error';const status=document.querySelector<HTMLElement>('#status-message');if(status)status.textContent=`Altered could not start: ${error instanceof Error?error.message:'Unknown error'}`;});

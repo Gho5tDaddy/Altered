@@ -1,4 +1,19 @@
-# Altered v0.24.0 QA report
+# Altered v0.24.1 QA report
+
+## v0.24.1 hosted-release verification
+
+- Strict TypeScript typecheck, clean PWA/standalone/worker build, and audit-evidence generation: passing.
+- Automated engine, schema, import, storage, content, UI-contract, PWA, proxy, accessibility-contract, and security checks: **149/149 passing**.
+- Exact generated hosted worker startup: passing at 1280 × 900 desktop and 390 × 844 phone dimensions.
+- Production-only bundle corruption was reproduced and fixed; the regression now executes the generated worker and asserts a ready Ferocitus sheet rather than checking source text alone.
+- Live public Ferocitus D&D Beyond import completed through the hosted route, including its review gate, six selected forms, thirteen spells, and private item records.
+- Brown Bear Multiattack produced independent Bite and Claw d20 attack totals and damage; the active-form aura remained visible through actions until the form ended.
+- Barkskin used a Bonus Action, retained the Action, set the Armor Class minimum to 17, and persisted through Wild Shape.
+- Circle of the Moon spells remained available in Wild Shape and became visibly blocked by Rage. Rage resistance reduced incoming Slashing damage before Temporary HP.
+- Help search, settings, reduced-motion/aura controls, Initiative, all five sheet tabs, SRD status, form exit, new turns, and import confirmation executed without a runtime error.
+- Current 2024 Player's Handbook errata behavior for Polymorph, True Polymorph, Shapechange, and Animal Shapes is locked by direct regression coverage.
+- Compatibility: existing character saves, combat-state migrations, Altered JSON import/export, private owned-content packs, standalone downloads, and built-in artwork remain unchanged.
+- Runtime dependencies remain TypeScript-only; no new production dependency or client network origin was added.
 
 ## v0.24.0 rules-audit verification
 
