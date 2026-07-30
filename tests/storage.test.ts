@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {installExtensionPack,listExtensionPacks,loadArtOverride,loadBooleanSetting,removeArtOverride,removeExtensionPack,saveArtOverride,saveBooleanSetting} from '../src/storage.js';
+import {installExtensionPack,listExtensionPackRecords,listExtensionPacks,loadArtOverride,loadBooleanSetting,removeArtOverride,removeExtensionPack,saveArtOverride,saveBooleanSetting} from '../src/storage.js';
 import {ownedContentTemplate,parseOwnedContentPack} from '../src/owned-content.js';
 
 test('settings use the in-memory fallback when browser storage is unavailable',async()=>{
@@ -27,6 +27,7 @@ test('private content packs can be installed, listed, and removed',async()=>{
   const pack=parseOwnedContentPack(ownedContentTemplate());pack.metadata.id='storage-test-private-pack';pack.metadata.name='Storage Test Private Pack';
   await installExtensionPack(pack);
   const installed=await listExtensionPacks();assert.ok(installed.some(entry=>entry.metadata.id===pack.metadata.id));
+  const records=await listExtensionPackRecords();assert.ok(records.some(entry=>entry.id===pack.metadata.id));
   await removeExtensionPack(pack.metadata.id);
   const removed=await listExtensionPacks();assert.equal(removed.some(entry=>entry.metadata.id===pack.metadata.id),false);
 });

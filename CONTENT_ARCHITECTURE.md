@@ -34,13 +34,17 @@ Every pack includes:
 
 This lets a content record be updated without rewriting character state or the user interface.
 
+### Live legal support catalog
+
+The local server exposes a fixed-host, source-filtered view of Open5e's `srd-2024` dataset. It validates the SRD 5.2.1 version and a 1,808-record baseline across 12 domains. The catalog is supporting infrastructure: the UI loads only records relevant to an import or transformation, then validates them through Altered's schema before use. Built-in packs remain the offline fallback.
+
 ## Layer 3 — imported character
 
 The character JSON contains only that character's classes, subclass, species, ability scores, HP maximum, proficiencies, known/seen forms, prepared spells, resources, feats, equipment, and structured custom rules. It does not contain live combat mutations.
 
 ## Layer 4 — mutable combat state
 
-Current HP, Temporary Hit Points, resources, spell slots, action economy, active form, Rage, Concentration, conditions, overlays, and the activity log are stored separately. Ending a form never overwrites the imported base character.
+Current HP, Temporary Hit Points, resources, spell slots, action economy, active form, Rage, Concentration, conditions, overlays, creature-action recharge/use state, and the activity log are stored separately. Ending a form never overwrites the imported base character.
 
 ## Layer 5 — local user assets and settings
 
@@ -48,7 +52,7 @@ IndexedDB stores custom artwork, preferences, and future extension packs. The st
 
 ## Runtime choice
 
-For the current offline-first PWA, validated TypeScript/JSON content compiled into indexed JavaScript objects is faster and simpler than a server database. IndexedDB is reserved for user-generated or optional data. A hosted service can later mirror the same pack metadata in SQLite/PostgreSQL without changing the rules-engine API.
+For the current offline-first PWA, validated TypeScript/JSON content compiled into indexed JavaScript objects is faster and simpler than a server database. IndexedDB is reserved for user-generated or optional data. Live API responses bypass the service-worker cache. A hosted service can later mirror the same pack metadata in SQLite/PostgreSQL without changing the rules-engine API.
 
 ## Legal boundary
 

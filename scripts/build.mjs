@@ -13,7 +13,7 @@ await mkdir(path.join(dist,'src'),{recursive:true});
 for(const name of await readdir(path.join(build,'tests')))if(name.endsWith('.js'))await copyFile(path.join(build,'tests',name),path.join(dist,'tests',name));
 for(const name of await readdir(path.join(build,'src')))if(name.endsWith('.js'))await copyFile(path.join(build,'src',name),path.join(dist,'src',name));
 
-const moduleNames=['rules-data.js','content-registry.js','storage.js','schema.js','owned-content.js','engine.js','sample-data.js','app.js'];
+const moduleNames=['rules-data.js','content-registry.js','srd-catalog.js','storage.js','schema.js','dndbeyond.js','owned-content.js','engine.js','sample-data.js','app.js'];
 const entries=[];
 for(const name of moduleNames){
   const code=await readFile(path.join(build,'src',name),'utf8');

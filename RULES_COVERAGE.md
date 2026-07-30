@@ -1,4 +1,4 @@
-# Rules coverage — v0.18.1
+# Rules coverage — v0.20.0
 
 ## Fully calculated in the bundled rules pack
 
@@ -17,10 +17,13 @@
 - Second Wind, Lay On Hands, Wild Resurgence exchanges, spell slots, and common resource recovery.
 - Damage resistances, immunities, vulnerabilities, Temporary HP conflicts, healing, and damage-triggered Concentration checks.
 - Core condition effects used by the sheet: action blocking, speech/Concentration consequences, zero Speed, attack/check/save disadvantage, and automatic Strength/Dexterity save failures.
-- Attack-roll, saving-throw, automatic, and Multiattack creature actions.
+- Attack-roll, saving-throw, automatic, and mixed-action Multiattack creature actions, including start-of-turn recharge rolls and lockout.
+- Per-day creature-action use tracking with Long Rest recovery.
+- Live SRD 5.2.1 support-catalog validation across 1,808 reusable records. Relevant selected Beast forms can be normalized into executable local form data during character import.
 
 ## Calculated only when the imported sheet declares the feature
 
+- Public D&D Beyond character data is normalized into Altered's schema for identity, classes, abilities, HP, AC, speed, proficiencies, exact save/skill totals, equipped numeric modifiers, spell slots, prepared/known spells, feats, limited-use resources, and recognizable legal forms.
 - Primal Strike and similar selected class options.
 - Imported structured speed bonuses, resistances, immunities, save bonuses, and Armor Class formulas.
 - War Caster, Eldritch Mind, and other named features that require presence on the character.
@@ -38,8 +41,8 @@ These remain visible and receive active, conditional, inactive, or table-ruling 
 
 ## Not yet automated
 
-- Direct D&D Beyond account integration.
-- General-purpose PDF character-sheet extraction.
+- Private or account-authenticated D&D Beyond characters; the current structured adapter requires the character's privacy setting to be Public during import.
+- PDF character-sheet extraction. The primary workflow is a temporary-public D&D Beyond link/ID or an Altered JSON backup.
 - Complete paid-book subclass, feat, spell, and magic-item automation.
 - Nested replacement transformations.
 - Exhaustion levels and target-specific relationships such as Frightened line of sight or grapple source distance.
@@ -48,3 +51,7 @@ These remain visible and receive active, conditional, inactive, or table-ruling 
 - Shared campaigns and cloud synchronization.
 
 Altered does not silently invent mechanics for unsupported features. An unknown replacement transformation is disabled until assigned an explicit supported profile.
+
+## Catalog boundary
+
+The legal catalog is supporting infrastructure, not the app's primary interface. Altered surfaces a catalog record only when it is relevant to the imported character or a transformation. A healthy status means the live SRD 5.2.1 source meets or exceeds the verified baseline; it is not a promise that an undocumented third-party service can never change. If the catalog is unavailable or fails validation, the app keeps its validated built-in rules and warns instead of importing uncertain data.

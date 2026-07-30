@@ -41,9 +41,9 @@ imported character
 
 Public releases may bundle SRD 5.2.1 material, original assets, user-created content, and properly licensed third-party material.
 
-Paid mechanics should use private, local **Owned Content Packs**. Altered must not request D&D Beyond credentials, scrape the site, depend on undocumented endpoints, copy paid books, bundle official artwork, or redistribute imported paid content.
+Paid mechanics should use private, local **Owned Content Packs**. Altered must not request D&D Beyond credentials, scrape site pages, copy paid books, bundle official artwork, or redistribute imported paid content. The current user-directed public-character adapter is isolated and validated because D&D Beyond does not publish a supported character-data API; Altered JSON backups remain the durable path if that service changes.
 
-A character PDF can identify many features but may not contain enough mechanical detail to execute them. Unsupported paid mechanics must be confirmed through a guided local setup instead of being guessed.
+The primary import is a temporary-public D&D Beyond link/ID followed by a review screen. Unsupported paid mechanics must be confirmed through a guided local setup instead of being guessed.
 
 ## Build history
 
@@ -54,15 +54,12 @@ A character PDF can identify many features but may not contain enough mechanical
 - The source chat then began a release-hardening audit. It reported a compiling v0.16 audit build with 50 passing tests and worked through private content, non-Beast transformations, schema changes, rendering, rules corrections, and broader tests in v0.17/v0.18.
 - The final online run's reasoning log reported a 70-test/typecheck baseline while hardening v0.18, but the run ended without posting a final answer or download link. Treat v0.18 as an unimported work-in-progress until its files are recovered and independently verified.
 
-## Known audit gaps
+## Current implementation status
 
-- Reusable private owned-content packs need full workflow and durability testing.
-- Imported forms must support complete private stat blocks.
-- Transformation support must not be restricted to the original core class set.
-- Non-Beast replacement forms and additive/overlay transformations need broader coverage.
-- Transformation retention rules, action economy, class/subclass/species interactions, persistence, and canonicalization need continued verification.
-- Tests must cover owned content, custom forms, non-Beast profiles, reload durability, and real browser behavior.
-- Version metadata, packaging cleanliness, service-worker caching, release notes, integrity hashes, and final browser QA need confirmation.
+- v0.20.0 has a strict TypeScript rules engine, public-link review import, private owned-content packs, a local transformation builder, non-Beast replacement profiles, additive overlays, persistence, and live browser coverage.
+- The legal SRD 5.2.1 support catalog is kept behind the character workflow and currently validates a 1,808-record baseline.
+- Paid-book mechanics remain private and user-supplied. Unknown mechanics stay conditional or disabled instead of being inferred from prose.
+- D&D Beyond's character service remains an undocumented compatibility boundary; a reviewed Altered JSON export is the durable backup.
 
 ## Latest user direction
 

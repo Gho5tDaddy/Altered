@@ -1,7 +1,11 @@
 {
   "name": "Altered \u2014 Transformation Character Sheet",
   "short_name": "Altered",
+  "id": "./",
   "start_url": "./index.html",
+  "scope": "./",
+  "description": "A rules-aware adaptive character sheet for fifth-edition transformations.",
+  "categories": ["games", "utilities"],
   "display": "standalone",
   "background_color": "#050607",
   "theme_color": "#161a1d",

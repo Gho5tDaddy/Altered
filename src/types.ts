@@ -9,20 +9,21 @@ export interface Abilities {str:number;dex:number;con:number;int:number;wis:numb
 export interface Speeds {walk?:number;climb?:number;swim?:number;fly?:number;burrow?:number}
 export interface DamagePacket {expression:string;type:DamageType;label?:string;doubleOnCritical?:boolean}
 export interface ConditionEffect {condition:string;duration?:string;escapeDc?:number;targetSizeMax?:string;note?:string}
+export interface ActionUseLimit {max:number;recovery:'long'}
 
 export interface AttackAction {
   id:string;name:string;type:'attack';cost:ActionCost;attackBonus:number;ability:Ability;
   kind:'beast'|'weapon'|'unarmed'|'spell';reach?:number;range?:string;
-  damage:DamagePacket[];effects?:ConditionEffect[];notes?:string;
+  damage:DamagePacket[];effects?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;notes?:string;
 }
 export interface SaveAction {
   id:string;name:string;type:'save';cost:ActionCost;saveAbility:Ability;dc:number;
   range?:string;damageOnFail?:DamagePacket[];damageOnSuccess?:DamagePacket[];
-  effectsOnFail?:ConditionEffect[];recharge?:{min:number;max:number};notes?:string;
+  effectsOnFail?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;notes?:string;
 }
 export interface AutomaticAction {
   id:string;name:string;type:'automatic';cost:ActionCost;damage?:DamagePacket[];
-  effects?:ConditionEffect[];prerequisite?:string;notes?:string;
+  effects?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;prerequisite?:string;notes?:string;
 }
 export interface MultiattackAction {id:string;name:string;type:'multiattack';cost:'action';sequence:string[];notes?:string}
 export type CreatureAction = AttackAction|SaveAction|AutomaticAction|MultiattackAction;
@@ -39,7 +40,7 @@ export interface CharacterClass {name:string;level:number;subclass?:string|null}
 export interface Spell {
   id?:string;name:string;level:number;sourceClass:string;ability:Ability;prepared?:boolean;
   castingTime:ActionCost;concentration?:boolean;components?:string;materialCost?:boolean;materialConsumed?:boolean;
-  attackBonus?:number;saveDc?:number;damage?:DamagePacket[];healing?:string;slotLevel?:number;summary?:string;
+  attackBonus?:number;saveDc?:number;damage?:DamagePacket[];healing?:string;resolution?:'save'|'automatic'|'manual';slotLevel?:number;summary?:string;
 }
 
 export interface RetentionPolicy {
@@ -94,11 +95,12 @@ export interface RageState {active:boolean;endsAtTurn:number;usedThisTurn:boolea
 export interface TurnState {number:number;actionsRemaining:number;surgeActionsRemaining:number;bonusRemaining:number;reactionRemaining:number;attackRollsMade:number;oncePerTurn:Record<string,boolean>}
 export interface ConcentrationState {name:string;source:string}
 export interface ActiveTransform {option:TransformationOption;startedTurn:number;duration:string;tempHpSource:boolean;spellConcentration?:boolean;permanentUntilDispelled?:boolean}
+export interface ActionRecharge {name:string;min:number;max:number}
 export interface GameState {
   stateVersion:2;hp:number;tempHp:number;tempHpSource?:string;activeTransform?:ActiveTransform;concentration?:ConcentrationState;
   concentrationChecks:{dc:number;damage:number;source:string}[];
   rage:RageState;turn:TurnState;resources:Record<string,ResourcePool>;spellSlots:Record<string,{current:number;max:number}>;
-  conditions:string[];equipment:EquipmentState;overlays:string[];log:string[];
+  conditions:string[];equipment:EquipmentState;overlays:string[];recharges:Record<string,ActionRecharge>;actionUses:Record<string,number>;log:string[];
 }
 
 export interface DerivedRoll {name:string;modifier:number;source:string;proficiency:ProficiencyRank;beastModifier?:number;advantageSources?:string[];disadvantageSources?:string[];conditionalSources?:string[];automaticFailure?:string;alternate?:{modifier:number;source:string}}

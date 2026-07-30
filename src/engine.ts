@@ -22,6 +22,10 @@ const hasCondition=(state:GameState,...conditions:string[])=>conditions.some(con
 const isIncapacitated=(state:GameState)=>hasCondition(state,'Incapacitated','Unconscious','Paralyzed','Petrified','Stunned');
 const hasZeroSpeedCondition=(state:GameState)=>hasCondition(state,'Grappled','Restrained','Paralyzed','Petrified','Stunned','Unconscious');
 const autoFailsPhysicalSaves=(state:GameState)=>hasCondition(state,'Unconscious','Paralyzed','Petrified','Stunned');
+export function boundedWhole(value:unknown,fallback:number,min=0,max=Number.MAX_SAFE_INTEGER){
+  if(typeof value!=='number'||!Number.isFinite(value))return fallback;
+  return Math.max(min,Math.min(max,Math.floor(value)));
+}
 
 export function wildShapeLimits(character:Character){
   const level=classLevel(character,'Druid');
@@ -152,7 +156,7 @@ export function createInitialState(character:Character):GameState{
     turn:{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,attackRollsMade:0,oncePerTurn:{}},
     resources:Object.fromEntries(character.resources.map(r=>[r.id,cloneResource(r)])),
     spellSlots:Object.fromEntries(Object.entries(character.spellSlots).map(([k,v])=>[k,{...v}])),
-    concentrationChecks:[],conditions:[],equipment:{...character.equipment},overlays:[],log:[]
+    concentrationChecks:[],conditions:[],equipment:{...character.equipment},overlays:[],recharges:{},actionUses:{},log:[]
   };
 }
 
@@ -279,6 +283,7 @@ function actionError(state:GameState,cost:ActionCost,conditionImmunities:Iterabl
   if(cost==='action')return state.turn.actionsRemaining+state.turn.surgeActionsRemaining>0?null:'Action already used this turn.';
   return null;
 }
+export function actionCostError(state:GameState,cost:ActionCost,conditionImmunities:Iterable<string>=[]){return actionError(state,cost,conditionImmunities)}
 export function spendActionCost(state:GameState,cost:ActionCost,conditionImmunities:Iterable<string>=[]):string|null{
   const error=actionError(state,cost,conditionImmunities);if(error)return error;
   if(cost==='bonus')state.turn.bonusRemaining--;
@@ -304,6 +309,7 @@ function consumeSpellSlot(state:GameState,level:number){const slot=state.spellSl
 function removeOverlay(state:GameState,id:string){state.overlays=state.overlays.filter(value=>value!==id)}
 function overlayId(option:TransformationOption){return option.grantId??option.id}
 function tempHpSourceName(option:TransformationOption){if(option.spellName)return option.spellName;if(option.profile==='animal-shapes')return 'Animal Shapes';return option.label}
+function clearActionRecharges(state:GameState){state.recharges={}}
 function applyIncomingTempHp(state:GameState,option:TransformationOption,incoming:number):TransitionResult|undefined{
   if(incoming<=0)return undefined;const source=tempHpSourceName(option);
   if(state.tempHp===0){state.tempHp=incoming;state.tempHpSource=source;return undefined;}
@@ -346,7 +352,7 @@ export function startTransformation(character:Character,state:GameState,option:T
   if(option.spellName&&!switchingSameEffect){const level=option.spellLevel??0;if(level>0)consumeSpellSlot(state,level);if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell'};}}
   else if(option.concentration&&!switchingSameEffect){if(state.concentration)endConcentration(state,`${option.label} replaced the previous Concentration effect.`,character);state.concentration={name:option.label,source:option.source};}
   const incoming=incomingTempHp(character,option,switchingSameEffect);const retainsExistingTransformTemp=Boolean(switchingSameEffect&&activeTransform?.tempHpSource&&state.tempHpSource===tempHpSourceName(option));
-  state.activeTransform={option,startedTurn:state.turn.number,duration:duration(character,option),tempHpSource:incoming>0||retainsExistingTransformTemp,...(option.concentration?{spellConcentration:true}:{})};
+  clearActionRecharges(state);state.activeTransform={option,startedTurn:state.turn.number,duration:duration(character,option),tempHpSource:incoming>0||retainsExistingTransformTemp,...(option.concentration?{spellConcentration:true}:{})};
   const choice=applyIncomingTempHp(state,option,incoming);if(choice)return choice;
   const baseMessage=`${switchingWildshape?'Wild Shape changed to':switchingShapechange?'Shapechange shifted to':switchingAnimalShapes?'Animal Shapes changed to':switchingSameEffect?'Form changed to':'Transformed into'} ${option.label}.`;
   if(option.profile==='wildshape')return {state,message:`${baseMessage} A Bonus Action was spent; voluntarily ending Wild Shape also requires a Bonus Action.`};
@@ -360,7 +366,7 @@ export function endTransformation(state:GameState,voluntary=true,character?:Char
   if(voluntary){const immunities=character?activeConditionImmunities(character,state):[];const error=actionError(state,cost,immunities);if(error)return {state,message:error};spendActionCost(state,cost,immunities);}
   if(active.spellConcentration&&state.concentration?.name===(active.option.spellName??active.option.label))endConcentration(state,`${active.option.label} ended.`,character);
   if(active.tempHpSource&&state.tempHpSource===tempHpSourceName(active.option)){state.tempHp=0;delete state.tempHpSource;}
-  const name=active.option.label;delete state.activeTransform;return {state,message:`${name} ended; Base Form restored.`};
+  const name=active.option.label;delete state.activeTransform;clearActionRecharges(state);return {state,message:`${name} ended; Base Form restored.`};
 }
 
 
@@ -405,6 +411,16 @@ export function extendRage(character:Character,state:GameState):TransitionResult
 }
 export function declareAttack(state:GameState,attack:CreatureAction){if(attack.type==='attack')state.turn.attackRollsMade++;if(attack.type==='attack'||attack.type==='save')markRageExtension(state)}
 
+type LimitedCreatureAction=Extract<CreatureAction,{type:'attack'|'save'|'automatic'}>;
+function actionStateKey(state:GameState,action:LimitedCreatureAction){return `${state.activeTransform?.option.id??'base'}:${action.id}`}
+export function pendingActionRecharge(state:GameState,action:LimitedCreatureAction){return action.recharge?state.recharges[actionStateKey(state,action)]:undefined}
+export function markActionRechargeUsed(state:GameState,action:LimitedCreatureAction){
+  if(!action.recharge)return;
+  state.recharges[actionStateKey(state,action)]={name:action.name,min:action.recharge.min,max:action.recharge.max};
+}
+export function remainingActionUses(state:GameState,action:LimitedCreatureAction){return action.uses?Math.max(0,action.uses.max-(state.actionUses[actionStateKey(state,action)]??0)):undefined}
+export function markLimitedActionUsed(state:GameState,action:LimitedCreatureAction){if(action.uses)state.actionUses[actionStateKey(state,action)]=(state.actionUses[actionStateKey(state,action)]??0)+1}
+
 export function restoreDragonWings(character:Character,state:GameState):TransitionResult{
   const sorcerer=classLevel(character,'Sorcerer');const isDraconic=sameText(subclass(character,'Sorcerer'),'Draconic Sorcery');
   if(sorcerer<14||!isDraconic)return {state,message:'This character does not have the Draconic Sorcery Dragon Wings feature.'};
@@ -421,10 +437,19 @@ export function useActionSurge(character:Character,state:GameState):TransitionRe
   spendResource(state,'action-surge');state.turn.oncePerTurn['action-surge']=true;state.turn.surgeActionsRemaining++;
   return {state,message:'Action Surge added one action that cannot be used for the Magic action.'};
 }
-export function startNewTurn(state:GameState):TransitionResult{
-  state.turn={number:state.turn.number+1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,attackRollsMade:0,oncePerTurn:{}};
+function restoreTurnBudget(state:GameState,advance=false){
+  state.turn={number:state.turn.number+(advance?1:0),actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,attackRollsMade:0,oncePerTurn:{}};
   state.rage.usedThisTurn=false;state.rage.recklessDeclared=false;state.rage.extendedThisTurn=false;
-  return {state,message:`Turn ${state.turn.number} started.`};
+}
+export function startNewTurn(state:GameState,rechargeRoll=()=>rollDice('1d6').total):TransitionResult{
+  restoreTurnBudget(state,true);
+  const rechargeMessages:string[]=[];
+  for(const [key,pending] of Object.entries(state.recharges)){
+    const roll=boundedWhole(rechargeRoll(),1,1,6);
+    if(roll>=pending.min){delete state.recharges[key];rechargeMessages.push(`${pending.name} recharged on ${roll}.`);}
+    else rechargeMessages.push(`${pending.name} recharge rolled ${roll}; it needs ${pending.min}–${pending.max}.`);
+  }
+  return {state,message:`Turn ${state.turn.number} started.${rechargeMessages.length?` ${rechargeMessages.join(' ')}`:''}`};
 }
 export function endTurn(character:Character,state:GameState):TransitionResult{
   if(state.rage.active&&classLevel(character,'Barbarian')<15&&state.turn.number>=state.rage.endsAtTurn)return endRage(state,'Rage ended because it was not extended.');
@@ -433,6 +458,7 @@ export function endTurn(character:Character,state:GameState):TransitionResult{
 export function shortRest(state:GameState):TransitionResult{
   for(const r of Object.values(state.resources)){if(r.recovery==='short-all')r.current=r.max;else if(r.recovery==='short-one')r.current=Math.min(r.max,r.current+1);}
   if(state.rage.active)endRage(state,'Rage ended during the Short Rest.');
+  restoreTurnBudget(state);
   return {state,message:'Short Rest completed; eligible resources recovered and Rage ended if it was active.'};
 }
 function durationPersistsThroughLongRest(duration:string|undefined){const value=normalized(duration);return value.includes('until ended')||value.includes('until dispelled')||value.includes('permanent');}
@@ -449,7 +475,8 @@ export function longRest(character:Character,state:GameState):TransitionResult{
   for(const r of Object.values(state.resources))if(r.recovery!=='manual')r.current=r.max;
   for(const slot of Object.values(state.spellSlots))slot.current=slot.max;
   state.hp=character.hp.max;state.tempHp=0;delete state.tempHpSource;
-  state.rage={active:false,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false};state.concentrationChecks=[];
+  state.rage={active:false,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false};state.concentrationChecks=[];clearActionRecharges(state);state.actionUses={};
+  restoreTurnBudget(state);
   return {state,message:`Long Rest completed; HP, slots, and eligible resources restored. Temporary Hit Points ended. Existing conditions were preserved.${notes.length?` ${notes.join(' ')}`:''}`};
 }
 
@@ -468,7 +495,7 @@ export function endConcentration(state:GameState,reason='Concentration ended.',c
     const active=state.activeTransform;
     if(name===undefined||(active.option.spellName??active.option.label)===name){
       if(state.tempHpSource===tempHpSourceName(active.option)){state.tempHp=0;delete state.tempHpSource;}
-      delete state.activeTransform;
+      delete state.activeTransform;clearActionRecharges(state);
     }
   }
   return {state,message:name?`${name} ended. ${reason}`:reason};
@@ -478,29 +505,39 @@ export function useSecondWind(character:Character,state:GameState,roll:number):T
   const level=classLevel(character,'Fighter');if(level<1)return {state,message:'This character has no Second Wind.'};
   if(!retainedClassFeatures(activeOption(state)))return {state,message:'The current transformation does not retain Second Wind.'};
   const immunities=activeConditionImmunities(character,state);const error=actionError(state,'bonus',immunities);if(error)return {state,message:error};if(!hasResource(state,'second-wind'))return {state,message:'No Second Wind uses remain.'};
-  spendActionCost(state,'bonus',immunities);spendResource(state,'second-wind');const amount=Math.max(1,Math.floor(roll))+level;const before=state.hp;state.hp=Math.min(character.hp.max,state.hp+amount);
+  spendActionCost(state,'bonus',immunities);spendResource(state,'second-wind');const amount=boundedWhole(roll,1,1,10)+level;const before=state.hp;state.hp=Math.min(character.hp.max,state.hp+amount);
   return {state,message:`Second Wind restored ${state.hp-before} Hit Points.`};
 }
 export function useLayOnHands(character:Character,state:GameState,amount:number):TransitionResult{
   if(classLevel(character,'Paladin')<1)return {state,message:'This character has no Lay On Hands.'};
   if(!retainedClassFeatures(activeOption(state)))return {state,message:'The current transformation does not retain Lay On Hands.'};
-  const spend=Math.max(1,Math.floor(amount));const pool=resource(state,'lay-on-hands');if(!pool||pool.current<spend)return {state,message:'The Lay On Hands pool is too low.'};
+  const spend=boundedWhole(amount,1,1);const pool=resource(state,'lay-on-hands');if(!pool||pool.current<spend)return {state,message:'The Lay On Hands pool is too low.'};
   const immunities=activeConditionImmunities(character,state);const error=actionError(state,'bonus',immunities);if(error)return {state,message:error};spendActionCost(state,'bonus',immunities);spendResource(state,'lay-on-hands',spend);const before=state.hp;state.hp=Math.min(character.hp.max,state.hp+spend);
   return {state,message:`Lay On Hands restored ${state.hp-before} Hit Points and spent ${spend} points.`};
 }
+export function wildResurgenceError(character:Character,state:GameState,mode:'slot-to-shape'|'shape-to-slot'):string|null{
+  if(classLevel(character,'Druid')<5)return 'This character has no Wild Resurgence.';
+  if(!retainedClassFeatures(activeOption(state)))return 'The current transformation does not retain Wild Resurgence.';
+  const pool=resource(state,'wild-shape');if(!pool)return 'Wild Shape resource is missing.';
+  if(mode==='slot-to-shape'){
+    if(state.turn.oncePerTurn['wild-resurgence-shape'])return 'This Wild Resurgence exchange can be used only once on a turn.';
+    if(pool.current>0)return 'Available only when no Wild Shape uses remain.';
+    const level=Object.keys(state.spellSlots).map(Number).filter(l=>(state.spellSlots[String(l)]?.current??0)>0).sort((a,b)=>a-b)[0];
+    return level?null:'No spell slot remains to exchange.';
+  }
+  const exchange=resource(state,'wild-resurgence-slot');if(!exchange||exchange.current<1)return 'Unavailable again until a Long Rest.';
+  if(pool.current<1)return 'No Wild Shape use remains to exchange.';
+  const slot=state.spellSlots['1'];if(!slot)return 'No level 1 spell-slot pool exists on this sheet.';if(slot.current>=slot.max)return 'Level 1 spell slots are already full.';
+  return null;
+}
 export function useWildResurgence(character:Character,state:GameState,mode:'slot-to-shape'|'shape-to-slot'):TransitionResult{
-  if(classLevel(character,'Druid')<5)return {state,message:'This character has no Wild Resurgence.'};
-  if(!retainedClassFeatures(activeOption(state)))return {state,message:'The current transformation does not retain Wild Resurgence.'};
+  const error=wildResurgenceError(character,state,mode);if(error)return {state,message:error};
   const pool=resource(state,'wild-shape');if(!pool)return {state,message:'Wild Shape resource is missing.'};
   if(mode==='slot-to-shape'){
-    if(state.turn.oncePerTurn['wild-resurgence-shape'])return {state,message:'This Wild Resurgence exchange can be used only once on a turn.'};
-    if(pool.current>0)return {state,message:'Slot-to-Wild-Shape is available only when no Wild Shape uses remain.'};
     const level=Object.keys(state.spellSlots).map(Number).filter(l=>(state.spellSlots[String(l)]?.current??0)>0).sort((a,b)=>a-b)[0];
     if(!level)return {state,message:'No spell slot remains to exchange.'};consumeSpellSlot(state,level);pool.current=1;state.turn.oncePerTurn['wild-resurgence-shape']=true;return {state,message:`Expended a level ${level} spell slot to regain one Wild Shape use.`};
   }
-  const exchange=resource(state,'wild-resurgence-slot');if(!exchange||exchange.current<1)return {state,message:'This Wild Resurgence benefit is unavailable again until a Long Rest.'};
-  if(pool.current<1)return {state,message:'No Wild Shape use remains to exchange.'};
-  const slot=state.spellSlots['1'];if(!slot)return {state,message:'No level 1 spell-slot pool exists on this sheet.'};if(slot.current>=slot.max)return {state,message:'Level 1 spell slots are already full.'};
+  const exchange=resource(state,'wild-resurgence-slot');const slot=state.spellSlots['1'];if(!exchange||!slot)return {state,message:'Wild Resurgence resource data is missing.'};
   pool.current--;slot.current++;exchange.current--;return {state,message:'Expended one Wild Shape use to regain a level 1 spell slot.'};
 }
 export function applyCondition(character:Character,state:GameState,condition:string):TransitionResult{
@@ -525,9 +562,9 @@ export function concentrationSaveMode(character:Character,state:GameState){
 }
 export function resolveConcentrationCheck(state:GameState,total:number,character?:Character):TransitionResult{
   const pending=state.concentrationChecks.shift();if(!pending)return {state,message:'No Concentration check is pending.'};
-  if(total>=pending.dc)return {state,message:`Concentration maintained with ${total} against DC ${pending.dc}.`};
+  const resolvedTotal=boundedWhole(total,0,0);if(resolvedTotal>=pending.dc)return {state,message:`Concentration maintained with ${resolvedTotal} against DC ${pending.dc}.`};
   const name=state.concentration?.name??'Concentration';endConcentration(state,'Failed Concentration check.',character);
-  return {state,message:`Concentration failed with ${total} against DC ${pending.dc}; ${name} ended.`};
+  return {state,message:`Concentration failed with ${resolvedTotal} against DC ${pending.dc}; ${name} ended.`};
 }
 
 export function castSpell(character:Character,state:GameState,spellName:string):TransitionResult{
@@ -594,7 +631,7 @@ export function rollDice(expression:string,random:()=>number=Math.random):{total
 }
 
 export function applyDamage(state:GameState,sheet:ResolvedSheet,amount:number,type:DamageType,character?:Character):TransitionResult{
-  let adjusted=Math.max(0,Math.floor(amount));const notes:string[]=[];
+  let adjusted=boundedWhole(amount,0);const notes:string[]=[];
   if(sheet.immunities.includes(type)){adjusted=0;notes.push('Immunity reduced damage to 0.');}
   else{
     if(sheet.resistances.includes(type)){adjusted=Math.floor(adjusted/2);notes.push('Resistance halved the damage.');}
@@ -604,7 +641,7 @@ export function applyDamage(state:GameState,sheet:ResolvedSheet,amount:number,ty
   if(absorbed)notes.push(`${absorbed} absorbed by Temporary HP.`);
   const active=state.activeTransform?.option;
   if(state.tempHp===0&&active&&(active.profile==='polymorph'||active.effects?.endsAtZeroTemporaryHp)){
-    const ended=active.label;delete state.activeTransform;
+    const ended=active.label;delete state.activeTransform;clearActionRecharges(state);
     if(state.concentration?.name===(active.spellName??active.label)){delete state.concentration;state.concentrationChecks=[];}
     delete state.tempHpSource;notes.push(`${ended} ended because its Temporary Hit Points reached 0.`);
   }
@@ -618,15 +655,15 @@ export function applyDamage(state:GameState,sheet:ResolvedSheet,amount:number,ty
       if(state.concentration?.name===(overlay.spellName??overlay.label)){delete state.concentration;state.concentrationChecks=[];}
       notes.push(`${overlay.label} ended because Hit Points reached 0.`);
     }
-    if(state.activeTransform?.option.effects?.endsAtZeroHp){const ended=state.activeTransform.option.label;delete state.activeTransform;notes.push(`${ended} ended because Hit Points reached 0.`);}
+    if(state.activeTransform?.option.effects?.endsAtZeroHp){const ended=state.activeTransform.option.label;delete state.activeTransform;clearActionRecharges(state);notes.push(`${ended} ended because Hit Points reached 0.`);}
   }
   if(adjusted>0&&state.concentration){const dc=concentrationCheckDc(adjusted);state.concentrationChecks.push({dc,damage:adjusted,source:type});notes.push(`Concentration save DC ${dc} required.`);}
   return {state,message:`Applied ${adjusted} ${type} damage. ${notes.join(' ')}`.trim()};
 }
 
 export function heal(state:GameState,character:Character,amount:number):TransitionResult{
-  const before=state.hp;state.hp=Math.min(character.hp.max,state.hp+Math.max(0,Math.floor(amount)));
+  const before=state.hp;state.hp=Math.min(character.hp.max,state.hp+boundedWhole(amount,0));
   return {state,message:`Recovered ${state.hp-before} Hit Points.`};
 }
-export function concentrationCheckDc(damageTaken:number){return Math.min(30,Math.max(10,Math.floor(damageTaken/2)))}
+export function concentrationCheckDc(damageTaken:number){return Math.min(30,Math.max(10,Math.floor(boundedWhole(damageTaken,0)/2)))}
 export function rulesMetadata(){return RULES_VERSION}

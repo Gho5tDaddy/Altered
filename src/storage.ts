@@ -48,19 +48,27 @@ export async function installExtensionPack(pack:OwnedContentPack):Promise<void>{
   const encoded=JSON.stringify(pack);if(encoded.length>2_000_000)throw new Error('Content pack exceeds the 2 MB local installation limit.');
   if(!pack.metadata||typeof pack.metadata.id!=='string'||!pack.metadata.id.trim())throw new Error('Content pack metadata is invalid.');
   await setValue(PACK_STORE,pack.metadata.id,pack);
-  const index=await getValue<string[]>(PACK_STORE,PACK_INDEX_KEY)??[];
+  const records=await listExtensionPackRecords();
+  const index=records.map(record=>record.id);
   if(!index.includes(pack.metadata.id))await setValue(PACK_STORE,PACK_INDEX_KEY,[...index,pack.metadata.id].sort());
 }
 export function loadExtensionPack(id:string):Promise<OwnedContentPack|undefined>{return getValue<OwnedContentPack>(PACK_STORE,id)}
+export async function listExtensionPackRecords():Promise<Array<{id:string;pack:unknown}>>{
+  const storedIndex=await getValue<unknown>(PACK_STORE,PACK_INDEX_KEY);
+  const rawIndex=Array.isArray(storedIndex)?storedIndex:[];
+  const index=[...new Set(rawIndex.filter((id):id is string=>typeof id==='string'&&id.length>0&&id!==PACK_INDEX_KEY))].slice(0,500);
+  const records=await Promise.all(index.map(async id=>({id,pack:await getValue<unknown>(PACK_STORE,id)})));
+  const present=records.filter(record=>record.pack!==undefined);
+  if(!Array.isArray(storedIndex)||present.length!==rawIndex.length||present.some((record,position)=>record.id!==rawIndex[position]))await setValue(PACK_STORE,PACK_INDEX_KEY,present.map(record=>record.id));
+  return present;
+}
 export async function listExtensionPacks():Promise<OwnedContentPack[]>{
-  const index=await getValue<string[]>(PACK_STORE,PACK_INDEX_KEY)??[];
-  const packs=await Promise.all(index.map(id=>loadExtensionPack(id)));
-  return packs.filter((pack):pack is OwnedContentPack=>Boolean(pack)).sort((a,b)=>a.metadata.name.localeCompare(b.metadata.name));
+  const records=await listExtensionPackRecords();
+  return records.map(record=>record.pack).filter((pack):pack is OwnedContentPack=>Boolean(pack&&typeof pack==='object')).sort((a,b)=>String(a.metadata?.name??'').localeCompare(String(b.metadata?.name??'')));
 }
 export async function removeExtensionPack(id:string):Promise<void>{
   await deleteValue(PACK_STORE,id);
-  const index=await getValue<string[]>(PACK_STORE,PACK_INDEX_KEY)??[];
-  if(index.includes(id))await setValue(PACK_STORE,PACK_INDEX_KEY,index.filter(value=>value!==id));
+  await listExtensionPackRecords();
 }
 
 function imageElement(dataUrl:string):Promise<HTMLImageElement>{return new Promise((resolve,reject)=>{const image=new Image();image.decoding='async';image.addEventListener('load',()=>resolve(image),{once:true});image.addEventListener('error',()=>reject(new Error('The selected image could not be decoded.')),{once:true});image.src=dataUrl;});}

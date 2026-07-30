@@ -4,8 +4,8 @@ import type {Character} from '../src/types.js';
 import {CREATURES} from '../src/content-registry.js';
 import {parseCharacter} from '../src/schema.js';
 import {
-  applyCondition,applyDamage,attackBonuses,attackRollSources,availableTransformations,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,declareRecklessAttack,
-  endConcentration,endTransformation,endTurn,extendRage,longRest,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildShapeLimits
+  applyCondition,applyDamage,attackBonuses,attackRollSources,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,declareRecklessAttack,
+  endConcentration,endTransformation,endTurn,extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
 } from '../src/engine.js';
 
 function must<T>(value:T|undefined):T{if(value===undefined)throw new Error('Expected value was missing.');return value}
@@ -41,6 +41,10 @@ test('verified 2024 creature golden values are locked',()=>{
   const constrict=must(CREATURES['giant-constrictor-snake']).actions.find(a=>a.id==='constrict');
   assert.equal(constrict?.type,'save');
   assert.equal(constrict?.type==='save'?constrict.dc:0,14);
+  assert.deepEqual(
+    ['giant-octopus','lion','tiger'].map(id=>{const form=must(CREATURES[id]);return [form.id,form.cr,form.ac,form.hp]}),
+    [['giant-octopus',1,11,45],['lion',1,12,22],['tiger',1,13,30]],
+  );
 });
 
 test('Moon Druid legal forms use Druid level and known forms',()=>{
@@ -50,6 +54,31 @@ test('Moon Druid legal forms use Druid level and known forms',()=>{
   const forms=availableTransformations(c,state).filter(o=>o.profile==='wildshape');
   assert.equal(forms.length,6);
   assert.ok(forms.some(f=>f.formId==='polar-bear'));
+});
+
+test('recharge actions remain unavailable until a qualifying start-of-turn roll',()=>{
+  const c=character();const state=createInitialState(c);const spider=must(CREATURES['giant-spider']);const web=spider.actions.find(action=>action.id==='web');
+  assert.ok(web?.type==='save');if(web.type!=='save')return;
+  assert.equal(pendingActionRecharge(state,web),undefined);markActionRechargeUsed(state,web);assert.equal(pendingActionRecharge(state,web)?.min,5);
+  const failed=startNewTurn(state,()=>4);assert.match(failed.message,/needs 5–6/);assert.ok(pendingActionRecharge(state,web));
+  const passed=startNewTurn(state,()=>5);assert.match(passed.message,/recharged on 5/);assert.equal(pendingActionRecharge(state,web),undefined);
+});
+
+test('entering a new replacement form resets its recharge actions',()=>{
+  const c=character();const state=createInitialState(c);const spider=must(CREATURES['giant-spider']);const web=spider.actions.find(action=>action.id==='web');
+  assert.ok(web?.type==='save');if(web.type!=='save')return;markActionRechargeUsed(state,web);
+  const wolf=availableTransformations(c,state).find(option=>option.formId==='dire-wolf'&&option.profile==='wildshape');assert.ok(wolf);startTransformation(c,state,wolf);
+  assert.deepEqual(state.recharges,{});
+});
+
+test('per-day creature actions remain spent across form changes and reset on a Long Rest',()=>{
+  const c=character();const state=createInitialState(c);
+  const ink={id:'ink-cloud',name:'Ink Cloud',type:'automatic' as const,cost:'reaction' as const,uses:{max:1,recovery:'long' as const}};
+  assert.equal(remainingActionUses(state,ink),1);markLimitedActionUsed(state,ink);assert.equal(remainingActionUses(state,ink),0);
+  const wolf=availableTransformations(c,state).find(option=>option.formId==='dire-wolf'&&option.profile==='wildshape');assert.ok(wolf);startTransformation(c,state,wolf);
+  assert.equal(remainingActionUses(state,ink),1); // keyed to the currently active transformation
+  endTransformation(state,false,c);assert.equal(remainingActionUses(state,ink),0);
+  longRest(c,state);assert.equal(remainingActionUses(state,ink),1);
 });
 
 test('Land Druid level 6 rejects illegal known forms and lists legal ones',()=>{
@@ -117,6 +146,14 @@ test('Shapechange retains spellcasting but Polymorph does not',()=>{
 test('Rage resistance applies damage after resistance and before HP',()=>{
   const c=character();const state=createInitialState(c);startRage(c,state);const sheet=resolveSheet(c,state);
   applyDamage(state,sheet,9,'Slashing');assert.equal(state.hp,56);
+});
+
+test('non-finite numeric inputs cannot corrupt combat state',()=>{
+  const c=character();const state=createInitialState(c);const sheet=resolveSheet(c,state);
+  applyDamage(state,sheet,Number.NaN,'Fire',c);heal(state,c,Number.POSITIVE_INFINITY);
+  assert.equal(state.hp,60);assert.equal(state.tempHp,0);assert.equal(concentrationCheckDc(Number.NaN),10);assert.equal(boundedWhole(Number.POSITIVE_INFINITY,7),7);
+  const fighter=character({classes:[{name:'Fighter',level:1}],totalLevel:1,hp:{current:20,max:60}});const fighterState=createInitialState(fighter);useSecondWind(fighter,fighterState,Number.NaN);assert.equal(fighterState.hp,22);assert.equal(fighterState.resources['second-wind']?.current,1);
+  const paladin=character({classes:[{name:'Paladin',level:1}],totalLevel:1,hp:{current:20,max:60}});const paladinState=createInitialState(paladin);useLayOnHands(paladin,paladinState,Number.NaN);assert.equal(paladinState.hp,21);assert.equal(paladinState.resources['lay-on-hands']?.current,4);
 });
 
 test('Reckless Attack must be declared and advantage/disadvantage can cancel',()=>{
@@ -190,6 +227,7 @@ test('Rage and Danger Sense add save advantages and Primal Knowledge adds Streng
 
 test('Wild Resurgence enforces once-per-turn and once-per-long-rest exchanges',()=>{
   const c=character();const state=createInitialState(c);must(state.resources['wild-shape']).current=0;
+  assert.equal(wildResurgenceError(c,state,'slot-to-shape'),null);assert.match(wildResurgenceError(c,state,'shape-to-slot')??'',/No Wild Shape/);
   assert.match(useWildResurgence(c,state,'slot-to-shape').message,/regain one Wild Shape/);must(state.resources['wild-shape']).current=0;assert.match(useWildResurgence(c,state,'slot-to-shape').message,/only once on a turn/);
   startNewTurn(state);must(state.resources['wild-shape']).current=1;must(state.spellSlots['1']??(state.spellSlots['1']={current:0,max:1})).current=0;assert.match(useWildResurgence(c,state,'shape-to-slot').message,/regain a level 1/);must(state.resources['wild-shape']).current=1;assert.match(useWildResurgence(c,state,'shape-to-slot').message,/Long Rest/);
 });
@@ -219,8 +257,12 @@ test('Polymorph lists bundled legal Beasts without requiring seenForms',()=>{
   const c=character({classes:[{name:'Wizard',level:8}],totalLevel:8,seenForms:[]});const forms=availableTransformations(c,createInitialState(c)).filter(o=>o.profile==='polymorph');assert.ok(forms.some(o=>o.formId==='dire-wolf'));
 });
 
-test('Short Rest ends Rage and Long Rest preserves unresolved conditions',()=>{
-  const c=character();const state=createInitialState(c);startRage(c,state);state.conditions.push('Poisoned');shortRest(state);assert.equal(state.rage.active,false);longRest(c,state);assert.ok(state.conditions.includes('Poisoned'));
+test('Rests restore a usable turn budget while Long Rest preserves unresolved conditions',()=>{
+  const c=character();const state=createInitialState(c);startRage(c,state);state.conditions.push('Poisoned');
+  state.turn.actionsRemaining=0;state.turn.surgeActionsRemaining=1;state.turn.bonusRemaining=0;state.turn.reactionRemaining=0;state.turn.attackRollsMade=2;state.turn.oncePerTurn.test=true;
+  shortRest(state);assert.equal(state.rage.active,false);assert.deepEqual(state.turn,{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,attackRollsMade:0,oncePerTurn:{}});
+  state.turn.actionsRemaining=0;state.turn.bonusRemaining=0;state.turn.reactionRemaining=0;state.turn.oncePerTurn.test=true;
+  longRest(c,state);assert.ok(state.conditions.includes('Poisoned'));assert.deepEqual(state.turn,{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,attackRollsMade:0,oncePerTurn:{}});
 });
 
 test('new Temporary Hit Points always require a choice when a pool already exists',()=>{

@@ -60,20 +60,24 @@ function parseAction(v:unknown,path:string):CreatureAction{
   if(type==='attack'){
     const kind=['beast','weapon','unarmed','spell'].includes(String(v.kind))?v.kind as 'beast'|'weapon'|'unarmed'|'spell':'beast';
     const out:CreatureAction={id,name,type:'attack',cost:actionCost(v.cost,`${path}.cost`,'action'),attackBonus:num(v.attackBonus,`${path}.attackBonus`,-20,40),ability:ability(v.ability,`${path}.ability`),kind,damage:parseDamage(v.damage,`${path}.damage`)};
-    if(typeof v.reach==='number')out.reach=num(v.reach,`${path}.reach`,0,1000);if(typeof v.range==='string')out.range=v.range.slice(0,80);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);const effects=parseConditionEffects(v.effects,`${path}.effects`);if(effects)out.effects=effects;return out;
+    if(typeof v.reach==='number')out.reach=num(v.reach,`${path}.reach`,0,1000);if(typeof v.range==='string')out.range=v.range.slice(0,80);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);const effects=parseConditionEffects(v.effects,`${path}.effects`);if(effects)out.effects=effects;parseActionLimits(v,path,out);return out;
   }
   if(type==='save'){
     const out:CreatureAction={id,name,type:'save',cost:actionCost(v.cost,`${path}.cost`,'action'),saveAbility:ability(v.saveAbility,`${path}.saveAbility`),dc:num(v.dc,`${path}.dc`,1,40)};
-    if(typeof v.range==='string')out.range=v.range.slice(0,80);if(v.damageOnFail!=null)out.damageOnFail=parseDamage(v.damageOnFail,`${path}.damageOnFail`);if(v.damageOnSuccess!=null)out.damageOnSuccess=parseDamage(v.damageOnSuccess,`${path}.damageOnSuccess`);const effects=parseConditionEffects(v.effectsOnFail,`${path}.effectsOnFail`);if(effects)out.effectsOnFail=effects;if(isObject(v.recharge))out.recharge={min:num(v.recharge.min,`${path}.recharge.min`,1,6),max:num(v.recharge.max,`${path}.recharge.max`,1,6)};if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);return out;
+    if(typeof v.range==='string')out.range=v.range.slice(0,80);if(v.damageOnFail!=null)out.damageOnFail=parseDamage(v.damageOnFail,`${path}.damageOnFail`);if(v.damageOnSuccess!=null)out.damageOnSuccess=parseDamage(v.damageOnSuccess,`${path}.damageOnSuccess`);const effects=parseConditionEffects(v.effectsOnFail,`${path}.effectsOnFail`);if(effects)out.effectsOnFail=effects;parseActionLimits(v,path,out);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);return out;
   }
   if(type==='automatic'){
-    const out:CreatureAction={id,name,type:'automatic',cost:actionCost(v.cost,`${path}.cost`,'action')};if(v.damage!=null)out.damage=parseDamage(v.damage,`${path}.damage`);const effects=parseConditionEffects(v.effects,`${path}.effects`);if(effects)out.effects=effects;if(typeof v.prerequisite==='string')out.prerequisite=v.prerequisite.slice(0,300);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);return out;
+    const out:CreatureAction={id,name,type:'automatic',cost:actionCost(v.cost,`${path}.cost`,'action')};if(v.damage!=null)out.damage=parseDamage(v.damage,`${path}.damage`);const effects=parseConditionEffects(v.effects,`${path}.effects`);if(effects)out.effects=effects;if(typeof v.prerequisite==='string')out.prerequisite=v.prerequisite.slice(0,300);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);parseActionLimits(v,path,out);return out;
   }
   if(type==='multiattack'){
     if(!Array.isArray(v.sequence)||v.sequence.length===0||v.sequence.length>20)throw new Error(`${path}.sequence must be a non-empty array under 20 entries.`);
     return {id,name,type:'multiattack',cost:'action',sequence:v.sequence.map((entry,i)=>str(entry,`${path}.sequence[${i}]`,120)),...(typeof v.notes==='string'?{notes:v.notes.slice(0,500)}:{})};
   }
   throw new Error(`${path}.type must be attack, save, automatic, or multiattack.`);
+}
+function parseActionLimits(v:Record<string,unknown>,path:string,out:Extract<CreatureAction,{type:'attack'|'save'|'automatic'}>){
+  if(isObject(v.recharge)){const min=num(v.recharge.min,`${path}.recharge.min`,1,6),max=num(v.recharge.max,`${path}.recharge.max`,1,6);if(min>max)throw new Error(`${path}.recharge.min must not exceed recharge.max.`);out.recharge={min,max};}
+  if(isObject(v.uses)){const max=num(v.uses.max,`${path}.uses.max`,1,100);if(v.uses.recovery!=='long')throw new Error(`${path}.uses.recovery must be long.`);out.uses={max,recovery:'long'};}
 }
 function parseCreature(v:unknown,i:number):Creature{
   const path=`customForms[${i}]`;if(!isObject(v))throw new Error(`${path} must be an object.`);
@@ -130,6 +134,7 @@ function parseSpell(v:unknown,i:number):Spell{
   if(typeof v.saveDc==='number')out.saveDc=num(v.saveDc,`spells[${i}].saveDc`,1,40);
   if(v.damage!=null)out.damage=parseDamage(v.damage,`spells[${i}].damage`);
   if(typeof v.healing==='string'){const healing=v.healing.replace(/\s+/g,'').slice(0,40);if(!DICE.test(healing))throw new Error(`spells[${i}].healing is not a safe dice expression.`);out.healing=healing;}
+  if(v.resolution!==undefined){if(!['save','automatic','manual'].includes(String(v.resolution)))throw new Error(`spells[${i}].resolution is unsupported.`);out.resolution=v.resolution as 'save'|'automatic'|'manual';}
   if(typeof v.slotLevel==='number')out.slotLevel=num(v.slotLevel,`spells[${i}].slotLevel`,0,9);
   if(typeof v.summary==='string')out.summary=v.summary.slice(0,300);
   return out;

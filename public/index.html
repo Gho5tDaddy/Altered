@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'">
   <meta name="theme-color" content="#161a1d">
   <title>Altered — 2024 Transformation Character Sheet</title>
   <link rel="manifest" href="manifest.json">
@@ -55,18 +56,18 @@
         <div id="quick-features" class="quick-features"></div>
         <div id="resource-strip" class="resource-strip"></div>
 
-        <nav class="tabs" aria-label="Character sheet sections">
-          <button class="tab active" data-tab="actions" type="button">Actions</button>
-          <button class="tab" data-tab="rolls" type="button">Saves & Skills</button>
-          <button class="tab" data-tab="spells" type="button">Spells</button>
-          <button class="tab" data-tab="features" type="button">Features</button>
-          <button class="tab" data-tab="rules" type="button">Why?</button>
+        <nav class="tabs" role="tablist" aria-label="Character sheet sections">
+          <button id="tab-actions" class="tab active" data-tab="actions" type="button" role="tab" aria-selected="true" aria-controls="tab-content" tabindex="0">Actions</button>
+          <button id="tab-rolls" class="tab" data-tab="rolls" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Saves & Skills</button>
+          <button id="tab-spells" class="tab" data-tab="spells" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Spells</button>
+          <button id="tab-features" class="tab" data-tab="features" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Features</button>
+          <button id="tab-rules" class="tab" data-tab="rules" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Why?</button>
         </nav>
         <section id="latest-roll" class="latest-roll" aria-live="polite">
           <div class="latest-roll-copy"><span>Latest result</span><strong id="roll-title">Ready</strong></div>
           <div class="latest-roll-value"><strong id="roll-total">—</strong><span id="roll-detail">Press an attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically.</span></div>
         </section>
-        <section id="tab-content" class="tab-content"></section>
+        <section id="tab-content" class="tab-content" role="tabpanel" aria-labelledby="tab-actions" tabindex="0"></section>
       </section>
 
       <aside class="side-column">
@@ -74,7 +75,7 @@
           <h2>Damage Received & Healing</h2>
           <p class="panel-help">Use this when your character takes damage. Damage dealt by your attacks and spells is rolled from their action buttons.</p>
           <div class="two-col">
-            <div><label for="damage-amount">Damage received</label><input id="damage-amount" type="number" min="0" value="5"></div>
+            <div><label for="damage-amount">Damage received</label><input id="damage-amount" type="number" min="0" step="1" inputmode="numeric" value="5"></div>
             <div><label for="damage-type">Damage type</label><select id="damage-type"></select></div>
           </div>
           <div class="two-col button-row"><button id="apply-damage" class="button danger" type="button">Take Damage</button><button id="apply-healing" class="button secondary" type="button">Heal</button></div>
@@ -88,7 +89,7 @@
 
         <section class="panel">
           <div class="section-title"><h2>Conditions</h2><button id="clear-conditions" class="text-button" type="button">Clear</button></div>
-          <div class="two-col"><select id="condition-select"></select><button id="add-condition" class="button secondary" type="button">Add</button></div>
+          <div class="two-col"><div><label class="sr-only" for="condition-select">Condition</label><select id="condition-select"></select></div><button id="add-condition" class="button secondary" type="button">Add</button></div>
           <div id="condition-list" class="chip-list"></div>
         </section>
 
@@ -103,16 +104,36 @@
 
 
 
-  <dialog id="import-dialog" class="wide-dialog">
+  <dialog id="import-dialog" class="wide-dialog" aria-labelledby="import-dialog-title">
     <div class="dialog-card import-center">
-      <div class="section-title"><h2>Import & Private Content</h2><button id="close-import-center" class="text-button" type="button">Close</button></div>
+      <div class="section-title"><h2 id="import-dialog-title">Import & Private Content</h2><button id="close-import-center" class="text-button" type="button">Close</button></div>
       <p class="import-intro">Character data and private owned-content packs are kept separate. Packs stay on this device and are applied only when their character, class, subclass, level, or species match.</p>
       <div class="import-grid">
+        <section class="import-block ddb-import-block">
+          <h3>D&amp;D Beyond character</h3>
+          <p>Temporarily make the character Public, paste its link or ID, and review the structured import before Altered changes your sheet.</p>
+          <label for="dndbeyond-source">Public character link or ID</label>
+          <div class="ddb-source-row">
+            <input id="dndbeyond-source" inputmode="numeric" autocomplete="off" placeholder="https://www.dndbeyond.com/characters/123456789">
+            <button id="fetch-dndbeyond" class="button primary" type="button">Fetch &amp; Review</button>
+          </div>
+          <p class="source-note">In D&amp;D Beyond, open the character builder’s Home tab and set Character Privacy to Public while importing. Altered sends no account credentials. After the import succeeds, you can set the character back to Private.</p>
+          <section id="dndbeyond-review" class="ddb-review" aria-labelledby="dndbeyond-review-title" hidden>
+            <div class="section-title"><h3 id="dndbeyond-review-title">Import review</h3><span id="dndbeyond-review-id"></span></div>
+            <div id="dndbeyond-review-summary" class="ddb-review-summary"></div>
+            <div id="dndbeyond-coverage" class="ddb-coverage"></div>
+            <div id="dndbeyond-warnings" class="ddb-warnings"></div>
+            <div class="inline-actions import-actions">
+              <button id="confirm-dndbeyond-import" class="button primary" type="button">Import Reviewed Character</button>
+              <button id="download-dndbeyond-json" class="button secondary" type="button">Download Altered JSON</button>
+            </div>
+          </section>
+        </section>
         <section class="import-block">
-          <h3>Character file</h3>
+          <h3>Altered backup</h3>
           <p>Import an Altered character JSON file. Installed matching packs are applied automatically after validation.</p>
           <label class="button primary file-button">Import Character JSON<input id="import-file" type="file" accept="application/json,.json"></label>
-          <p class="source-note">D&amp;D Beyond can export a form-fillable PDF, but PDFs do not reliably contain every executable rule needed for paid transformations. Altered therefore uses validated JSON for calculations and treats the PDF or owned book as the source you consult while creating a private pack.</p>
+          <p class="source-note">Use this for a reviewed Altered export or a hand-authored character file. Every import is validated before it can replace the current sheet.</p>
         </section>
         <section class="import-block">
           <h3>Owned-content pack</h3>
@@ -132,9 +153,9 @@
     </div>
   </dialog>
 
-  <dialog id="transform-builder-dialog" class="wide-dialog">
+  <dialog id="transform-builder-dialog" class="wide-dialog" aria-labelledby="transform-builder-title">
     <form id="transform-builder-form" class="dialog-card builder-card">
-      <div class="section-title"><h2>Create Private Transformation</h2><button id="close-transform-builder" class="text-button" type="button">Close</button></div>
+      <div class="section-title"><h2 id="transform-builder-title">Create Private Transformation</h2><button id="close-transform-builder" class="text-button" type="button">Close</button></div>
       <p class="import-intro">Enter only the mechanical values from content you own. The resulting pack remains local and can be exported as your private backup.</p>
       <div class="builder-grid">
         <div><label for="builder-pack-name">Pack name</label><input id="builder-pack-name" value="My Private Transformations" required></div>
@@ -189,22 +210,26 @@
     </form>
   </dialog>
 
-  <dialog id="settings-dialog">
+  <dialog id="settings-dialog" aria-labelledby="settings-dialog-title">
     <div class="dialog-card settings-card">
-      <div class="section-title"><h2>Altered Settings</h2><button id="close-settings" class="text-button" type="button">Close</button></div>
+      <div class="section-title"><h2 id="settings-dialog-title">Altered Settings</h2><button id="close-settings" class="text-button" type="button">Close</button></div>
       <label class="setting-row" for="magic-effects-enabled"><span><strong>Magical form aura</strong><small>Keep a subtle changing glow and pulse around the interface while a form is active.</small></span><input id="magic-effects-enabled" type="checkbox"></label>
       <label class="setting-row" for="reduce-motion"><span><strong>Reduce motion</strong><small>Keep a static transformed glow without pulsing or burst animations.</small></span><input id="reduce-motion" type="checkbox"></label>
       <div class="settings-data">
         <h3>Rules databank</h3>
         <p id="content-registry-summary"></p>
         <div id="content-pack-list" class="content-pack-list"></div>
+        <div class="catalog-health">
+          <div class="section-title"><h3>Legal SRD support catalog</h3><button id="refresh-srd-catalog" class="button compact secondary" type="button">Check now</button></div>
+          <p id="srd-catalog-status" role="status" aria-live="polite">Checking the live legal SRD support catalog...</p>
+        </div>
       </div>
     </div>
   </dialog>
 
-  <dialog id="temp-hp-dialog">
+  <dialog id="temp-hp-dialog" aria-labelledby="temp-hp-dialog-title">
     <form method="dialog" class="dialog-card">
-      <h2>Temporary Hit Points do not stack</h2>
+      <h2 id="temp-hp-dialog-title">Temporary Hit Points do not stack</h2>
       <p id="temp-hp-copy"></p>
       <div class="dialog-actions"><button id="keep-current-thp" class="button secondary" value="cancel" type="button"></button><button id="keep-new-thp" class="button primary" value="default" type="button"></button></div>
     </form>
