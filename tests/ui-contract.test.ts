@@ -13,6 +13,14 @@ test('static shell exposes accessible tabs, dialogs, and condition input',()=>{
   }
 });
 
+test('recent activity exposes a clear control that preserves non-log state',()=>{
+  const html=readFileSync('public/index.html','utf8');
+  const source=readFileSync('src/app.ts','utf8');
+  assert.match(html,/id="clear-activity"[^>]*>Clear Activity<\/button>/);
+  assert.match(source,/\$\('#clear-activity'\)\.addEventListener\('click',\(\)=>\{state\.log=\[\];/);
+  assert.match(source,/Recent activity cleared\./);
+});
+
 test('static shell applies a restrictive local-only content policy',()=>{
   const html=readFileSync('public/index.html','utf8');
   const policy=html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1]??'';
