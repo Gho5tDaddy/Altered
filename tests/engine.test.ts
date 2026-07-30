@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type {Character} from '../src/types.js';
+import type {AttackAction,Character} from '../src/types.js';
 import {CREATURES} from '../src/content-registry.js';
 import {parseCharacter} from '../src/schema.js';
 import {
   applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,declareRecklessAttack,
-  endConcentration,endTransformation,endTurn,extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
+  endConcentration,endSpellEffect,endTransformation,endTurn,extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
 } from '../src/engine.js';
 
 function must<T>(value:T|undefined):T{if(value===undefined)throw new Error('Expected value was missing.');return value}
@@ -169,7 +169,37 @@ test('Moonbeam is visible and castable in Moon Wild Shape, but Rage blocks it',(
 
 test('castSpell consumes action, slot, and starts Concentration',()=>{
   const c=character();const state=createInitialState(c);const result=castSpell(c,state,'Moonbeam');assert.match(result.message,/Cast Moonbeam/);
-  assert.equal(state.turn.actionsRemaining,0);assert.equal(must(state.spellSlots['2']).current,1);assert.equal(state.concentration?.name,'Moonbeam');
+  assert.equal(state.turn.actionsRemaining,0);assert.equal(state.turn.bonusRemaining,1);assert.equal(state.turn.slotSpellCast,true);assert.equal(must(state.spellSlots['2']).current,1);assert.equal(state.concentration?.name,'Moonbeam');
+});
+
+test('Barkskin applies a persistent AC 17 minimum through Wild Shape and can be ended',()=>{
+  const c=character({ac:14,abilities:{str:12,dex:14,con:16,int:10,wis:16,cha:8},spells:[
+    {name:'Barkskin',level:2,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'bonus'},
+    {name:'Starry Wisp',level:0,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action'},
+  ]});const state=createInitialState(c);
+  assert.match(castSpell(c,state,'Barkskin').message,/Cast Barkskin/);assert.equal(state.turn.actionsRemaining,1);assert.equal(state.turn.bonusRemaining,0);assert.equal(state.concentration,undefined);assert.equal(resolveSheet(c,state).ac,17);
+  startNewTurn(state);const wolf=availableTransformations(c,state).find(option=>option.profile==='wildshape'&&option.formId==='dire-wolf');assert.ok(wolf);startTransformation(c,state,wolf);assert.equal(resolveSheet(c,state).ac,17);assert.equal(resolveSheet(c,state).acSource,'Barkskin minimum');
+  assert.match(endSpellEffect(state,'barkskin').message,/Barkskin ended/);assert.equal(resolveSheet(c,state).ac,16);
+});
+
+test('an Action and Bonus Action remain independent while 2024 limits slot spells to one per turn',()=>{
+  const c=character({spells:[
+    {name:'Barkskin',level:2,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'bonus'},
+    {name:'Healing Word',level:1,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'bonus',healing:'1d4+4'},
+    {name:'Starry Wisp',level:0,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action'},
+  ],spellSlots:{'1':{current:2,max:2},'2':{current:2,max:2}}});const state=createInitialState(c);
+  assert.match(castSpell(c,state,'Barkskin').message,/Cast Barkskin/);assert.equal(resolveSheet(c,state).spells.find(spell=>spell.name==='Starry Wisp')?.available,true);assert.equal(resolveSheet(c,state).spells.find(spell=>spell.name==='Healing Word')?.available,false);
+  assert.match(castSpell(c,state,'Starry Wisp').message,/Cast Starry Wisp/);assert.equal(state.turn.actionsRemaining,0);assert.equal(state.turn.bonusRemaining,0);
+  startNewTurn(state);assert.equal(state.turn.slotSpellCast,false);assert.equal(resolveSheet(c,state).spells.find(spell=>spell.name==='Healing Word')?.available,true);
+});
+
+test('Fount of Moonlight is a Magic Action and powers melee beast attacks while concentrated',()=>{
+  const c=character({classes:[{name:'Druid',level:7,subclass:'Circle of the Moon'}],totalLevel:7,knownForms:['dire-wolf'],spells:[
+    {name:'Fount of Moonlight',level:4,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action',concentration:true},
+  ],spellSlots:{'4':{current:1,max:1}}});const state=createInitialState(c);const wolf=availableTransformations(c,state).find(option=>option.profile==='wildshape'&&option.formId==='dire-wolf');assert.ok(wolf);startTransformation(c,state,wolf);
+  const spell=resolveSheet(c,state).spells.find(entry=>entry.name==='Fount of Moonlight');assert.equal(spell?.available,true);assert.equal(spell?.castingTime,'magic-action');assert.match(castSpell(c,state,'Fount of Moonlight').message,/Cast Fount/);
+  const sheet=resolveSheet(c,state);const bite=sheet.actions.find(action=>action.type==='attack');assert.ok(bite);assert.ok(sheet.resistances.includes('Radiant'));assert.ok(attackBonuses(c,state,sheet,bite).some(packet=>packet.label==='Fount of Moonlight'&&packet.expression==='2d6'));
+  const rangedSpell:AttackAction={id:'starry-wisp',name:'Starry Wisp',type:'attack',cost:'none',attackBonus:7,ability:'wis',kind:'spell',range:'60 feet',damage:[{expression:'2d8',type:'Radiant'}]};assert.equal(attackBonuses(c,state,sheet,rangedSpell).some(packet=>packet.label==='Fount of Moonlight'),false);
 });
 
 test('a spell can use a higher-level slot when its base slot is empty',()=>{
@@ -282,9 +312,9 @@ test('Polymorph lists bundled legal Beasts without requiring seenForms',()=>{
 test('Rests restore a usable turn budget while Long Rest preserves unresolved conditions',()=>{
   const c=character();const state=createInitialState(c);startRage(c,state);state.conditions.push('Poisoned');
   state.turn.actionsRemaining=0;state.turn.surgeActionsRemaining=1;state.turn.bonusRemaining=0;state.turn.reactionRemaining=0;state.turn.attackRollsMade=2;state.turn.oncePerTurn.test=true;
-  shortRest(state);assert.equal(state.rage.active,false);assert.deepEqual(state.turn,{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,attackRollsMade:0,oncePerTurn:{}});
+  shortRest(state);assert.equal(state.rage.active,false);assert.deepEqual(state.turn,{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,slotSpellCast:false,attackRollsMade:0,oncePerTurn:{}});
   state.turn.actionsRemaining=0;state.turn.bonusRemaining=0;state.turn.reactionRemaining=0;state.turn.oncePerTurn.test=true;
-  longRest(c,state);assert.ok(state.conditions.includes('Poisoned'));assert.deepEqual(state.turn,{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,attackRollsMade:0,oncePerTurn:{}});
+  longRest(c,state);assert.ok(state.conditions.includes('Poisoned'));assert.deepEqual(state.turn,{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,slotSpellCast:false,attackRollsMade:0,oncePerTurn:{}});
 });
 
 test('new Temporary Hit Points always require a choice when a pool already exists',()=>{

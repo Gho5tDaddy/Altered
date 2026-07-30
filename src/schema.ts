@@ -142,6 +142,7 @@ function parseSpell(v:unknown,i:number):Spell{
   if(v.resolution!==undefined){if(!['save','automatic','manual'].includes(String(v.resolution)))throw new Error(`spells[${i}].resolution is unsupported.`);out.resolution=v.resolution as 'save'|'automatic'|'manual';}
   if(typeof v.slotLevel==='number')out.slotLevel=num(v.slotLevel,`spells[${i}].slotLevel`,0,9);
   if(typeof v.summary==='string')out.summary=v.summary.slice(0,300);
+  if(v.activeEffect!==undefined){if(!isObject(v.activeEffect))throw new Error(`spells[${i}].activeEffect must be an object.`);const effect={id:str(v.activeEffect.id,`spells[${i}].activeEffect.id`,120),duration:str(v.activeEffect.duration,`spells[${i}].activeEffect.duration`,120),summary:str(v.activeEffect.summary,`spells[${i}].activeEffect.summary`,300)};out.activeEffect={...effect,...(typeof v.activeEffect.acMinimum==='number'?{acMinimum:num(v.activeEffect.acMinimum,`spells[${i}].activeEffect.acMinimum`,1,40)}:{})};}
   return out;
 }
 function parseFeature(v:unknown,i:number):ImportedFeatureRule{

@@ -121,16 +121,6 @@
       "summary": "Creates the 2024 spectral pack effect."
     },
     {
-      "name": "Fount of Moonlight",
-      "level": 4,
-      "sourceClass": "Druid",
-      "ability": "wis",
-      "prepared": true,
-      "castingTime": "bonus",
-      "concentration": true,
-      "summary": "Moonlit melee enhancement and defensive effect."
-    },
-    {
       "name": "Polymorph",
       "level": 4,
       "sourceClass": "Druid",

@@ -100,6 +100,7 @@ const ferocitusPayload={
         spell(3,'Starry Wisp',0,{attackType:1,modifiers:[{type:'damage',subType:'radiant',die:{diceString:'2d8'}}]}),
         spell(4,'Cure Wounds',1),
         spell(5,'Moonbeam',2,{concentration:true,saveDcAbilityId:3,modifiers:[{type:'damage',subType:'radiant',die:{diceString:'2d10'}}]}),
+        {...spell(7,'Barkskin',2),activation:{activationType:3}},
         {...spell(6,'Unprepared Spell',1),prepared:false,countsAsKnownSpell:false},
       ],
     }],
@@ -146,7 +147,9 @@ test('normalizes a Ferocitus-shaped multiclass character without guessing core v
   assert.equal(character.skillBonuses?.Intimidation,4);
   assert.equal(character.skillBonuses?.Nature,4);
   assert.deepEqual(character.knownForms,['dire-wolf','brown-bear','giant-spider','giant-toad','black-bear','panther']);
-  assert.equal(character.spells.length,6);
+  assert.equal(character.spells.length,7);
+  assert.deepEqual(character.spells.find(spell=>spell.name==='Barkskin')?.activeEffect,{id:'barkskin',duration:'1 hour',acMinimum:17,summary:'The target has Armor Class 17 if its AC would otherwise be lower.'});
+  assert.equal(character.spells.find(spell=>spell.name==='Barkskin')?.castingTime,'bonus');
   assert.ok(character.spells.some(spell=>spell.name==='Conjure Animals'&&spell.specialAccess==='circle-of-the-moon'));
   assert.equal(character.spells.filter(spell=>spell.name==='Moonbeam').length,1);
   assert.deepEqual(character.spellSlots,{

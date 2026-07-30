@@ -162,12 +162,12 @@ export function availableTransformations(character:Character,state?:GameState):T
 
 export function createInitialState(character:Character):GameState{
   return {
-    stateVersion:2,hp:character.hp.current,tempHp:0,
+    stateVersion:3,hp:character.hp.current,tempHp:0,
     rage:{active:false,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false},
-    turn:{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,attackRollsMade:0,oncePerTurn:{}},
+    turn:{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,slotSpellCast:false,attackRollsMade:0,oncePerTurn:{}},
     resources:Object.fromEntries(character.resources.map(r=>[r.id,cloneResource(r)])),
     spellSlots:Object.fromEntries(Object.entries(character.spellSlots).map(([k,v])=>[k,{...v}])),
-    concentrationChecks:[],conditions:[],equipment:{...character.equipment},overlays:[],recharges:{},actionUses:{},log:[]
+    concentrationChecks:[],activeSpellEffects:[],conditions:[],equipment:{...character.equipment},overlays:[],recharges:{},actionUses:{},log:[]
   };
 }
 
@@ -208,7 +208,8 @@ function evaluateFeatures(character:Character,state:GameState,option:Transformat
   return result;
 }
 function moonSpellAllowed(character:Character,spell:Spell){const level=recordValue(MOON_FORM_SPELL_LEVELS,spell.name);return sameText(subclass(character,'Druid'),'Circle of the Moon')&&level!==undefined&&classLevel(character,'Druid')>=level&&sameText(spell.sourceClass,'Druid')}
-function evaluateSpells(character:Character,state:GameState,option:TransformationOption,baseCanCast:boolean){return character.spells.map(spell=>{const prepared=spell.prepared!==false;const circleAccess=moonSpellAllowed(character,spell);let available=baseCanCast&&prepared;let reason=available?'Spellcasting is allowed.':'Spellcasting is blocked in the current form.';if(option.profile==='wildshape'&&circleAccess&&prepared&&!state.rage.active){available=true;reason='Available through Circle of the Moon while in Wild Shape.';}if(option.profile==='wildshape'&&classLevel(character,'Druid')>=18&&!state.rage.active){available=prepared&&!(spell.materialCost||spell.materialConsumed);reason=!prepared?'The spell is not prepared or otherwise available.':available?'Available through Beast Spells.':'Beast Spells excludes costly or consumed Material components.';}if(state.rage.active){available=false;reason='Rage blocks all spellcasting, including Circle spells.';}const level=spell.slotLevel??spell.level;if(available&&level>0&&!slotAvailable(state,character,level)){available=false;reason=`No level ${level} or higher spell slot remains.`;}if(available){const error=actionError(state,spell.castingTime,activeConditionImmunities(character,state,option));if(error){available=false;reason=error;}}return {...spell,...(circleAccess?{specialAccess:'circle-of-the-moon' as const}:{}),available,reason};});}
+export function spellActiveEffect(spell:Spell){if(spell.activeEffect)return spell.activeEffect;if(sameText(spell.name,'Barkskin'))return {id:'barkskin',duration:'1 hour',acMinimum:17,summary:'The target has Armor Class 17 if its AC would otherwise be lower.'};return undefined}
+function evaluateSpells(character:Character,state:GameState,option:TransformationOption,baseCanCast:boolean){return character.spells.map(spell=>{const prepared=spell.prepared!==false;const circleAccess=moonSpellAllowed(character,spell);let available=baseCanCast&&prepared;let reason=available?'Spellcasting is allowed.':'Spellcasting is blocked in the current form.';if(option.profile==='wildshape'&&circleAccess&&prepared&&!state.rage.active){available=true;reason='Available through Circle of the Moon while in Wild Shape.';}if(option.profile==='wildshape'&&classLevel(character,'Druid')>=18&&!state.rage.active){available=prepared&&!(spell.materialCost||spell.materialConsumed);reason=!prepared?'The spell is not prepared or otherwise available.':available?'Available through Beast Spells.':'Beast Spells excludes costly or consumed Material components.';}if(state.rage.active){available=false;reason='Rage blocks all spellcasting, including Circle spells.';}const level=spell.slotLevel??spell.level;if(available&&level>0&&state.turn.slotSpellCast){available=false;reason='2024 rule: a spell slot has already been expended to cast a spell on this turn. Cantrips and non-spell actions remain available.';}if(available&&level>0&&!slotAvailable(state,character,level)){available=false;reason=`No level ${level} or higher spell slot remains.`;}if(available){const error=actionError(state,spell.castingTime,activeConditionImmunities(character,state,option));if(error){available=false;reason=error;}}return {...spell,...(circleAccess?{specialAccess:'circle-of-the-moon' as const}:{}),available,reason};});}
 function resolveSpeeds(character:Character,state:GameState,option:TransformationOption,effects:TransformationEffects[]){
   const form=creature(character,option.formId);const speeds=form&&option.profile!=='overlay'?{...form.speeds}:{walk:character.speed};
   if(retainedClassFeatures(option)){const barb=classLevel(character,'Barbarian');if(barb>=5&&!(armorActive(state,option)&&state.equipment.armorCategory==='heavy'))speeds.walk=(speeds.walk??0)+10;const monk=classLevel(character,'Monk');if(monk>=2&&!armorActive(state,option)&&!shieldActive(state,option))speeds.walk=(speeds.walk??0)+monkMovement(monk);const ranger=classLevel(character,'Ranger');if(ranger>=6&&!(armorActive(state,option)&&state.equipment.armorCategory==='heavy')){speeds.walk=(speeds.walk??0)+10;speeds.climb=Math.max(speeds.climb??0,speeds.walk);speeds.swim=Math.max(speeds.swim??0,speeds.walk);}for(const feature of character.features){if(!retentionAllows(feature,option))continue;const bonus=feature.grants?.speedBonus??0;if(bonus)speeds.walk=(speeds.walk??0)+bonus;}}
@@ -227,6 +228,7 @@ function resolveAc(character:Character,state:GameState,option:TransformationOpti
   if(retainedClassFeatures(option)&&classLevel(character,'Monk')>=1)candidates.push({name:'Monk Unarmored Defense',value:10+abilityMod(abilities.dex)+abilityMod(abilities.wis),legal:!armorActive(state,option)&&!shieldActive(state,option),reason:armorActive(state,option)||shieldActive(state,option)?'Illegal while armor or a Shield is active.':'10 + Dexterity + Wisdom.'});
   for(const feature of character.features){const formula=feature.grants?.acFormula;if(!formula||!retentionAllows(feature,option))continue;const value=formula.base+formula.abilities.reduce((n,a)=>n+abilityMod(abilities[a]),0);const legal=!(feature.requires?.noArmor&&armorActive(state,option))&&!(feature.requires?.noShield&&shieldActive(state,option));candidates.push({name:feature.name,value,legal,reason:legal?'Imported structured AC formula.':'Imported prerequisites are not met.'});}
   for(const [i,effect] of effects.entries())if(effect.acFormula)candidates.push({name:`Transformation formula ${i+1}`,value:effect.acFormula.base+effect.acFormula.abilities.reduce((n,a)=>n+abilityMod(abilities[a]),0),legal:true,reason:'Explicit imported transformation AC formula.'});
+  for(const effect of state.activeSpellEffects)if(effect.acMinimum!==undefined)candidates.push({name:`${effect.name} minimum`,value:effect.acMinimum,legal:true,reason:`Active for ${effect.duration}. This is a minimum; a higher legal AC still wins.`});
   const bonus=effects.reduce((n,e)=>n+(e.acBonus??0),0);const legal=candidates.filter(c=>c.legal).sort((a,b)=>b.value-a.value);const selected=legal[0]??{name:'Fallback AC',value:10,legal:true,reason:'No legal formula found.'};if(bonus)candidates.push({name:'Transformation AC modifiers',value:selected.value+bonus,legal:true,reason:`Selected AC plus ${bonus>=0?'+':''}${bonus}.`});return {value:selected.value+bonus,source:bonus?`${selected.name} + modifiers`:selected.name,candidates};
 }
 function characterSaveValue(character:Character,option:TransformationOption,abilities:Character['abilities'],a:Ability,rank:number,pb:number){if((option.profile==='base'||option.profile==='overlay')&&character.saveBonuses?.[a]!==undefined)return (character.saveBonuses[a] as number)+abilityMod(abilities[a])-abilityMod(character.abilities[a]);return abilityMod(abilities[a])+pb*rank}
@@ -278,6 +280,7 @@ export function resolveSheet(character:Character,state:GameState):ResolvedSheet{
   for(const feature of character.features){if(!retentionAllows(feature,option))continue;resistances.push(...(feature.grants?.resistances??[]));immunities.push(...(feature.grants?.immunities??[]));}
   for(const effect of effects){resistances.push(...(effect.resistances??[]));immunities.push(...(effect.immunities??[]));vulnerabilities.push(...(effect.vulnerabilities??[]));}
   const conditionImmunities=effectConditionImmunities(form,effects);if(state.rage.active&&retainedClassFeatures(option))resistances.push('Bludgeoning','Piercing','Slashing');if(conditionApplies(state,'Petrified',conditionImmunities))resistances.push(...ALL_DAMAGE_TYPES);
+  if(sameText(state.concentration?.name,'Fount of Moonlight'))resistances.push('Radiant');
   const resolvedConditionImmunities=unique([...(form?.conditionImmunities??[]),...effects.flatMap(effect=>effect.conditionImmunities??[])]);const attackDamageModifiers=effects.map(effect=>effect.attackDamageModifier).filter((value):value is NonNullable<TransformationEffects['attackDamageModifier']>=>Boolean(value));
   const effectCreatureType=effects.map(effect=>effect.creatureType).filter((value):value is string=>Boolean(value)).at(-1);const creatureType=effectCreatureType??(form&&!policyFor(option).creatureType?form.type:character.creatureType);
   return {profile,...(form?{form}:{}),creatureType,size:effects.map(e=>e.size).filter(Boolean).at(-1)??form?.size??character.size,abilities,ac:ac.value,acSource:ac.source,acCandidates:ac.candidates,speeds:resolveSpeeds(character,state,option,effects),saves:resolveSaves(character,state,option,abilities,effects),skills:resolveSkills(character,state,option,abilities,effects),actions:resolvedActions(character,option,effects,canAttack,abilities),resistances:unique(resistances),immunities:unique(immunities),vulnerabilities:unique(vulnerabilities),senses:unique([...(form?.senses??[]),...effects.flatMap(e=>e.senses??[])]),canSpeak,canCast,canConcentrate,canAttack,canManipulateObjects,conditionImmunities:resolvedConditionImmunities,attackDamageModifiers,features,spells:evaluateSpells(character,state,option,baseCanCast)};
@@ -455,7 +458,7 @@ export function useActionSurge(character:Character,state:GameState):TransitionRe
   return {state,message:'Action Surge added one action that cannot be used for the Magic action.'};
 }
 function restoreTurnBudget(state:GameState,advance=false){
-  state.turn={number:state.turn.number+(advance?1:0),actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,attackRollsMade:0,oncePerTurn:{}};
+  state.turn={number:state.turn.number+(advance?1:0),actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,slotSpellCast:false,attackRollsMade:0,oncePerTurn:{}};
   state.rage.usedThisTurn=false;state.rage.recklessDeclared=false;state.rage.extendedThisTurn=false;
 }
 export function startNewTurn(state:GameState,rechargeRoll=()=>rollDice('1d6').total):TransitionResult{
@@ -472,13 +475,15 @@ export function endTurn(character:Character,state:GameState):TransitionResult{
   if(state.rage.active&&classLevel(character,'Barbarian')<15&&state.turn.number>=state.rage.endsAtTurn)return endRage(state,'Rage ended because it was not extended.');
   return {state,message:`Turn ${state.turn.number} ended.`};
 }
+function expiresDuringShortRest(duration:string){const value=normalized(duration);return value.includes('round')||value.includes('minute')||/(^|\D)1 hour(\D|$)/.test(value)}
 export function shortRest(state:GameState):TransitionResult{
   for(const r of Object.values(state.resources)){if(r.recovery==='short-all')r.current=r.max;else if(r.recovery==='short-one')r.current=Math.min(r.max,r.current+1);}
   if(state.rage.active)endRage(state,'Rage ended during the Short Rest.');
+  const expired=state.activeSpellEffects.filter(effect=>expiresDuringShortRest(effect.duration)).map(effect=>effect.name);state.activeSpellEffects=state.activeSpellEffects.filter(effect=>!expiresDuringShortRest(effect.duration));
   restoreTurnBudget(state);
-  return {state,message:'Short Rest completed; eligible resources recovered and Rage ended if it was active.'};
+  return {state,message:`Short Rest completed; eligible resources recovered and Rage ended if it was active.${expired.length?` ${expired.join(', ')} expired during the one-hour rest.`:''}`};
 }
-function durationPersistsThroughLongRest(duration:string|undefined){const value=normalized(duration);return value.includes('until ended')||value.includes('until dispelled')||value.includes('permanent');}
+function durationPersistsThroughLongRest(duration:string|undefined){const value=normalized(duration);return value.includes('until ended')||value.includes('until dispelled')||value.includes('permanent')||value.includes('24 hour')||value.includes('day');}
 export function longRest(character:Character,state:GameState):TransitionResult{
   const notes:string[]=[];
   if(state.concentration){const name=state.concentration.name;endConcentration(state,'A Long Rest ends Concentration.',character);notes.push(`${name} ended.`);}
@@ -489,6 +494,7 @@ export function longRest(character:Character,state:GameState):TransitionResult{
     else active.tempHpSource=false;
   }
   state.overlays=state.overlays.filter(id=>{const option=overlayOption(character,state,id);return Boolean(option&&!option.concentration&&durationPersistsThroughLongRest(option.duration));});
+  const endedSpellEffects=state.activeSpellEffects.filter(effect=>!durationPersistsThroughLongRest(effect.duration));state.activeSpellEffects=state.activeSpellEffects.filter(effect=>durationPersistsThroughLongRest(effect.duration));if(endedSpellEffects.length)notes.push(`${endedSpellEffects.map(effect=>effect.name).join(', ')} ended during the rest.`);
   for(const r of Object.values(state.resources))if(r.recovery!=='manual')r.current=r.max;
   for(const slot of Object.values(state.spellSlots))slot.current=slot.max;
   state.hp=character.hp.max;state.tempHp=0;delete state.tempHpSource;
@@ -591,10 +597,16 @@ export function castSpell(character:Character,state:GameState,spellName:string,c
   if(!spell.available)return {state,message:spell.reason};
   const immunities=activeConditionImmunities(character,state);const error=actionError(state,spell.castingTime,immunities);if(error)return {state,message:error};
   const minimumLevel=spell.slotLevel??spell.level;let usedLevel=0;
+  if(minimumLevel>0&&state.turn.slotSpellCast)return {state,message:'2024 rule: a spell slot has already been expended to cast a spell on this turn. You may still cast a cantrip if its action cost is available.'};
   if(minimumLevel>0){const requested=castLevel??nextSpellSlot(character,state,minimumLevel);if(requested===undefined||requested<minimumLevel)return {state,message:`No level ${minimumLevel} or higher spell slot remains.`};if(!availableSpellSlotLevels(character,state,minimumLevel).includes(requested))return {state,message:`A level ${requested} spell slot is not available.`};usedLevel=requested;}
-  spendActionCost(state,spell.castingTime,immunities);if(usedLevel>0)consumeSpellSlot(state,usedLevel);
+  spendActionCost(state,spell.castingTime,immunities);if(usedLevel>0){consumeSpellSlot(state,usedLevel);state.turn.slotSpellCast=true;}
   if(spell.concentration){if(state.concentration)endConcentration(state,'A new Concentration spell was cast.',character);state.concentration={name:spell.name,source:spell.sourceClass,...(usedLevel?{castLevel:usedLevel}:{})};}
+  const activeEffect=spellActiveEffect(spell);if(activeEffect){state.activeSpellEffects=state.activeSpellEffects.filter(effect=>effect.id!==activeEffect.id);state.activeSpellEffects.push({...activeEffect,name:spell.name,source:spell.sourceClass,...(usedLevel?{castLevel:usedLevel}:{})});}
   return {state,message:`Cast ${spell.name}${usedLevel>0?` using a level ${usedLevel} slot`:''}.`};
+}
+export function endSpellEffect(state:GameState,effectId:string):TransitionResult{
+  const active=state.activeSpellEffects.find(effect=>effect.id===effectId);if(!active)return {state,message:'That spell effect is not active.'};
+  state.activeSpellEffects=state.activeSpellEffects.filter(effect=>effect.id!==effectId);return {state,message:`${active.name} ended.`};
 }
 
 export function resolveAdvantage(sources:{advantage:string[];disadvantage:string[]}){
@@ -621,6 +633,7 @@ export function attackBonuses(character:Character,state:GameState,sheet:Resolved
     for(const type of ['Cold','Fire','Lightning','Thunder'] as DamageType[])packets.push({expression:classLevel(character,'Druid')>=15?'2d8':'1d8',type,label:`Optional Primal Strike — ${type}`});
   }
   if(sheet.profile==='wildshape'&&sameText(subclass(character,'Druid'),'Circle of the Moon')&&classLevel(character,'Druid')>=14&&!state.turn.oncePerTurn['lunar-form']&&action.kind==='beast')packets.push({expression:'2d10',type:'Radiant',label:'Optional Lunar Form'});
+  if(sameText(state.concentration?.name,'Fount of Moonlight')&&action.range===undefined&&['beast','weapon','unarmed'].includes(action.kind))packets.push({expression:'2d6',type:'Radiant',label:'Fount of Moonlight'});
   if(classLevel(character,'Paladin')>=11&&(action.kind==='unarmed'||(action.kind==='weapon'&&action.reach!==undefined)))packets.push({expression:'1d8',type:'Radiant',label:'Radiant Strikes'});
   for(const modifier of sheet.attackDamageModifiers){
     if(!modifier.appliesTo.includes(action.kind as 'weapon'|'unarmed'))continue;

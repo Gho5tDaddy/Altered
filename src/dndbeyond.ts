@@ -342,6 +342,7 @@ function parseSpells(data:JsonObject,abilities:Character['abilities'],level:numb
     const components=array(definition.components).map(value=>whole(value)===1?'V':whole(value)===2?'S':whole(value)===3?'M':'').filter(Boolean).join(', ');
     const damage=spellDamage(definition);const conditionalDamage=damage.length>0&&hasConditionalDamage(definition);const healing=spellHealing(definition,modifier(abilities[ability]));
     const entry:Spell={id:`ddb-spell-${whole(definition.id)||slug(name)}`,name,level:spellLevel,sourceClass,ability,prepared:true,castingTime:spellAction(raw),summary:'Imported from D&D Beyond; verify full spell text in your source.'};
+    if(name.toLowerCase()==='barkskin')entry.activeEffect={id:'barkskin',duration:'1 hour',acMinimum:17,summary:'The target has Armor Class 17 if its AC would otherwise be lower.'};
     if(Boolean(definition.concentration))entry.concentration=true;
     if(components)entry.components=components;
     if(attackType!==undefined)entry.attackBonus=modifier(abilities[ability])+pb;
