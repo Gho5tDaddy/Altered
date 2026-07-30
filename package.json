@@ -8,7 +8,9 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run clean && tsc && node scripts/build.mjs",
     "serve": "node scripts/serve.mjs",
+    "serve:lan": "node scripts/serve.mjs --lan",
     "start": "npm run build && npm run serve",
+    "start:lan": "npm run build && npm run serve:lan",
     "test": "npm run build && node --test dist/tests/*.test.js",
     "verify": "npm run typecheck && npm test"
   },

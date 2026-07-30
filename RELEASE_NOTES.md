@@ -32,6 +32,7 @@ Altered is a cross-platform local alpha for Android, Windows, and macOS browsers
 - The static shell now includes named dialogs, a labeled condition selector, a local-only content policy, stronger local-server headers, and stable PWA identity metadata.
 - Builds now use a cross-platform cleanup script.
 - `npm start` builds the project and serves it at `http://127.0.0.1:4173`.
+- `npm run start:lan` explicitly enables same-Wi-Fi phone access while ordinary startup remains restricted to the PC.
 - Online launches prefer current application assets while retaining the offline cache as a fallback.
 - API responses are excluded from the service-worker cache so live rules stay fresh and character payloads remain private.
 - The local server now sends the Content Security Policy and restrictive browser permissions as response headers.
@@ -49,7 +50,7 @@ Altered is a cross-platform local alpha for Android, Windows, and macOS browsers
 ## Verification
 
 - Strict TypeScript compilation: pass.
-- Automated tests: 108/108 pass.
+- Automated tests: 109/109 pass.
 - Standalone and PWA generation: pass.
 - Live browser interaction coverage: transformations, rolls, damage/healing, conditions, turns/rests, spells/concentration, D&D Beyond success/privacy paths, imports/exports, private packs, settings persistence, artwork upload/reset, and Temporary HP choices.
 - Full live SRD creature normalization: 331/331 pass, including 91 Beast records and 989 executable actions.

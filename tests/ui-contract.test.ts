@@ -45,6 +45,15 @@ test('local server sends update-friendly cache and security headers',()=>{
   assert.match(source,/request\.method!=='GET'&&request\.method!=='HEAD'/);
 });
 
+test('phone access is explicit while the default server remains loopback-only',()=>{
+  const source=readFileSync('scripts/serve.mjs','utf8');
+  const pkg=JSON.parse(readFileSync('package.json','utf8')) as {scripts?:Record<string,string>};
+  assert.match(source,/process\.argv\.slice\(2\)\.includes\('--lan'\)/);
+  assert.match(source,/lanMode\?'0\.0\.0\.0':'127\.0\.0\.1'/);
+  assert.equal(pkg.scripts?.['serve:lan'],'node scripts/serve.mjs --lan');
+  assert.equal(pkg.scripts?.['start:lan'],'npm run build && npm run serve:lan');
+});
+
 test('D&D Beyond proxy is fixed-host, numeric-ID-only, bounded, and non-caching',()=>{
   const source=readFileSync('scripts/serve.mjs','utf8');
   assert.match(source,/ddbRoute=\/\^\\\/api\\\/dndbeyond\\\/character\\\/\(\\d\{5,15\}\)\$\//);

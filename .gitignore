@@ -6,6 +6,7 @@ dist/
 # Project-local tooling and caches
 .tools/
 .npm-cache/
+.codex-remote-attachments/
 
 # Logs and temporary files
 *.log

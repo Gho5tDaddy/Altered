@@ -2,6 +2,7 @@
 
 ## v0.20.0
 
+- Added explicit `start:lan` and `serve:lan` commands for same-Wi-Fi phone access without weakening the default loopback-only server.
 - Added a fixed-host, source-filtered SRD 5.2.1 support catalog with a 1,808-record health baseline across 12 legal content domains.
 - Added on-demand enrichment for selected legal Beast forms missing from the built-in registry during public D&D Beyond import.
 - Removed PDF import from the user workflow; the primary route is a temporary-public D&D Beyond link/ID with review before import.
@@ -12,7 +13,7 @@
 - Prevented D&D Beyond and SRD API responses from entering the offline service-worker cache.
 - Added live Content Security Policy and browser permissions response headers.
 - Corrected bundled source metadata and attribution to use SRD 5.2.1 as the reusable official source.
-- Expanded the automated regression suite to 108 passing tests and completed live interaction coverage for the primary character, combat, transformation, import, private-pack, settings, and accessibility workflows.
+- Expanded the automated regression suite to 109 passing tests and completed live interaction coverage for the primary character, combat, transformation, import, private-pack, settings, accessibility, and LAN-access workflows.
 
 ## v0.19.0
 

@@ -4,7 +4,7 @@
 
 - Strict TypeScript compilation: pass
 - Reproducible standalone and PWA build: pass
-- Node test suite: 108/108 pass
+- Node test suite: 109/109 pass
 - Schema, content-registry, storage, owned-content, data-integrity, and rules-engine suites: pass
 - Runtime dependencies: project-local Node.js v24.18.0 and TypeScript 5.8.3
 
@@ -53,6 +53,7 @@ Verified:
 - Damaged stored private-pack records are removed safely during startup.
 - The 390 × 844 responsive layout has no horizontal overflow.
 - GET/HEAD behavior, rejected methods, missing-file handling, cache policy, security headers, and both fixed-host proxies were checked against the running local server.
+- Opt-in LAN mode binds to all private interfaces while ordinary startup remains loopback-only; the app, SRD status, and public D&D Beyond import returned HTTP 200 through the PC's Wi-Fi address.
 
 Runtime page errors during the final interaction pass: 0.
 

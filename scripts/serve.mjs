@@ -1,11 +1,13 @@
 import {createReadStream} from 'node:fs';
 import {stat} from 'node:fs/promises';
 import {createServer} from 'node:http';
+import {networkInterfaces} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..','dist');
-const host='127.0.0.1';
+const lanMode=process.argv.slice(2).includes('--lan');
+const host=lanMode?'0.0.0.0':'127.0.0.1';
 const port=Number.parseInt(process.env.PORT??'4173',10);
 const contentTypes=new Map([
   ['.css','text/css; charset=utf-8'],
@@ -169,6 +171,17 @@ const server=createServer(async (request,response)=>{
   }
 });
 
-server.listen(port,host,()=>console.log(`Altered is running at http://${host}:${port}`));
+function accessUrls(){
+  if(!lanMode)return [`http://${host}:${port}`];
+  const addresses=Object.values(networkInterfaces()).flat().filter(address=>
+    address&&!address.internal&&(address.family==='IPv4'||address.family===4)
+  ).map(address=>address.address);
+  return [...new Set(addresses)].map(address=>`http://${address}:${port}`);
+}
+
+server.listen(port,host,()=>{
+  if(lanMode)console.log('Altered LAN access is enabled for devices on this private network.');
+  for(const url of accessUrls())console.log(`Altered is running at ${url}`);
+});
 
 export {server};

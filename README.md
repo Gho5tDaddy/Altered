@@ -42,6 +42,14 @@ npm start
 
 Then open `http://127.0.0.1:4173`.
 
+To use Altered from a phone on the same private Wi-Fi network:
+
+```bash
+npm run start:lan
+```
+
+Open one of the `http://192.168.x.x:4173` addresses printed by the server on the phone. A phone cannot use the PC's `127.0.0.1` address, and ChatGPT Remote does not tunnel Windows localhost pages. LAN access is opt-in; the ordinary `npm start` command remains limited to this computer.
+
 ### Importing from D&D Beyond
 
 1. In D&D Beyond, open the character builder's Home tab, set Character Privacy to Public, and save.
