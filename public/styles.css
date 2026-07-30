@@ -1218,6 +1218,7 @@ input{
 .concentration-effect{border-color:#75609b}
 .rage-active-button{border-color:#d87a50!important;color:#ffd1b9!important;box-shadow:0 0 0 1px rgba(216,122,80,.22),0 0 18px rgba(216,92,55,.16)}
 .tab-help{margin:0 0 12px;padding:9px 11px;border-left:3px solid var(--accent);background:rgba(7,9,10,.42);color:var(--muted);font-size:.78rem;line-height:1.5}
+.turn-guidance{flex:1 0 100%;margin:2px 0 0;padding:8px 10px;border-left:3px solid var(--accent);background:rgba(7,9,10,.42);color:var(--text);font-size:.76rem;line-height:1.45}
 .tab-content .item-card>p{white-space:pre-line;line-height:1.52}
 .slot-picker{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.74rem}
 .slot-picker select{min-height:36px;max-width:100%;border:1px solid var(--line);background:var(--panel-3);color:var(--text);padding:6px 28px 6px 8px}

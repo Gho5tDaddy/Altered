@@ -177,7 +177,7 @@ test('Barkskin applies a persistent AC 17 minimum through Wild Shape and can be 
     {name:'Barkskin',level:2,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'bonus'},
     {name:'Starry Wisp',level:0,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action'},
   ]});const state=createInitialState(c);
-  assert.match(castSpell(c,state,'Barkskin').message,/Cast Barkskin/);assert.equal(state.turn.actionsRemaining,1);assert.equal(state.turn.bonusRemaining,0);assert.equal(state.concentration,undefined);assert.equal(resolveSheet(c,state).ac,17);
+  assert.match(castSpell(c,state,'Barkskin').message,/Bonus Action spent; your Action remains available.*Wild Shape and Rage.*later turn/);assert.equal(state.turn.actionsRemaining,1);assert.equal(state.turn.bonusRemaining,0);assert.equal(state.concentration,undefined);assert.equal(resolveSheet(c,state).ac,17);
   startNewTurn(state);const wolf=availableTransformations(c,state).find(option=>option.profile==='wildshape'&&option.formId==='dire-wolf');assert.ok(wolf);startTransformation(c,state,wolf);assert.equal(resolveSheet(c,state).ac,17);assert.equal(resolveSheet(c,state).acSource,'Barkskin minimum');
   assert.match(endSpellEffect(state,'barkskin').message,/Barkskin ended/);assert.equal(resolveSheet(c,state).ac,16);
 });

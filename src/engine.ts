@@ -602,7 +602,8 @@ export function castSpell(character:Character,state:GameState,spellName:string,c
   spendActionCost(state,spell.castingTime,immunities);if(usedLevel>0){consumeSpellSlot(state,usedLevel);state.turn.slotSpellCast=true;}
   if(spell.concentration){if(state.concentration)endConcentration(state,'A new Concentration spell was cast.',character);state.concentration={name:spell.name,source:spell.sourceClass,...(usedLevel?{castLevel:usedLevel}:{})};}
   const activeEffect=spellActiveEffect(spell);if(activeEffect){state.activeSpellEffects=state.activeSpellEffects.filter(effect=>effect.id!==activeEffect.id);state.activeSpellEffects.push({...activeEffect,name:spell.name,source:spell.sourceClass,...(usedLevel?{castLevel:usedLevel}:{})});}
-  return {state,message:`Cast ${spell.name}${usedLevel>0?` using a level ${usedLevel} slot`:''}.`};
+  const timing=spell.castingTime==='bonus'?` Bonus Action spent; your Action remains available.${normalized(spell.name)==='barkskin'?' Wild Shape and Rage also require a Bonus Action, so they must wait until a later turn.':''}`:'';
+  return {state,message:`Cast ${spell.name}${usedLevel>0?` using a level ${usedLevel} slot`:''}.${timing}`};
 }
 export function endSpellEffect(state:GameState,effectId:string):TransitionResult{
   const active=state.activeSpellEffects.find(effect=>effect.id===effectId);if(!active)return {state,message:'That spell effect is not active.'};

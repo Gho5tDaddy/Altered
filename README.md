@@ -28,7 +28,7 @@ The same standalone file is used on all three platforms. The `dist` directory is
 
 The **Active now** panel explains the effects that currently change the sheet. Barkskin raises Armor Class to its 2024 minimum and remains visible through Wild Shape until ended. In Moon Wild Shape the panel lists the Circle spells that can still be cast; during Rage it shows the active resistances and Strength benefits and explains why spells are blocked.
 
-The turn strip tracks the Action, Bonus Action, Reaction, and the 2024 one-slot-spell-per-turn limit separately. Spending an Action never consumes the Bonus Action, and a cantrip does not consume the slot-spell limit.
+The turn strip tracks the Action, Bonus Action, Reaction, and the 2024 one-slot-spell-per-turn limit separately. Spending an Action never consumes the Bonus Action, and a cantrip does not consume the slot-spell limit. Barkskin, Wild Shape, and Rage each require a Bonus Action, so Altered keeps the Action available after Barkskin while clearly requiring Wild Shape or Rage to wait for another turn.
 
 ## Development
 
