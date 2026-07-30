@@ -29,6 +29,10 @@ test('combat state and spell availability are explained before a click',()=>{
   assert.match(source,/Start Rage — Bonus Action Used/);
   assert.match(source,/Action still available: use it for an attack, another non-spell action, or a cantrip/);
   assert.match(source,/Barkskin, Wild Shape, and Rage each use a Bonus Action/);
+  assert.match(source,/attack roll: \$\{modeText\(attack\)\}/);
+  assert.match(source,/Potential damage if every attack hits and every save fails/);
+  assert.match(source,/form-aura-pulse/);
+  assert.match(source,/Static aura is active because Reduce motion is on/);
   assert.match(source,/Rage Damage applies only to Strength attacks with a weapon or Unarmed Strike/);
   assert.match(source,/Available now \(\$\{ready\.length\}\)/);
   assert.match(source,/Unavailable right now \(\$\{blocked\.length\}\)/);

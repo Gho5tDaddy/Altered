@@ -30,6 +30,8 @@ The **Active now** panel explains the effects that currently change the sheet. B
 
 The turn strip tracks the Action, Bonus Action, Reaction, and the 2024 one-slot-spell-per-turn limit separately. Spending an Action never consumes the Bonus Action, and a cantrip does not consume the slot-spell limit. Barkskin, Wild Shape, and Rage each require a Bonus Action, so Altered keeps the Action available after Barkskin while clearly requiring Wild Shape or Rage to wait for another turn.
 
+Multiattack displays a separate d20-to-hit or saving-throw result for every component, followed by each component's damage and a clearly labeled potential damage total. Active forms use a visible animated portrait ring and interface aura; if Reduce motion is enabled, the Active now panel explains why the aura is static.
+
 ## Development
 
 ```bash
