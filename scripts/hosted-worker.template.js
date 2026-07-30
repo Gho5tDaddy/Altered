@@ -40,8 +40,10 @@ function json(status,body){
   return new Response(JSON.stringify(body),{status,headers:headers('application/json; charset=utf-8','no-store')});
 }
 
-async function boundedUpstreamJson(url,signal,maxBytes=maxSrdResponseBytes,userAgent='Altered hosted support service'){
-  const upstream=await fetch(url,{headers:{Accept:'application/json','User-Agent':userAgent},redirect:'error',signal});
+async function boundedUpstreamJson(url,signal,maxBytes=maxSrdResponseBytes){
+  // Cloudflare's Worker fetch accepts a URL string or Request. Normalizing URL
+  // objects here keeps the same code valid in both Node preview and production.
+  const upstream=await fetch(String(url),{headers:{Accept:'application/json'},redirect:'error',signal});
   if(!upstream.ok){
     const error=new Error(`upstream status ${upstream.status}`);
     error.status=upstream.status;
@@ -62,9 +64,9 @@ async function proxyDdbCharacter(id){
       `${ddbOrigin}/character/v5/character/${id}`,
       controller.signal,
       maxDdbResponseBytes,
-      'Altered private character importer',
     ));
   }catch(error){
+    console.error('Altered D&D Beyond upstream failure',error instanceof Error?`${error.name}: ${error.message}`:'Unknown error');
     if(error?.status===403)return json(403,{error:'D&D Beyond blocked this character. Set Character Privacy to Public, save, and try again.'});
     if(error?.status===404)return json(404,{error:'D&D Beyond could not find that character ID.'});
     const timedOut=error instanceof Error&&error.name==='AbortError';
@@ -99,6 +101,7 @@ async function proxySrdStatus(){
   try{
     return json(200,await currentSrdStatus(controller.signal));
   }catch(error){
+    console.error('Altered SRD status upstream failure',error instanceof Error?`${error.name}: ${error.message}`:'Unknown error');
     const timedOut=error instanceof Error&&error.name==='AbortError';
     return json(502,{error:timedOut?'The SRD support catalog did not respond within 15 seconds.':'Altered could not validate the live SRD support catalog.'});
   }finally{
@@ -128,6 +131,7 @@ async function proxySrdCatalog(requestUrl){
     }):[];
     return json(200,{domain,count:Number.isInteger(upstream?.count)?upstream.count:results.length,page,results});
   }catch(error){
+    console.error('Altered SRD catalog upstream failure',error instanceof Error?`${error.name}: ${error.message}`:'Unknown error');
     const timedOut=error instanceof Error&&error.name==='AbortError';
     return json(502,{error:timedOut?'The SRD support catalog did not respond within 15 seconds.':'Altered could not load validated SRD support data.'});
   }finally{

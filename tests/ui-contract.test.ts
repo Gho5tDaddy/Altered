@@ -95,6 +95,8 @@ test('the exact hosted build executes before optional mobile storage hydration',
   assert.ok(worker.includes("url.pathname==='/api/srd/catalog'"));
   assert.match(worker,/character-service\.dndbeyond\.com/);
   assert.match(worker,/api\.open5e\.com/);
+  assert.match(source,/credentials:'same-origin'/);
+  assert.match(worker,/fetch\(String\(url\)/);
   assert.ok(!worker.includes('Live imports are unavailable'));
 });
 

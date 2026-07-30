@@ -369,7 +369,11 @@ async function fetchDdbCharacter(explicitSource?:string){
   $<HTMLInputElement>('#dndbeyond-source').value=id;const trigger=$<HTMLButtonElement>('#fetch-dndbeyond');trigger.disabled=true;trigger.textContent='Fetching…';
   pendingDdbImport=null;$('#dndbeyond-review').hidden=true;setImportStatus(`Retrieving D&D Beyond character ${id} without account credentials…`);
   try{
-    const response=await fetch(`/api/dndbeyond/character/${id}`,{headers:{Accept:'application/json'},credentials:'omit',cache:'no-store'});
+    // The private hosted app authenticates same-origin API requests at its
+    // edge. The worker never forwards the incoming request or its cookies to
+    // D&D Beyond, so sending credentials only to Altered is both necessary and
+    // contained.
+    const response=await fetch(`/api/dndbeyond/character/${id}`,{headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store'});
     const body=await response.text();let payload:unknown;try{payload=JSON.parse(body);}catch{throw new Error(response.ok?'The import service returned invalid data.':'The local Altered server does not support D&D Beyond import. Restart Altered and try again.');}
     if(!response.ok){const error=typeof payload==='object'&&payload!==null&&typeof (payload as {error?:unknown}).error==='string'?(payload as {error:string}).error:`Import service returned status ${response.status}.`;throw new Error(error);}
     let report=importDdbCharacter(payload,id);
