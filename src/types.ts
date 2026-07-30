@@ -40,7 +40,8 @@ export interface CharacterClass {name:string;level:number;subclass?:string|null}
 export interface Spell {
   id?:string;name:string;level:number;sourceClass:string;ability:Ability;prepared?:boolean;
   castingTime:ActionCost;concentration?:boolean;components?:string;materialCost?:boolean;materialConsumed?:boolean;
-  attackBonus?:number;saveDc?:number;damage?:DamagePacket[];healing?:string;resolution?:'save'|'automatic'|'manual';slotLevel?:number;summary?:string;
+  attackBonus?:number;saveDc?:number;saveAbility?:Ability;damage?:DamagePacket[];healing?:string;halfOnSave?:boolean;resolution?:'save'|'automatic'|'manual';slotLevel?:number;summary?:string;
+  specialAccess?:'circle-of-the-moon';higherSlotDamage?:DamagePacket[];higherSlotHealing?:string;
 }
 
 export interface RetentionPolicy {
@@ -93,7 +94,7 @@ export interface Character {
 export interface TransformationOption {id:string;label:string;profile:TransformProfile;formId?:string|undefined;grantId?:string|undefined;source:string;actionCost:ActionCost;usable:boolean;reason?:string|undefined;duration?:string|undefined;endActionCost?:ActionCost|undefined;resourceId?:string|undefined;resourceCost?:number|undefined;concentration?:boolean|undefined;retention?:Partial<RetentionPolicy>|undefined;effects?:TransformationEffects|undefined;deactivate?:boolean|undefined;spellName?:string|undefined;spellLevel?:number|undefined;switchGroup?:string|undefined}
 export interface RageState {active:boolean;endsAtTurn:number;usedThisTurn:boolean;recklessDeclared:boolean;extendedThisTurn:boolean}
 export interface TurnState {number:number;actionsRemaining:number;surgeActionsRemaining:number;bonusRemaining:number;reactionRemaining:number;attackRollsMade:number;oncePerTurn:Record<string,boolean>}
-export interface ConcentrationState {name:string;source:string}
+export interface ConcentrationState {name:string;source:string;castLevel?:number}
 export interface ActiveTransform {option:TransformationOption;startedTurn:number;duration:string;tempHpSource:boolean;spellConcentration?:boolean;permanentUntilDispelled?:boolean}
 export interface ActionRecharge {name:string;min:number;max:number}
 export interface GameState {

@@ -1,7 +1,7 @@
 import type {Ability,Character,Creature,DamageType,ImportedFeatureRule} from './types.js';
 
 export const RULES_VERSION={
-  label:'2024 Revised Fifth Edition',srd:'5.2.1',errata:'SRD 5.2.1, including second-printing core-rule errata present at release',reviewed:'2026-07-29',
+  label:'2024 Revised Fifth Edition',srd:'5.2.1',errata:'SRD 5.2.1, including second-printing core-rule errata present at release',reviewed:'2026-07-30',
   officialSources:[
     'https://www.dndbeyond.com/srd',
     'https://media.dndbeyond.com/compendium-images/srd/5.2/SRD_CC_v5.2.1.pdf'

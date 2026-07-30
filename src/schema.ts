@@ -132,8 +132,13 @@ function parseSpell(v:unknown,i:number):Spell{
   if(typeof v.materialConsumed==='boolean')out.materialConsumed=v.materialConsumed;
   if(typeof v.attackBonus==='number')out.attackBonus=num(v.attackBonus,`spells[${i}].attackBonus`,-20,30);
   if(typeof v.saveDc==='number')out.saveDc=num(v.saveDc,`spells[${i}].saveDc`,1,40);
+  if(v.saveAbility!==undefined)out.saveAbility=ability(v.saveAbility,`spells[${i}].saveAbility`);
   if(v.damage!=null)out.damage=parseDamage(v.damage,`spells[${i}].damage`);
   if(typeof v.healing==='string'){const healing=v.healing.replace(/\s+/g,'').slice(0,40);if(!DICE.test(healing))throw new Error(`spells[${i}].healing is not a safe dice expression.`);out.healing=healing;}
+  if(typeof v.halfOnSave==='boolean')out.halfOnSave=v.halfOnSave;
+  if(v.higherSlotDamage!=null)out.higherSlotDamage=parseDamage(v.higherSlotDamage,`spells[${i}].higherSlotDamage`);
+  if(typeof v.higherSlotHealing==='string'){const healing=v.higherSlotHealing.replace(/\s+/g,'').slice(0,40);if(!DICE.test(healing))throw new Error(`spells[${i}].higherSlotHealing is not a safe dice expression.`);out.higherSlotHealing=healing;}
+  if(v.specialAccess!==undefined){if(v.specialAccess!=='circle-of-the-moon')throw new Error(`spells[${i}].specialAccess is unsupported.`);out.specialAccess='circle-of-the-moon';}
   if(v.resolution!==undefined){if(!['save','automatic','manual'].includes(String(v.resolution)))throw new Error(`spells[${i}].resolution is unsupported.`);out.resolution=v.resolution as 'save'|'automatic'|'manual';}
   if(typeof v.slotLevel==='number')out.slotLevel=num(v.slotLevel,`spells[${i}].slotLevel`,0,9);
   if(typeof v.summary==='string')out.summary=v.summary.slice(0,300);

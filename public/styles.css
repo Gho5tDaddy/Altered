@@ -1207,6 +1207,33 @@ input{
 .app-shell.reduce-motion.form-active:not(.effects-disabled) .button.primary::after,
 .app-shell.reduce-motion.form-active:not(.effects-disabled) .tab.active::after{animation:none!important; opacity:.6}
 
+/* v0.21 combat clarity: visible active effects, actionable spell groups, and slot choice */
+.active-effects{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0 13px}
+.active-effects[hidden]{display:none}
+.active-effects h3{grid-column:1/-1;margin:0;color:var(--accent-2);font-size:.78rem;letter-spacing:.09em;text-transform:uppercase}
+.effect-card{position:relative;display:grid;gap:4px;padding:10px 12px;border:1px solid var(--line);background:linear-gradient(135deg,rgba(16,19,21,.94),rgba(28,31,33,.82));clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.effect-card strong{color:var(--text);font-size:.88rem}.effect-card small{color:var(--muted);line-height:1.45}.effect-benefit{color:var(--accent-2);font-size:.76rem;font-weight:700}
+.rage-effect{border-color:#9c5841;background:linear-gradient(135deg,rgba(71,34,26,.7),rgba(29,23,25,.9))}
+.moon-effect{border-color:#557d91;background:linear-gradient(135deg,rgba(31,55,68,.72),rgba(29,25,48,.84))}
+.concentration-effect{border-color:#75609b}
+.rage-active-button{border-color:#d87a50!important;color:#ffd1b9!important;box-shadow:0 0 0 1px rgba(216,122,80,.22),0 0 18px rgba(216,92,55,.16)}
+.tab-help{margin:0 0 12px;padding:9px 11px;border-left:3px solid var(--accent);background:rgba(7,9,10,.42);color:var(--muted);font-size:.78rem;line-height:1.5}
+.tab-content .item-card>p{white-space:pre-line;line-height:1.52}
+.slot-picker{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.74rem}
+.slot-picker select{min-height:36px;max-width:100%;border:1px solid var(--line);background:var(--panel-3);color:var(--text);padding:6px 28px 6px 8px}
+.unavailable-spells{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.unavailable-spells>summary{cursor:pointer;list-style-position:inside;color:var(--muted);font-size:.82rem;font-weight:750;letter-spacing:.03em;margin-bottom:8px}
+.unavailable-spells[open]>summary{color:var(--accent-2)}
+.unavailable-spells .item-card{opacity:.82}
+.button:disabled{cursor:not-allowed;filter:saturate(.45);opacity:.58}
+@media(max-width:700px){
+  .active-effects{grid-template-columns:1fr}
+  .effect-card{padding:10px}
+  .slot-picker{align-items:stretch;flex-direction:column;gap:4px}
+  .slot-picker select{width:100%}
+  .item-actions .button{white-space:normal}
+}
+
 /* v0.17 private owned-content import center */
 .wide-dialog{max-width:920px;max-height:92vh;overflow:auto}
 .import-center,.builder-card{display:grid;gap:14px}

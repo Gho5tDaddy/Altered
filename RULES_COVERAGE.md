@@ -1,20 +1,20 @@
-# Rules coverage — v0.20.0
+# Rules coverage — v0.21.0
 
 ## Fully calculated in the bundled rules pack
 
 - Base Form and the verified bundled creature records.
 - 2024 Wild Shape eligibility by Druid level, known-form count, Challenge Rating, Beast type, and Fly Speed access.
-- Circle of the Moon Challenge Rating, Temporary HP, Circle Forms Armor Class, Improved Circle Forms Constitution-save bonus, Radiant damage option, and legal Moon-spell visibility.
+- Circle of the Moon Challenge Rating, Temporary HP, Circle Forms Armor Class, Improved Circle Forms Constitution-save bonus, Radiant damage option, always-prepared Circle spell restoration, and legal Circle spellcasting while Wild Shaped.
 - Wild Shape replacement of physical abilities and retention of mental abilities, character HP, Proficiency Bonus, skill/save proficiencies, class features, and feats.
 - Higher creature-versus-character skill and saving-throw modifier selection.
 - Polymorph and Shapechange core profiles and their transformation Temporary HP endings.
 - Polymorph form eligibility without a seen-form requirement; Shapechange retains its separate seen-form restriction.
-- Rage activation, resource use, physical damage resistance, spellcasting/Concentration conflict, duration extension, Persistent Rage, and rest behavior.
+- Rage activation, resource use, physical damage resistance, Strength-check/save Advantage, weapon-or-Unarmed-Strike Rage Damage limits, spellcasting/Concentration conflict, duration extension, Persistent Rage, and rest behavior.
 - Reckless Attack qualification for Strength-based attack rolls, including advantage/disadvantage cancellation.
 - Barbarian and Monk Unarmored Defense competition.
 - Built-in Barbarian, Monk, and Ranger movement calculations.
 - Action Surge's extra non-Magic action and once-per-turn limit.
-- Second Wind, Lay On Hands, Wild Resurgence exchanges, spell slots, and common resource recovery.
+- Second Wind, Lay On Hands, Wild Resurgence exchanges, base-or-higher spell-slot spending, supported Circle-spell higher-slot scaling, and common resource recovery.
 - Damage resistances, immunities, vulnerabilities, Temporary HP conflicts, healing, and damage-triggered Concentration checks.
 - Core condition effects used by the sheet: action blocking, speech/Concentration consequences, zero Speed, attack/check/save disadvantage, and automatic Strength/Dexterity save failures.
 - Attack-roll, saving-throw, automatic, and mixed-action Multiattack creature actions, including start-of-turn recharge rolls and lockout.

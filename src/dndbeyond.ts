@@ -1,5 +1,5 @@
 import type {Ability,ActionCost,Character,Creature,DamagePacket,DamageType,ProficiencyRank,ResourcePool,Spell} from './types.js';
-import {CREATURES} from './content-registry.js';
+import {CREATURES,MOON_FORM_SPELL_LEVELS} from './content-registry.js';
 import {parseCharacter} from './schema.js';
 
 type JsonObject=Record<string,unknown>;
@@ -327,7 +327,7 @@ function hasConditionalDamage(definition:JsonObject):boolean{
 }
 
 function parseSpells(data:JsonObject,abilities:Character['abilities'],level:number):Spell[]{
-  const classesById=new Map<number,JsonObject>();for(const raw of array(data.classes)){const entry=object(raw);classesById.set(whole(entry.id),entry);}
+  const classesById=new Map<number,JsonObject>();for(const raw of array(data.classes)){const entry=object(raw);classesById.set(whole(entry.id),entry);const definitionId=whole(object(entry.definition).id);if(definitionId)classesById.set(definitionId,entry);}
   const candidates:{spell:JsonObject;parent:JsonObject}[]=[];
   for(const [group,rawGroup] of Object.entries(object(data.spells)))for(const raw of array(rawGroup))candidates.push({spell:object(raw),parent:{group}});
   for(const rawParent of array(data.classSpells)){const parent=object(rawParent);for(const raw of array(parent.spells))candidates.push({spell:object(raw),parent});}
@@ -345,7 +345,7 @@ function parseSpells(data:JsonObject,abilities:Character['abilities'],level:numb
     if(Boolean(definition.concentration))entry.concentration=true;
     if(components)entry.components=components;
     if(attackType!==undefined)entry.attackBonus=modifier(abilities[ability])+pb;
-    if(saveAbility>0)entry.saveDc=8+modifier(abilities[ability])+pb;
+    if(saveAbility>0){entry.saveDc=8+modifier(abilities[ability])+pb;const save=ABILITIES[saveAbility-1];if(save)entry.saveAbility=save;}
     if(damage.length)entry.damage=damage;
     if(healing)entry.healing=healing;
     if(conditionalDamage){entry.resolution='manual';entry.summary='Conditional damage rider imported from D&D Beyond; resolve its trigger and damage type from your source.';}
@@ -354,6 +354,39 @@ function parseSpells(data:JsonObject,abilities:Character['abilities'],level:numb
     result.push(entry);
   }
   return result.slice(0,200);
+}
+
+function signedDice(expression:string,bonus:number){
+  return `${expression}${bonus>0?`+${bonus}`:bonus<0?bonus:''}`;
+}
+
+function cantripDice(level:number,size:number){
+  const dice=level>=17?4:level>=11?3:level>=5?2:1;
+  return `${dice}d${size}`;
+}
+
+function moonCircleSpell(name:string,abilities:Character['abilities'],level:number):Spell{
+  const wisdom=modifier(abilities.wis);const attack=wisdom+proficiencyBonus(level);const save=8+attack;
+  const common={id:`rules-circle-moon-${slug(name)}`,name,sourceClass:'Druid',ability:'wis' as const,prepared:true,specialAccess:'circle-of-the-moon' as const,castingTime:'magic-action' as const};
+  if(name==='Starry Wisp')return {...common,level:0,components:'V, S',attackBonus:attack,damage:[{expression:cantripDice(level,8),type:'Radiant'}],summary:'Ranged spell attack. On a hit, the target sheds Dim Light and cannot benefit from Invisible until the end of your next turn.'};
+  if(name==='Cure Wounds')return {...common,level:1,components:'V, S',healing:signedDice('2d8',wisdom),higherSlotHealing:'2d8',summary:'Touch one creature to restore Hit Points. Adds 2d8 for every slot level above 1.'};
+  if(name==='Moonbeam')return {...common,level:2,components:'V, S, M',concentration:true,saveDc:save,saveAbility:'con',damage:[{expression:'2d10',type:'Radiant'}],higherSlotDamage:[{expression:'1d10',type:'Radiant'}],halfOnSave:true,resolution:'save',summary:'Concentration, up to 1 minute. A creature in the beam makes a Constitution save; half damage on success.'};
+  if(name==='Conjure Animals')return {...common,level:3,components:'V, S',concentration:true,saveDc:save,saveAbility:'dex',damage:[{expression:'3d10',type:'Slashing'}],higherSlotDamage:[{expression:'1d10',type:'Slashing'}],halfOnSave:true,resolution:'save',summary:'Concentration, up to 10 minutes. Creatures in the spectral pack make Dexterity saves; half damage on success.'};
+  if(name==='Fount of Moonlight')return {...common,level:4,components:'V, S',concentration:true,resolution:'manual',summary:'Concentration, up to 10 minutes. Your melee attacks gain Radiant damage and you have Resistance to Radiant damage; resolve the attack rider from your source.'};
+  return {...common,level:5,components:'V, S',healing:signedDice('5d8',wisdom),higherSlotHealing:'1d8',summary:'Up to six creatures in range regain Hit Points. Adds 1d8 for every slot level above 5.'};
+}
+
+function restoreMoonCircleSpells(spells:Spell[],classes:Character['classes'],abilities:Character['abilities'],level:number){
+  const druid=classes.find(entry=>entry.name.toLowerCase()==='druid');
+  if(!druid||druid.level<3||(druid.subclass??'').toLowerCase()!=='circle of the moon')return {spells,added:0};
+  const result=[...spells];let added=0;
+  for(const [name,requiredLevel] of Object.entries(MOON_FORM_SPELL_LEVELS)){
+    if(druid.level<requiredLevel)continue;
+    const index=result.findIndex(spell=>spell.name.toLowerCase()===name.toLowerCase()&&['druid','imported'].includes(spell.sourceClass.toLowerCase()));
+    if(index>=0){const existing=result[index];if(existing)result[index]={...existing,sourceClass:'Druid',ability:'wis',prepared:true,specialAccess:'circle-of-the-moon'};}
+    else{result.push(moonCircleSpell(name,abilities,level));added++;}
+  }
+  return {spells:result.slice(0,200),added};
 }
 
 function parseFeats(data:JsonObject):string[]{
@@ -451,7 +484,8 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
   const defense=parseEquipmentAndAc(data,abilities,classes,modifiers);const formSelection=legalKnownForms(data,classes,warnings);const knownForms=formSelection.knownForms;
   const druid=classes.find(entry=>entry.name.toLowerCase()==='druid');
   if(druid&&druid.level>=2&&knownForms.length===0)warnings.push({code:'wild-shape-not-provided',severity:'warning',message:'D&D Beyond did not provide recognizable Wild Shape selections. No forms were guessed; add or review known forms in Altered before transforming.'});
-  const spells=parseSpells(data,abilities,totalLevel);const feats=parseFeats(data);const resources=parseResources(data,totalLevel);
+  const parsedSpells=parseSpells(data,abilities,totalLevel);const moonSpells=restoreMoonCircleSpells(parsedSpells,classes,abilities,totalLevel);const spells=moonSpells.spells;const feats=parseFeats(data);const resources=parseResources(data,totalLevel);
+  if(moonSpells.added)warnings.push({code:'circle-moon-spells-restored',severity:'info',message:`D&D Beyond omitted ${moonSpells.added} always-prepared Circle of the Moon spell${moonSpells.added===1?'':'s'} from its character payload. Altered restored the current 2024 Circle spell list for this Druid level.`});
   const activeItems=array(data.inventory).filter(raw=>Boolean(object(raw).equipped));
   if(activeItems.length)warnings.push({code:'item-text-review',severity:'warning',message:'Numeric armor, saving-throw, ability, speed, and hit-point item modifiers were imported. Review special item text and attack-only bonuses; Altered does not copy proprietary descriptions.'});
   const homebrew=homebrewCount(data);if(homebrew)warnings.push({code:'homebrew-review',severity:'warning',message:`${homebrew} homebrew entr${homebrew===1?'y requires':'ies require'} manual rules review in Altered.`});
@@ -467,7 +501,7 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
     {label:'Ability scores, HP, and speed',status:'verified',detail:`${ABILITIES.map(key=>`${key.toUpperCase()} ${character.abilities[key]}`).join(' · ')} · HP ${character.hp.current}/${character.hp.max} · ${character.speed} ft.`},
     {label:'Armor Class and equipment',status:defense.review?'review':'verified',detail:`AC ${character.ac} · ${character.equipment.armorCategory} armor · ${character.equipment.shield?'shield':'no shield'}`},
     {label:'Saving throws and skills',status:'verified',detail:`${Object.values(character.proficiencies.saves).filter(rank=>rank>0).length} save proficiencies · ${Object.values(character.proficiencies.skills).filter(rank=>rank>0).length} skill proficiencies`},
-    {label:'Prepared and known spells',status:spells.length?'verified':'not-provided',detail:`${spells.length} spell${spells.length===1?'':'s'} imported · ${Object.keys(character.spellSlots).length} slot levels`},
+    {label:'Prepared and known spells',status:spells.length?'verified':'not-provided',detail:`${spells.length} spell${spells.length===1?'':'s'} available${moonSpells.added?` · ${moonSpells.added} Circle spell${moonSpells.added===1?'':'s'} restored`:''} · ${Object.keys(character.spellSlots).length} slot levels`},
     {label:'Wild Shape selections',status:druid&&druid.level>=2?(knownForms.length?'verified':'review'):'not-provided',detail:knownForms.length?knownForms.map(id=>CREATURES[id]?.name??id).join(', '):'No form names were provided or matched'},
     {label:'Special items and homebrew',status:activeItems.length||homebrew?'review':'not-provided',detail:`${activeItems.length} equipped item${activeItems.length===1?'':'s'} · ${homebrew} homebrew entr${homebrew===1?'y':'ies'}`},
   ];

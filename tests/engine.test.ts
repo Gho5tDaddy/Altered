@@ -4,7 +4,7 @@ import type {Character} from '../src/types.js';
 import {CREATURES} from '../src/content-registry.js';
 import {parseCharacter} from '../src/schema.js';
 import {
-  applyCondition,applyDamage,attackBonuses,attackRollSources,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,declareRecklessAttack,
+  applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,declareRecklessAttack,
   endConcentration,endTransformation,endTurn,extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
 } from '../src/engine.js';
 
@@ -170,6 +170,28 @@ test('Moonbeam is visible and castable in Moon Wild Shape, but Rage blocks it',(
 test('castSpell consumes action, slot, and starts Concentration',()=>{
   const c=character();const state=createInitialState(c);const result=castSpell(c,state,'Moonbeam');assert.match(result.message,/Cast Moonbeam/);
   assert.equal(state.turn.actionsRemaining,0);assert.equal(must(state.spellSlots['2']).current,1);assert.equal(state.concentration?.name,'Moonbeam');
+});
+
+test('a spell can use a higher-level slot when its base slot is empty',()=>{
+  const c=character({spellSlots:{'2':{current:0,max:2},'3':{current:1,max:1},'4':{current:1,max:1},'9':{current:1,max:1}}});const state=createInitialState(c);
+  assert.deepEqual(availableSpellSlotLevels(c,state,2),[3,4,9]);
+  assert.equal(resolveSheet(c,state).spells.find(spell=>spell.name==='Moonbeam')?.available,true);
+  const result=castSpell(c,state,'Moonbeam');assert.match(result.message,/level 3 slot/);assert.equal(must(state.spellSlots['3']).current,0);
+});
+
+test('an explicitly selected higher-level slot is consumed',()=>{
+  const c=character({spellSlots:{'2':{current:1,max:1},'3':{current:1,max:1},'4':{current:1,max:1},'9':{current:1,max:1}}});const state=createInitialState(c);
+  const result=castSpell(c,state,'Moonbeam',3);assert.match(result.message,/level 3 slot/);assert.equal(must(state.spellSlots['2']).current,1);assert.equal(must(state.spellSlots['3']).current,0);assert.equal(state.concentration?.castLevel,3);
+});
+
+test('spells clearly become unavailable after their Magic Action is spent',()=>{
+  const c=character();const state=createInitialState(c);state.turn.actionsRemaining=0;
+  const spell=resolveSheet(c,state).spells.find(entry=>entry.name==='Moonbeam');assert.equal(spell?.available,false);assert.match(spell?.reason??'',/Action remains/);
+});
+
+test('Rage benefits a beast form but does not add Rage Damage to beast stat-block attacks',()=>{
+  const c=character();const state=createInitialState(c);const bear=availableTransformations(c,state).find(option=>option.profile==='wildshape'&&option.formId==='brown-bear');assert.ok(bear);startTransformation(c,state,bear);state.turn.bonusRemaining=1;startRage(c,state);
+  const sheet=resolveSheet(c,state);const bite=sheet.actions.find(action=>action.type==='attack');assert.ok(bite);assert.ok(sheet.resistances.includes('Slashing'));assert.equal(bite?attackBonuses(c,state,sheet,bite).some(packet=>packet.label==='Rage Damage'):true,false);
 });
 
 

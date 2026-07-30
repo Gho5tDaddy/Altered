@@ -40,7 +40,18 @@ export function monkMovement(level:number){return level>=18?30:level>=14?25:leve
 
 function preparedSpell(character:Character,name:string){const key=name.toLowerCase();return character.spells.some(s=>s.name.toLowerCase()===key&&s.prepared!==false)}
 function spellOnSheet(character:Character,name:string){const key=name.toLowerCase();return character.spells.find(s=>s.name.toLowerCase()===key&&s.prepared!==false)}
-function slotAvailable(state:GameState|undefined,character:Character,level:number){return level===0||((state?.spellSlots??character.spellSlots)[String(level)]?.current??0)>0}
+export function availableSpellSlotLevels(character:Character,state:GameState|undefined,minimumLevel:number){
+  if(minimumLevel<=0)return [];
+  return Object.entries(state?.spellSlots??character.spellSlots)
+    .filter(([level,slot])=>Number(level)>=minimumLevel&&slot.current>0)
+    .map(([level])=>Number(level))
+    .sort((a,b)=>a-b);
+}
+function slotAvailable(state:GameState|undefined,character:Character,level:number){return level===0||availableSpellSlotLevels(character,state,level).length>0}
+function nextSpellSlot(character:Character,state:GameState,minimumLevel:number,requestedLevel?:number){
+  const levels=availableSpellSlotLevels(character,state,minimumLevel);
+  return requestedLevel===undefined?levels[0]:levels.includes(requestedLevel)?requestedLevel:undefined;
+}
 function creature(character:Character,id?:string){return id?(character.customForms[id]??CREATURES[id]):undefined}
 function allForms(character:Character){return [...Object.values(CREATURES),...Object.values(character.customForms)]}
 function activeProfile(state?:GameState):TransformProfile{return state?.activeTransform?.option.profile??'base'}
@@ -109,7 +120,7 @@ function activeOverlayOptions(character:Character,state:GameState){return state.
 function addSpellOverlayOptions(options:TransformationOption[],character:Character,state:GameState|undefined,spellName:string,ids:string[]){
   if(!preparedSpell(character,spellName))return;
   const activeIds=new Set(state?.overlays??[]);const activeGroup=ids.some(id=>activeIds.has(id));const castAllowed=canNormallyCast(character,state);const level=spellOnSheet(character,spellName)?.slotLevel??spellOnSheet(character,spellName)?.level??0;const slotReady=slotAvailable(state,character,level);
-  for(const id of ids){const base=builtInOverlayOption(character,state,id);if(!base)continue;const active=activeIds.has(id);const switching=Boolean(base.switchGroup&&activeGroup&&!active);const usable=active||switching||(castAllowed&&slotReady);const reason=!castAllowed?'Current form, condition, or Rage blocks spellcasting.':!slotReady?`No level ${level} spell slot remains.`:undefined;options.push({...base,label:active?`End ${base.label}`:base.label,actionCost:active?(base.endActionCost??'none'):base.actionCost,usable,...(!active&&!usable&&reason?{reason}:{}),...(active?{deactivate:true}:{})});}
+  for(const id of ids){const base=builtInOverlayOption(character,state,id);if(!base)continue;const active=activeIds.has(id);const switching=Boolean(base.switchGroup&&activeGroup&&!active);const usable=active||switching||(castAllowed&&slotReady);const reason=!castAllowed?'Current form, condition, or Rage blocks spellcasting.':!slotReady?`No level ${level} or higher spell slot remains.`:undefined;options.push({...base,label:active?`End ${base.label}`:base.label,actionCost:active?(base.endActionCost??'none'):base.actionCost,usable,...(!active&&!usable&&reason?{reason}:{}),...(active?{deactivate:true}:{})});}
 }
 
 export function availableTransformations(character:Character,state?:GameState):TransformationOption[]{
@@ -121,19 +132,19 @@ export function availableTransformations(character:Character,state?:GameState):T
     for(const id of character.knownForms){const form=creature(character,id);if(!form||normalized(form.type)!=='beast'||form.cr>limits.maxCr||(form.speeds.fly&&!limits.fly))continue;const usable=!pool||pool.current>0;options.push({id:`wildshape:${id}`,label:form.name,profile:'wildshape',formId:id,source:limits.moon?'Circle of the Moon Wild Shape':'Wild Shape',actionCost:'bonus',usable,...(!usable?{reason:'No Wild Shape uses remaining.'}:{})});}
   }
   if(preparedSpell(character,'Polymorph')){
-    const castAllowed=canNormallyCast(character,state);const usable=castAllowed&&slotAvailable(state,character,4);const reason=!castAllowed?'Current form or Rage blocks Polymorph.':'No level 4 spell slot remains.';
+    const castAllowed=canNormallyCast(character,state);const usable=castAllowed&&slotAvailable(state,character,4);const reason=!castAllowed?'Current form or Rage blocks Polymorph.':'No level 4 or higher spell slot remains.';
     for(const form of allForms(character))if(normalized(form.type)==='beast'&&form.cr<=character.totalLevel)options.push({id:`polymorph:${form.id}`,label:`${form.name} — Polymorph`,profile:'polymorph',formId:form.id,source:'Polymorph',actionCost:'magic-action',spellName:'Polymorph',spellLevel:4,concentration:true,usable,...(!usable?{reason}:{})});
   }
   if(preparedSpell(character,'True Polymorph')){
-    const castAllowed=canNormallyCast(character,state);const usable=castAllowed&&slotAvailable(state,character,9);const reason=!castAllowed?'Current form or Rage blocks True Polymorph.':'No level 9 spell slot remains.';
+    const castAllowed=canNormallyCast(character,state);const usable=castAllowed&&slotAvailable(state,character,9);const reason=!castAllowed?'Current form or Rage blocks True Polymorph.':'No level 9 or higher spell slot remains.';
     for(const form of allForms(character))if(form.cr<=character.totalLevel)options.push({id:`true-polymorph:${form.id}`,label:`${form.name} — True Polymorph`,profile:'true-polymorph',formId:form.id,source:'True Polymorph — creature into creature',actionCost:'magic-action',spellName:'True Polymorph',spellLevel:9,concentration:true,duration:'Concentration, up to 1 hour; permanent until dispelled after the full hour',usable,...(!usable?{reason}:{})});
   }
   if(preparedSpell(character,'Shapechange')&&(profile==='base'||profile==='shapechange')){
-    const switching=profile==='shapechange';const usable=switching||(canNormallyCast(character,state)&&slotAvailable(state,character,9));const reason=state?.rage.active?'Rage blocks spellcasting.':switching?'':'No level 9 spell slot remains.';
+    const switching=profile==='shapechange';const usable=switching||(canNormallyCast(character,state)&&slotAvailable(state,character,9));const reason=state?.rage.active?'Rage blocks spellcasting.':switching?'':'No level 9 or higher spell slot remains.';
     for(const id of character.seenForms){const form=creature(character,id);if(form&&form.cr<=character.totalLevel&&!['construct','undead'].includes(normalized(form.type)))options.push({id:`shapechange:${id}`,label:`${form.name} — Shapechange`,profile:'shapechange',formId:id,source:'Shapechange',actionCost:'magic-action',spellName:'Shapechange',spellLevel:9,concentration:true,switchGroup:'shapechange',usable,...(!usable?{reason}:{})});}
   }
   if(preparedSpell(character,'Animal Shapes')){
-    const switching=profile==='animal-shapes';const usable=switching||(canNormallyCast(character,state)&&slotAvailable(state,character,8));const reason=!canNormallyCast(character,state)?'Current state blocks spellcasting.':'No level 8 spell slot remains.';
+    const switching=profile==='animal-shapes';const usable=switching||(canNormallyCast(character,state)&&slotAvailable(state,character,8));const reason=!canNormallyCast(character,state)?'Current state blocks spellcasting.':'No level 8 or higher spell slot remains.';
     for(const form of allForms(character))if(normalized(form.type)==='beast'&&form.cr<=4&&!['Huge','Gargantuan'].includes(form.size))options.push({id:`animal-shapes:${form.id}`,label:`${form.name} — Animal Shapes`,profile:'animal-shapes',formId:form.id,source:'Animal Shapes',actionCost:'magic-action',endActionCost:'bonus',spellName:'Animal Shapes',spellLevel:8,switchGroup:'animal-shapes',duration:'24 hours',usable,...(!usable?{reason}:{})});
   }
   addSpellOverlayOptions(options,character,state,'Alter Self',['spell:alter-self:aquatic','spell:alter-self:appearance','spell:alter-self:weapons-slashing','spell:alter-self:weapons-piercing','spell:alter-self:weapons-bludgeoning']);
@@ -197,7 +208,7 @@ function evaluateFeatures(character:Character,state:GameState,option:Transformat
   return result;
 }
 function moonSpellAllowed(character:Character,spell:Spell){const level=recordValue(MOON_FORM_SPELL_LEVELS,spell.name);return sameText(subclass(character,'Druid'),'Circle of the Moon')&&level!==undefined&&classLevel(character,'Druid')>=level&&sameText(spell.sourceClass,'Druid')}
-function evaluateSpells(character:Character,state:GameState,option:TransformationOption,baseCanCast:boolean){return character.spells.map(spell=>{const prepared=spell.prepared!==false;let available=baseCanCast&&prepared;let reason=available?'Spellcasting is allowed.':'Spellcasting is blocked in the current form.';if(option.profile==='wildshape'&&moonSpellAllowed(character,spell)&&prepared&&!state.rage.active){available=true;reason='Available through Circle of the Moon while in Wild Shape.';}if(option.profile==='wildshape'&&classLevel(character,'Druid')>=18&&!state.rage.active){available=prepared&&!(spell.materialCost||spell.materialConsumed);reason=!prepared?'The spell is not prepared or otherwise available.':available?'Available through Beast Spells.':'Beast Spells excludes costly or consumed Material components.';}if(state.rage.active){available=false;reason='Rage blocks spellcasting.';}const level=spell.slotLevel??spell.level;if(available&&level>0&&!slotAvailable(state,character,level)){available=false;reason=`No level ${level} spell slot remains.`;}return {...spell,available,reason};});}
+function evaluateSpells(character:Character,state:GameState,option:TransformationOption,baseCanCast:boolean){return character.spells.map(spell=>{const prepared=spell.prepared!==false;const circleAccess=moonSpellAllowed(character,spell);let available=baseCanCast&&prepared;let reason=available?'Spellcasting is allowed.':'Spellcasting is blocked in the current form.';if(option.profile==='wildshape'&&circleAccess&&prepared&&!state.rage.active){available=true;reason='Available through Circle of the Moon while in Wild Shape.';}if(option.profile==='wildshape'&&classLevel(character,'Druid')>=18&&!state.rage.active){available=prepared&&!(spell.materialCost||spell.materialConsumed);reason=!prepared?'The spell is not prepared or otherwise available.':available?'Available through Beast Spells.':'Beast Spells excludes costly or consumed Material components.';}if(state.rage.active){available=false;reason='Rage blocks all spellcasting, including Circle spells.';}const level=spell.slotLevel??spell.level;if(available&&level>0&&!slotAvailable(state,character,level)){available=false;reason=`No level ${level} or higher spell slot remains.`;}if(available){const error=actionError(state,spell.castingTime,activeConditionImmunities(character,state,option));if(error){available=false;reason=error;}}return {...spell,...(circleAccess?{specialAccess:'circle-of-the-moon' as const}:{}),available,reason};});}
 function resolveSpeeds(character:Character,state:GameState,option:TransformationOption,effects:TransformationEffects[]){
   const form=creature(character,option.formId);const speeds=form&&option.profile!=='overlay'?{...form.speeds}:{walk:character.speed};
   if(retainedClassFeatures(option)){const barb=classLevel(character,'Barbarian');if(barb>=5&&!(armorActive(state,option)&&state.equipment.armorCategory==='heavy'))speeds.walk=(speeds.walk??0)+10;const monk=classLevel(character,'Monk');if(monk>=2&&!armorActive(state,option)&&!shieldActive(state,option))speeds.walk=(speeds.walk??0)+monkMovement(monk);const ranger=classLevel(character,'Ranger');if(ranger>=6&&!(armorActive(state,option)&&state.equipment.armorCategory==='heavy')){speeds.walk=(speeds.walk??0)+10;speeds.climb=Math.max(speeds.climb??0,speeds.walk);speeds.swim=Math.max(speeds.swim??0,speeds.walk);}for(const feature of character.features){if(!retentionAllows(feature,option))continue;const bonus=feature.grants?.speedBonus??0;if(bonus)speeds.walk=(speeds.walk??0)+bonus;}}
@@ -306,6 +317,7 @@ function duration(character:Character,option:TransformationOption){
   if(option.duration)return option.duration;if(option.profile==='wildshape')return `${Math.floor(classLevel(character,'Druid')/2)} hours`;if(option.profile==='polymorph'||option.profile==='shapechange'||option.profile==='true-polymorph')return 'Concentration, up to 1 hour';if(option.profile==='animal-shapes')return '24 hours';return 'As defined by the feature';
 }
 function consumeSpellSlot(state:GameState,level:number){const slot=state.spellSlots[String(level)];if(!slot||slot.current<1)return false;slot.current--;return true}
+function consumeAvailableSpellSlot(character:Character,state:GameState,minimumLevel:number,requestedLevel?:number){const level=nextSpellSlot(character,state,minimumLevel,requestedLevel);return level===undefined?undefined:(consumeSpellSlot(state,level),level)}
 function removeOverlay(state:GameState,id:string){state.overlays=state.overlays.filter(value=>value!==id)}
 function overlayId(option:TransformationOption){return option.grantId??option.id}
 function tempHpSourceName(option:TransformationOption){if(option.spellName)return option.spellName;if(option.profile==='animal-shapes')return 'Animal Shapes';return option.label}
@@ -329,10 +341,10 @@ export function startTransformation(character:Character,state:GameState,option:T
     }
     const error=actionError(state,option.actionCost,activeConditionImmunities(character,state));if(error)return {state,message:error};if(option.resourceId&&!hasResource(state,option.resourceId,option.resourceCost??1))return {state,message:`No ${option.resourceId} resource remains.`};
     const existingGroup=option.switchGroup?overlayInSwitchGroup(character,state,option.switchGroup):undefined;const switchingSameSpell=Boolean(existingGroup&&option.switchGroup);
-    if(option.spellName&&!switchingSameSpell){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&!slotAvailable(state,character,level))return {state,message:`No level ${level} spell slot remains.`};}
+    if(option.spellName&&!switchingSameSpell){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&!slotAvailable(state,character,level))return {state,message:`No level ${level} or higher spell slot remains.`};}
     if(option.concentration&&!switchingSameSpell&&state.rage.active)return {state,message:'Rage blocks Concentration.'};
     spendActionCost(state,option.actionCost,activeConditionImmunities(character,state));if(option.resourceId)spendResource(state,option.resourceId,option.resourceCost??1);
-    if(option.spellName&&!switchingSameSpell){const level=option.spellLevel??0;if(level>0)consumeSpellSlot(state,level);if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell'};}}
+    if(option.spellName&&!switchingSameSpell){const level=option.spellLevel??0;if(level>0)consumeAvailableSpellSlot(character,state,level);if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell'};}}
     else if(option.concentration&&!switchingSameSpell){if(state.concentration)endConcentration(state,`${option.label} replaced the previous Concentration effect.`,character);state.concentration={name:option.label,source:option.source};}
     if(existingGroup)removeOverlay(state,existingGroup);if(!state.overlays.includes(id))state.overlays.push(id);
     const incoming=incomingTempHp(character,option,false);const choice=applyIncomingTempHp(state,option,incoming);if(choice)return choice;
@@ -343,13 +355,13 @@ export function startTransformation(character:Character,state:GameState,option:T
   const activeTransform=state.activeTransform;const active=activeTransform?.option;const switchingSameEffect=Boolean(active&&active.profile===option.profile&&((active.switchGroup&&active.switchGroup===option.switchGroup)||['wildshape','shapechange','animal-shapes'].includes(option.profile)));
   const switchingWildshape=active?.profile==='wildshape'&&option.profile==='wildshape';const switchingShapechange=active?.profile==='shapechange'&&option.profile==='shapechange';const switchingAnimalShapes=active?.profile==='animal-shapes'&&option.profile==='animal-shapes';
   const error=actionError(state,option.actionCost,activeConditionImmunities(character,state));if(error)return {state,message:error};if(option.profile==='wildshape'&&!hasResource(state,'wild-shape'))return {state,message:'No Wild Shape uses remaining.'};if(option.resourceId&&!hasResource(state,option.resourceId,option.resourceCost??1))return {state,message:`No ${option.resourceId} resource remains.`};
-  if(option.spellName&&!switchingSameEffect){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&!slotAvailable(state,character,level))return {state,message:`No level ${level} spell slot remains.`};}
+  if(option.spellName&&!switchingSameEffect){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&!slotAvailable(state,character,level))return {state,message:`No level ${level} or higher spell slot remains.`};}
   if(option.concentration&&!switchingSameEffect&&state.rage.active)return {state,message:'Rage blocks Concentration.'};
   spendActionCost(state,option.actionCost,activeConditionImmunities(character,state));if(option.profile==='wildshape')spendResource(state,'wild-shape');if(option.resourceId)spendResource(state,option.resourceId,option.resourceCost??1);
   const replacingDifferentEffect=Boolean(active&&!switchingSameEffect);const oldSource=active?tempHpSourceName(active):undefined;
   if(active&&(switchingWildshape||replacingDifferentEffect)&&activeTransform?.tempHpSource&&state.tempHpSource===oldSource){state.tempHp=0;delete state.tempHpSource;}
   if(activeTransform?.spellConcentration&&!switchingSameEffect&&state.concentration?.name===(activeTransform.option.spellName??activeTransform.option.label))endConcentration(state,`${activeTransform.option.label} was replaced by ${option.label}.`,character);
-  if(option.spellName&&!switchingSameEffect){const level=option.spellLevel??0;if(level>0)consumeSpellSlot(state,level);if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell'};}}
+  if(option.spellName&&!switchingSameEffect){const level=option.spellLevel??0;if(level>0)consumeAvailableSpellSlot(character,state,level);if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell'};}}
   else if(option.concentration&&!switchingSameEffect){if(state.concentration)endConcentration(state,`${option.label} replaced the previous Concentration effect.`,character);state.concentration={name:option.label,source:option.source};}
   const incoming=incomingTempHp(character,option,switchingSameEffect);const retainsExistingTransformTemp=Boolean(switchingSameEffect&&activeTransform?.tempHpSource&&state.tempHpSource===tempHpSourceName(option));
   clearActionRecharges(state);state.activeTransform={option,startedTurn:state.turn.number,duration:duration(character,option),tempHpSource:incoming>0||retainsExistingTransformTemp,...(option.concentration?{spellConcentration:true}:{})};
@@ -381,19 +393,24 @@ export function completeTruePolymorph(state:GameState):TransitionResult{
 }
 
 export function startRage(character:Character,state:GameState):TransitionResult{
-  if(classLevel(character,'Barbarian')<1)return {state,message:'This character has no Rage feature.'};
-  if(state.rage.active)return {state,message:'Rage is already active.'};
-  const option=activeOption(state);
-  if(!retainedClassFeatures(option))return {state,message:'The current transformation does not retain the Rage class feature.'};
-  if(state.equipment.armorCategory==='heavy'&&armorActive(state,option))return {state,message:'Rage cannot begin while wearing Heavy armor.'};
-  const immunities=activeConditionImmunities(character,state);const error=actionError(state,'bonus',immunities);if(error)return {state,message:error};
-  if(!hasResource(state,'rage'))return {state,message:'No Rage uses remain.'};
+  const blocked=rageStartError(character,state);if(blocked)return {state,message:blocked};
+  const immunities=activeConditionImmunities(character,state);
   spendActionCost(state,'bonus',immunities);spendResource(state,'rage');
   const persistent=classLevel(character,'Barbarian')>=15;
   state.rage={active:true,endsAtTurn:persistent?Number.MAX_SAFE_INTEGER:state.turn.number+1,usedThisTurn:true,recklessDeclared:false,extendedThisTurn:persistent};
   const endedConcentration=Boolean(state.concentration);
   if(endedConcentration)endConcentration(state,'Rage prevents maintaining Concentration.',character);
-  return {state,message:endedConcentration?'Rage started. Concentration ended; spellcasting is blocked.':'Rage started; spellcasting and Concentration are blocked.'};
+  return {state,message:endedConcentration?'Rage started. Concentration ended. You now resist Bludgeoning, Piercing, and Slashing damage and have Advantage on Strength checks and saves; spellcasting is blocked.':'Rage started. You now resist Bludgeoning, Piercing, and Slashing damage and have Advantage on Strength checks and saves; spellcasting is blocked.'};
+}
+export function rageStartError(character:Character,state:GameState){
+  if(classLevel(character,'Barbarian')<1)return 'This character has no Rage feature.';
+  if(state.rage.active)return 'Rage is already active.';
+  const option=activeOption(state);
+  if(!retainedClassFeatures(option))return 'The current transformation does not retain the Rage class feature.';
+  if(state.equipment.armorCategory==='heavy'&&armorActive(state,option))return 'Rage cannot begin while wearing Heavy armor.';
+  const error=actionError(state,'bonus',activeConditionImmunities(character,state));if(error)return error;
+  if(!hasResource(state,'rage'))return 'No Rage uses remain.';
+  return null;
 }
 export function endRage(state:GameState,reason='Rage ended.'):TransitionResult{state.rage={active:false,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false};return {state,message:reason}}
 export function declareRecklessAttack(character:Character,state:GameState):TransitionResult{
@@ -567,17 +584,17 @@ export function resolveConcentrationCheck(state:GameState,total:number,character
   return {state,message:`Concentration failed with ${resolvedTotal} against DC ${pending.dc}; ${name} ended.`};
 }
 
-export function castSpell(character:Character,state:GameState,spellName:string):TransitionResult{
+export function castSpell(character:Character,state:GameState,spellName:string,castLevel?:number):TransitionResult{
   const sheet=resolveSheet(character,state);
   const spell=sheet.spells.find(s=>s.name===spellName);
   if(!spell)return {state,message:'Spell not found on the imported character sheet.'};
   if(!spell.available)return {state,message:spell.reason};
   const immunities=activeConditionImmunities(character,state);const error=actionError(state,spell.castingTime,immunities);if(error)return {state,message:error};
-  const level=spell.slotLevel??spell.level;
-  if(level>0&&!slotAvailable(state,character,level))return {state,message:`No level ${level} spell slot remains.`};
-  spendActionCost(state,spell.castingTime,immunities);if(level>0)consumeSpellSlot(state,level);
-  if(spell.concentration){if(state.concentration)endConcentration(state,'A new Concentration spell was cast.',character);state.concentration={name:spell.name,source:spell.sourceClass};}
-  return {state,message:`Cast ${spell.name}${level>0?` using a level ${level} slot`:''}.`};
+  const minimumLevel=spell.slotLevel??spell.level;let usedLevel=0;
+  if(minimumLevel>0){const requested=castLevel??nextSpellSlot(character,state,minimumLevel);if(requested===undefined||requested<minimumLevel)return {state,message:`No level ${minimumLevel} or higher spell slot remains.`};if(!availableSpellSlotLevels(character,state,minimumLevel).includes(requested))return {state,message:`A level ${requested} spell slot is not available.`};usedLevel=requested;}
+  spendActionCost(state,spell.castingTime,immunities);if(usedLevel>0)consumeSpellSlot(state,usedLevel);
+  if(spell.concentration){if(state.concentration)endConcentration(state,'A new Concentration spell was cast.',character);state.concentration={name:spell.name,source:spell.sourceClass,...(usedLevel?{castLevel:usedLevel}:{})};}
+  return {state,message:`Cast ${spell.name}${usedLevel>0?` using a level ${usedLevel} slot`:''}.`};
 }
 
 export function resolveAdvantage(sources:{advantage:string[];disadvantage:string[]}){

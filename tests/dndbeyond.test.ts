@@ -146,7 +146,9 @@ test('normalizes a Ferocitus-shaped multiclass character without guessing core v
   assert.equal(character.skillBonuses?.Intimidation,4);
   assert.equal(character.skillBonuses?.Nature,4);
   assert.deepEqual(character.knownForms,['dire-wolf','brown-bear','giant-spider','giant-toad','black-bear','panther']);
-  assert.equal(character.spells.length,5);
+  assert.equal(character.spells.length,6);
+  assert.ok(character.spells.some(spell=>spell.name==='Conjure Animals'&&spell.specialAccess==='circle-of-the-moon'));
+  assert.equal(character.spells.filter(spell=>spell.name==='Moonbeam').length,1);
   assert.deepEqual(character.spellSlots,{
     '1':{current:4,max:4},
     '2':{current:3,max:3},
@@ -164,6 +166,21 @@ test('normalizes a Ferocitus-shaped multiclass character without guessing core v
   assert.ok(character.transformationGrants?.some(grant=>grant.id==='goliath-large-form'));
   assert.ok(report.coverage.every(item=>item.status!=='review'||item.label==='Special items and homebrew'));
   assert.ok(report.warnings.some(item=>item.code==='item-text-review'));
+  assert.ok(report.warnings.some(item=>item.code==='circle-moon-spells-restored'));
+});
+
+test('restores every always-prepared Circle of the Moon spell D&D Beyond omits at the current Druid level',()=>{
+  const payload=structuredClone(ferocitusPayload);
+  const spellGroup=payload.data.classSpells[0];assert.ok(spellGroup);
+  spellGroup.spells=spellGroup.spells.filter(entry=>!['Starry Wisp','Cure Wounds','Moonbeam'].includes(entry.definition.name));
+  const report=importDdbCharacter(payload,'152187683');const character=report.character;
+  const circle=character.spells.filter(spell=>spell.specialAccess==='circle-of-the-moon');
+  assert.deepEqual(circle.map(spell=>spell.name).sort(),['Conjure Animals','Cure Wounds','Moonbeam','Starry Wisp']);
+  assert.equal(circle.find(spell=>spell.name==='Starry Wisp')?.damage?.[0]?.expression,'2d8');
+  assert.equal(circle.find(spell=>spell.name==='Cure Wounds')?.healing,'2d8+3');
+  assert.equal(circle.find(spell=>spell.name==='Moonbeam')?.saveAbility,'con');
+  assert.equal(circle.find(spell=>spell.name==='Conjure Animals')?.saveAbility,'dex');
+  assert.match(report.coverage.find(item=>item.label==='Prepared and known spells')?.detail??'',/4 Circle spells restored/);
 });
 
 test('imports healing rolls but keeps conditional spell damage manual',()=>{

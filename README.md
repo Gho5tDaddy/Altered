@@ -26,6 +26,8 @@ The same standalone file is used on all three platforms. The `dist` directory is
 4. Press the named attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically.
 5. Press End Form when a legal exit is available. Wild Shape voluntary exit requires a Bonus Action, so the button clearly explains when that Bonus Action is unavailable.
 
+The **Active now** panel explains the effects that currently change the sheet. In Moon Wild Shape it lists the Circle spells that can still be cast; during Rage it shows the active resistances and Strength benefits and explains why spells are blocked.
+
 ## Development
 
 ```bash

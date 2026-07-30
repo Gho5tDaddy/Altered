@@ -1,8 +1,19 @@
-# Altered v0.20.0 release notes
+# Altered v0.21.0 release notes
 
 ## Status
 
 Altered is a cross-platform local alpha for Android, Windows, and macOS browsers. It is suitable for supervised gameplay testing, not yet a commercial release.
+
+## Actions, Rage, and Circle of the Moon spells
+
+- Public D&D Beyond imports now restore subclass-granted Circle of the Moon spells that are absent from the character-service spell arrays.
+- Starry Wisp, Cure Wounds, Moonbeam, and Conjure Animals are available to the tested Druid 5 Moon character, and later Circle spells unlock at the correct Druid levels.
+- Circle spells remain usable while Wild Shaped unless Rage, a spent Magic Action, missing spell slots, or another current rule blocks them.
+- Level 1+ spells can use a slot of their level or higher. Supported Circle spells automatically add their documented higher-slot dice.
+- The Spells tab puts usable spells first, identifies Circle spells, offers the legal slot levels, and folds blocked spells into a clearly labeled disclosure.
+- Rage now has a persistent Active Now card showing physical damage resistance, Strength advantages, and the spellcasting restriction.
+- The Rage card explicitly explains that Rage Damage applies to Strength attacks made with a weapon or Unarmed Strike, not beast stat-block attacks.
+- Actions and spells disable as soon as their Action, Bonus Action, Reaction, or Magic Action is spent and show the exact reason.
 
 ## Public character import and legal rules support
 
@@ -51,7 +62,7 @@ Altered is a cross-platform local alpha for Android, Windows, and macOS browsers
 ## Verification
 
 - Strict TypeScript compilation: pass.
-- Automated tests: 110/110 pass.
+- Automated tests: 116/116 pass.
 - Standalone and PWA generation: pass.
 - Live browser interaction coverage: transformations, rolls, damage/healing, conditions, turns/rests, spells/concentration, D&D Beyond success/privacy paths, imports/exports, private packs, settings persistence, artwork upload/reset, and Temporary HP choices.
 - Full live SRD creature normalization: 331/331 pass, including 91 Beast records and 989 executable actions.

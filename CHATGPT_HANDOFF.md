@@ -56,7 +56,9 @@ The primary import is a temporary-public D&D Beyond link/ID followed by a review
 
 ## Current implementation status
 
-- v0.20.0 has a strict TypeScript rules engine, public-link review import, private owned-content packs, a local transformation builder, non-Beast replacement profiles, additive overlays, persistence, and live browser coverage.
+- v0.21.0 has a strict TypeScript rules engine, public-link review import, private owned-content packs, a local transformation builder, non-Beast replacement profiles, additive overlays, persistence, and live browser coverage.
+- D&D Beyond Circle of the Moon spell omissions are restored from the current level-gated rules table. Circle spells remain castable in Wild Shape, legal higher-level slots are selectable, and Rage/action-economy blockers are explained before a click.
+- The v0.21.0 verification baseline is 116 passing automated tests plus a live Ferocitus/Brown Bear mobile workflow with no browser errors.
 - The legal SRD 5.2.1 support catalog is kept behind the character workflow and currently validates a 1,808-record baseline.
 - Paid-book mechanics remain private and user-supplied. Unknown mechanics stay conditional or disabled instead of being inferred from prose.
 - D&D Beyond's character service remains an undocumented compatibility boundary; a reviewed Altered JSON export is the durable backup.

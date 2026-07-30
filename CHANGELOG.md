@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.21.0
+
+- Restored the 2024 Circle of the Moon always-prepared spell list when D&D Beyond omits subclass-granted spells from its character payload.
+- Added executable Starry Wisp, Cure Wounds, Moonbeam, Conjure Animals, Fount of Moonlight, and Mass Cure Wounds records at their correct Circle of the Moon Druid levels.
+- Kept Circle spells available while Wild Shaped and made Rage’s universal spellcasting block explicit.
+- Added legal higher-level spell-slot selection and supported higher-slot damage/healing scaling for the Circle spell records.
+- Added saving-throw abilities, half-damage guidance, and stored cast level for ongoing Concentration effects.
+- Added a prominent Active Now panel explaining Rage, Moon Wild Shape, Temporary HP, spell access, and Concentration.
+- Made Rage activation visibly change state and explain its resistances, Strength benefits, spell restriction, and weapon/Unarmed-Strike-only Rage Damage.
+- Disabled spent Action, Bonus Action, Reaction, and Magic Action controls before a click and displayed the exact blocker on every action or spell.
+- Reorganized spells into Available Now and an expandable Unavailable Right Now section with clear Circle spell badges and slot selectors.
+- Expanded the regression suite to 116 tests covering missing Circle spells, duplicate prevention, higher-level slots, action availability, Rage in beast form, and the user-facing combat-state contract.
+
 ## v0.20.0
 
 - Added explicit `start:lan` and `serve:lan` commands for same-Wi-Fi phone access without weakening the default loopback-only server.

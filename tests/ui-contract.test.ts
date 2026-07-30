@@ -21,6 +21,18 @@ test('recent activity exposes a clear control that preserves non-log state',()=>
   assert.match(source,/Recent activity cleared\./);
 });
 
+test('combat state and spell availability are explained before a click',()=>{
+  const html=readFileSync('public/index.html','utf8');
+  const source=readFileSync('src/app.ts','utf8');
+  assert.match(html,/id="active-effects"[^>]*aria-live="polite"/);
+  assert.match(source,/Start Rage · Bonus Action/);
+  assert.match(source,/Rage Damage applies only to Strength attacks with a weapon or Unarmed Strike/);
+  assert.match(source,/Available now \(\$\{ready\.length\}\)/);
+  assert.match(source,/Unavailable right now \(\$\{blocked\.length\}\)/);
+  assert.match(source,/availableSpellSlotLevels\(character,state,slotLevel\)/);
+  assert.match(source,/actionCostError\(state,action\.cost,sheet\.conditionImmunities\)/);
+});
+
 test('static shell applies a restrictive local-only content policy',()=>{
   const html=readFileSync('public/index.html','utf8');
   const policy=html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1]??'';
