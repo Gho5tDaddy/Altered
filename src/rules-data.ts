@@ -57,6 +57,79 @@ export const CLASS_FEATURES:Record<string,ImportedFeatureRule[]>={
   Wizard:[{id:'scholar',name:'Scholar',source:'Wizard',level:2,summary:'Relevant Expertise is retained through skill proficiency rules.',retention:{wildshape:true}},{id:'spellcasting-wizard',name:'Spellcasting',source:'Wizard',level:1,summary:'Ordinary Wild Shape blocks casting; Shapechange explicitly retains Spellcasting.',retention:{shapechange:true},requires:{spellcasting:true}}]
 };
 
+export const SUBCLASS_FEATURES:Record<string,ImportedFeatureRule[]>={
+  'Path of the Berserker':[
+    {id:'berserker-frenzy',name:'Frenzy',source:'Path of the Berserker',level:3,automation:'conditional',summary:'The first eligible Strength hit after using Reckless Attack while Raging can deal extra d6s equal to the Rage Damage bonus.',retention:{wildshape:true},requires:{strengthAttack:true}},
+    {id:'mindless-rage',name:'Mindless Rage',source:'Path of the Berserker',level:6,automation:'calculated',summary:'While Raging, Charmed and Frightened are removed and cannot affect you.',retention:{wildshape:true}},
+    {id:'berserker-retaliation',name:'Retaliation',source:'Path of the Berserker',level:10,automation:'conditional',summary:'After nearby creature damage, a Reaction can make one melee weapon or Unarmed Strike attack.',retention:{wildshape:true}},
+    {id:'intimidating-presence',name:'Intimidating Presence',source:'Path of the Berserker',level:14,automation:'conditional',summary:'Bonus Action Wisdom-save fear effect with a Long Rest use and Rage-use recharge option.',retention:{wildshape:true},activation:'bonus'}
+  ],
+  'College of Lore':[
+    {id:'cutting-words',name:'Cutting Words',source:'College of Lore',level:3,automation:'conditional',summary:'Reaction Bardic Inspiration reduction after a visible creature succeeds on an eligible roll.',retention:{wildshape:true},requires:{speech:true}},
+    {id:'magical-discoveries',name:'Magical Discoveries',source:'College of Lore',level:6,automation:'reference',summary:'Selected spells must be present in the imported spell list.',retention:{wildshape:true},requires:{spellcasting:true}},
+    {id:'peerless-skill',name:'Peerless Skill',source:'College of Lore',level:14,automation:'conditional',summary:'Can add Bardic Inspiration to a failed ability check, spending the use only if the check succeeds.',retention:{wildshape:true}}
+  ],
+  'Life Domain':[
+    {id:'disciple-of-life',name:'Disciple of Life',source:'Life Domain',level:3,automation:'conditional',summary:'Adds healing when an eligible spell restores Hit Points; imported spell and target details determine the result.',retention:{wildshape:true},requires:{spellcasting:true}},
+    {id:'preserve-life',name:'Preserve Life',source:'Life Domain',level:3,automation:'conditional',summary:'Channel Divinity healing is target- and range-dependent.',retention:{wildshape:true}},
+    {id:'supreme-healing',name:'Supreme Healing',source:'Life Domain',level:17,automation:'conditional',summary:'Eligible spell-healing dice use their maximum values.',retention:{wildshape:true},requires:{spellcasting:true}}
+  ],
+  'Circle of the Land':[
+    {id:'land-circle-spells',name:'Circle Spells',source:'Circle of the Land',level:3,automation:'reference',summary:'Always-prepared land spells must be present on the imported character.',retention:{wildshape:true},requires:{spellcasting:true}},
+    {id:'lands-aid',name:"Land's Aid",source:'Circle of the Land',level:3,automation:'conditional',summary:'Magic Action expends Wild Shape for a Constitution-save area effect and healing.',retention:{wildshape:true},activation:'magic-action'},
+    {id:'natural-recovery',name:'Natural Recovery',source:'Circle of the Land',level:6,automation:'reference',summary:'Spell-slot recovery choice is recorded from the source rather than guessed.',retention:{wildshape:true}},
+    {id:'natures-ward',name:"Nature's Ward",source:'Circle of the Land',level:10,automation:'reference',summary:'The selected land grants a specific resistance or immunity that must be imported.',retention:{wildshape:true}}
+  ],
+  Champion:[
+    {id:'improved-critical',name:'Improved Critical',source:'Champion',level:3,automation:'calculated',summary:'Weapon and Unarmed Strike attack rolls score critical hits on 19–20, expanding to 18–20 at Fighter level 15.',retention:{wildshape:true}},
+    {id:'remarkable-athlete',name:'Remarkable Athlete',source:'Champion',level:3,automation:'calculated',summary:'Advantage on Initiative and eligible Strength (Athletics) checks.',retention:{wildshape:true}},
+    {id:'additional-fighting-style',name:'Additional Fighting Style',source:'Champion',level:7,automation:'reference',summary:'The selected Fighting Style must be present on the imported character.',retention:{wildshape:true}},
+    {id:'heroic-warrior',name:'Heroic Warrior',source:'Champion',level:10,automation:'conditional',summary:'Heroic Inspiration is regained at the start of a turn when unavailable.',retention:{wildshape:true}},
+    {id:'survivor',name:'Survivor',source:'Champion',level:18,automation:'conditional',summary:'Improves Death Saving Throws and restores HP at turn start while Bloodied and above 0 HP.',retention:{wildshape:true}}
+  ],
+  'Warrior of the Open Hand':[
+    {id:'open-hand-technique',name:'Open Hand Technique',source:'Warrior of the Open Hand',level:3,automation:'conditional',summary:'Flurry of Blows hits can Addle, Push, or Topple after their target prerequisites.',retention:{wildshape:true}},
+    {id:'wholeness-of-body',name:'Wholeness of Body',source:'Warrior of the Open Hand',level:6,automation:'conditional',summary:'Bonus Action self-healing with limited uses.',retention:{wildshape:true},activation:'bonus'},
+    {id:'fleet-step',name:'Fleet Step',source:'Warrior of the Open Hand',level:11,automation:'conditional',summary:'Step of the Wind can also provide its other option that turn.',retention:{wildshape:true}},
+    {id:'quivering-palm',name:'Quivering Palm',source:'Warrior of the Open Hand',level:17,automation:'reference',summary:'Track the marked target and later save effect from the source.',retention:{wildshape:true}}
+  ],
+  'Oath of Devotion':[
+    {id:'sacred-weapon',name:'Sacred Weapon',source:'Oath of Devotion',level:3,automation:'conditional',summary:'Channel Divinity empowers a selected weapon; ordinary Beast attacks are not weapons.',retention:{wildshape:true},requires:{weapon:true}},
+    {id:'aura-of-devotion',name:'Aura of Devotion',source:'Oath of Devotion',level:7,automation:'conditional',summary:'Charmed immunity depends on the Paladin aura and range.',retention:{wildshape:true}},
+    {id:'holy-nimbus',name:'Holy Nimbus',source:'Oath of Devotion',level:20,automation:'reference',summary:'The emanation, resistance, and action economy require an explicit active-effect record.',retention:{wildshape:true},activation:'bonus'}
+  ],
+  Hunter:[
+    {id:'hunters-prey',name:"Hunter's Prey",source:'Hunter',level:3,automation:'conditional',summary:'The selected option changes eligible attacks and must be present in imported feature data.',retention:{wildshape:true}},
+    {id:'hunters-lore',name:"Hunter's Lore",source:'Hunter',level:3,automation:'conditional',summary:"Reveals a marked target's damage immunities, resistances, and vulnerabilities.",retention:{wildshape:true},requires:{concentration:true}},
+    {id:'defensive-tactics',name:'Defensive Tactics',source:'Hunter',level:7,automation:'reference',summary:'The selected defensive option must be imported.',retention:{wildshape:true}},
+    {id:'superior-hunters-defense',name:"Superior Hunter's Defense",source:'Hunter',level:15,automation:'reference',summary:'The selected defensive option must be imported.',retention:{wildshape:true}}
+  ],
+  Thief:[
+    {id:'fast-hands',name:'Fast Hands',source:'Thief',level:3,automation:'conditional',summary:'Cunning Action can make eligible Sleight of Hand checks or use objects with the Utilize action.',retention:{wildshape:true},activation:'bonus'},
+    {id:'second-story-work',name:'Second-Story Work',source:'Thief',level:3,automation:'conditional',summary:'Climb Speed and jump benefits depend on current anatomy and Strength.',retention:{wildshape:true}},
+    {id:'supreme-sneak',name:'Supreme Sneak',source:'Thief',level:9,automation:'conditional',summary:'Stealth Advantage applies while the movement limit is satisfied.',retention:{wildshape:true}},
+    {id:'use-magic-device',name:'Use Magic Device',source:'Thief',level:13,automation:'reference',summary:'Attunement and charge-roll interactions require the imported item records.',retention:{wildshape:true}},
+    {id:'thiefs-reflexes',name:"Thief's Reflexes",source:'Thief',level:17,automation:'reference',summary:'The extra first-round turn is shown as a reminder; Initiative order is not automatically rewritten.',retention:{wildshape:true}}
+  ],
+  'Draconic Sorcery':[
+    {id:'draconic-resilience',name:'Draconic Resilience',source:'Draconic Sorcery',level:3,automation:'conditional',summary:'Base-form AC formula and HP increase depend on imported totals and armor state.',retention:{wildshape:true},requires:{noArmor:true}},
+    {id:'elemental-affinity',name:'Elemental Affinity',source:'Draconic Sorcery',level:6,automation:'conditional',summary:'One eligible spell damage roll can add Charisma and optionally grant temporary resistance.',retention:{wildshape:true},requires:{spellcasting:true}},
+    {id:'dragon-wings',name:'Dragon Wings',source:'Draconic Sorcery',level:14,automation:'calculated',summary:'Bonus Action wings grant a Fly Speed equal to Speed; a spent use can be restored with 3 Sorcery Points.',retention:{wildshape:true},activation:'bonus'}
+  ],
+  'Fiend Patron':[
+    {id:'dark-ones-blessing',name:"Dark One's Blessing",source:'Fiend Patron',level:3,automation:'conditional',summary:'Temporary HP trigger depends on a hostile creature reaching 0 HP near you.',retention:{wildshape:true}},
+    {id:'dark-ones-own-luck',name:"Dark One's Own Luck",source:'Fiend Patron',level:6,automation:'conditional',summary:'Can add 1d10 after an ability check or save, subject to its use limit.',retention:{wildshape:true}},
+    {id:'fiendish-resilience',name:'Fiendish Resilience',source:'Fiend Patron',level:10,automation:'reference',summary:'The chosen resistance must be imported as a structured feature.',retention:{wildshape:true}},
+    {id:'hurl-through-hell',name:'Hurl Through Hell',source:'Fiend Patron',level:14,automation:'conditional',summary:'Once-per-rest hit rider requires target and damage resolution.',retention:{wildshape:true}}
+  ],
+  Evoker:[
+    {id:'sculpt-spells',name:'Sculpt Spells',source:'Evoker',level:3,automation:'conditional',summary:'Chosen creatures can automatically succeed against eligible Evocation spells.',retention:{wildshape:true},requires:{spellcasting:true}},
+    {id:'potent-cantrip',name:'Potent Cantrip',source:'Evoker',level:6,automation:'conditional',summary:'Eligible damaging cantrips deal partial damage after their normal resolution.',retention:{wildshape:true},requires:{spellcasting:true}},
+    {id:'empowered-evocation',name:'Empowered Evocation',source:'Evoker',level:10,automation:'conditional',summary:'Adds Intelligence to one eligible Wizard Evocation spell damage roll.',retention:{wildshape:true},requires:{spellcasting:true}},
+    {id:'overchannel',name:'Overchannel',source:'Evoker',level:14,automation:'reference',summary:'Maximum-damage uses and later self-damage require explicit per-rest tracking.',retention:{wildshape:true},requires:{spellcasting:true}}
+  ]
+};
+
 export const SPECIES_FEATURES:Record<string,ImportedFeatureRule[]>={
   Aasimar:[{id:'celestial-revelation',name:'Celestial Revelation',source:'Aasimar',level:3,summary:'Species trait is not retained by Wild Shape, but an already-active timed effect can continue.',activation:'bonus'}],
   Dragonborn:[{id:'breath-weapon',name:'Breath Weapon',source:'Dragonborn',summary:'Species trait is not on Wild Shape’s retained list.'},{id:'draconic-flight',name:'Draconic Flight',source:'Dragonborn',level:5,summary:'An already-active duration can continue after a later transformation.',activation:'bonus'}],

@@ -4,6 +4,9 @@ export type ActionCost = 'action'|'bonus'|'reaction'|'free'|'magic-action'|'none
 export type TransformProfile = 'base'|'wildshape'|'polymorph'|'true-polymorph'|'shapechange'|'animal-shapes'|'overlay'|'custom';
 export type ProficiencyRank = 0|1|2;
 export type FeatureStatus = 'active'|'conditional'|'inactive'|'ruling';
+export type RuleAutomationState = 'calculated'|'conditional'|'reference'|'unsupported';
+export type RuleSourceKind = 'srd'|'basic-rules'|'errata'|'owned-character';
+export type RuleAuditDomain = 'core'|'conditions'|'classes'|'subclasses'|'forms'|'spells'|'items'|'import'|'product';
 
 export interface Abilities {str:number;dex:number;con:number;int:number;wis:number;cha:number}
 export interface Speeds {walk?:number;climb?:number;swim?:number;fly?:number;burrow?:number}
@@ -80,6 +83,7 @@ export interface TransformationGrant {
 
 export interface ImportedFeatureRule {
   id:string;name:string;source:string;level?:number;summary:string;
+  automation?:RuleAutomationState;
   retention?:Partial<Record<Exclude<TransformProfile,'base'>,boolean>>;
   requires?:{spellcasting?:boolean;concentration?:boolean;speech?:boolean;weapon?:boolean;unarmed?:boolean;strengthAttack?:boolean;noArmor?:boolean;noShield?:boolean};
   grants?:{speedBonus?:number;resistances?:DamageType[];immunities?:DamageType[];saveBonusAbility?:Ability;saveBonusFromAbility?:Ability;acFormula?:{base:number;abilities:Ability[]}};
@@ -87,6 +91,12 @@ export interface ImportedFeatureRule {
 }
 export interface ResourcePool {id:string;name:string;current:number;max:number;recovery:'short-one'|'short-all'|'long-all'|'manual'}
 export interface EquipmentState {armorCategory:'none'|'light'|'medium'|'heavy';shield:boolean;transformBehavior:'merge'|'drop'|'wear';formCanWear?:boolean}
+export type CharacterRuleset='2024'|'legacy'|'mixed'|'unknown';
+export interface CharacterProvenance {provider:'local'|'dndbeyond';sourceId?:string;ruleset:CharacterRuleset;rulesetEvidence:string[];reviewRequired:boolean}
+export interface CharacterItem {
+  id:string;name:string;type:string;equipped:boolean;attuned:boolean;requiresAttunement:boolean;
+  ruleset:CharacterRuleset;sourceIds:string[];mechanics:'included-in-imported-totals'|'reference-only'|'review-required';
+}
 
 export interface Character {
   schemaVersion:1;id:string;name:string;species:string;legacyRace?:string;creatureType:string;size:string;totalLevel:number;
@@ -94,7 +104,7 @@ export interface Character {
   proficiencies:{saves:Partial<Record<Ability,ProficiencyRank>>;skills:Record<string,ProficiencyRank>};
   skillBonuses?:Record<string,number>;saveBonuses?:Partial<Record<Ability,number>>;
   knownForms:string[];seenForms:string[];spells:Spell[];spellSlots:Record<string,{current:number;max:number}>;
-  feats:string[];features:ImportedFeatureRule[];resources:ResourcePool[];equipment:EquipmentState;
+  feats:string[];features:ImportedFeatureRule[];resources:ResourcePool[];equipment:EquipmentState;items:CharacterItem[];provenance:CharacterProvenance;
   transformationGrants?:TransformationGrant[];customForms:Record<string,Creature>;
 }
 
@@ -102,17 +112,19 @@ export interface TransformationOption {id:string;label:string;profile:TransformP
 export interface RageState {active:boolean;endsAtTurn:number;usedThisTurn:boolean;recklessDeclared:boolean;extendedThisTurn:boolean}
 export interface TurnState {number:number;actionsRemaining:number;surgeActionsRemaining:number;bonusRemaining:number;reactionRemaining:number;slotSpellCast:boolean;attackRollsMade:number;oncePerTurn:Record<string,boolean>}
 export interface ConcentrationState {name:string;source:string;castLevel?:number}
+export interface PendingRelentlessRage {dc:number;damage:number;source:DamageType}
+export interface LifeState {dead:boolean;stable:boolean;deathSaveSuccesses:number;deathSaveFailures:number}
 export interface ActiveSpellEffect extends SpellActiveEffect {name:string;source:string;castLevel?:number}
 export interface ActiveTransform {option:TransformationOption;startedTurn:number;duration:string;tempHpSource:boolean;spellConcentration?:boolean;permanentUntilDispelled?:boolean}
 export interface ActionRecharge {name:string;min:number;max:number}
 export interface GameState {
-  stateVersion:3;hp:number;tempHp:number;tempHpSource?:string;activeTransform?:ActiveTransform;concentration?:ConcentrationState;activeSpellEffects:ActiveSpellEffect[];
+  stateVersion:5;hp:number;tempHp:number;life:LifeState;exhaustionLevel:number;relentlessRageDc:number;pendingRelentlessRage?:PendingRelentlessRage;tempHpSource?:string;activeTransform?:ActiveTransform;concentration?:ConcentrationState;activeSpellEffects:ActiveSpellEffect[];
   concentrationChecks:{dc:number;damage:number;source:string}[];
   rage:RageState;turn:TurnState;resources:Record<string,ResourcePool>;spellSlots:Record<string,{current:number;max:number}>;
   conditions:string[];equipment:EquipmentState;overlays:string[];recharges:Record<string,ActionRecharge>;actionUses:Record<string,number>;log:string[];
 }
 
-export interface DerivedRoll {name:string;modifier:number;source:string;proficiency:ProficiencyRank;beastModifier?:number;advantageSources?:string[];disadvantageSources?:string[];conditionalSources?:string[];automaticFailure?:string;alternate?:{modifier:number;source:string}}
+export interface DerivedRoll {name:string;modifier:number;source:string;proficiency:ProficiencyRank;beastModifier?:number;advantageSources?:string[];disadvantageSources?:string[];conditionalSources?:string[];automaticFailure?:string;minimumD20?:number;minimumTotal?:number;minimumSource?:string;alternate?:{modifier:number;source:string;minimumD20?:number;minimumTotal?:number;minimumSource?:string}}
 export interface EvaluatedFeature {id:string;name:string;source:string;status:FeatureStatus;reason:string;summary:string;activation?:ActionCost}
 export interface AcCandidate {name:string;value:number;legal:boolean;reason:string}
 export interface ResolvedSheet {
@@ -131,6 +143,7 @@ export interface ContentPackMetadata {
 }
 export interface ConditionDefinition {
   id:string;name:string;summary:string;tags:string[];
+  cumulative?:boolean;maximumLevel?:number;d20PenaltyPerLevel?:number;speedPenaltyPerLevel?:number;
   blocksActions?:boolean;blocksBonusActions?:boolean;blocksReactions?:boolean;speedBecomesZero?:boolean;
   endsConcentration?:boolean;endsWildShape?:boolean;endsRage?:boolean;
   attackAdvantageAgainst?:boolean;attackDisadvantage?:boolean;abilityCheckDisadvantage?:boolean;
@@ -148,6 +161,41 @@ export interface ContentRegistrySnapshot {
   verifiedThrough:string;
 }
 export interface CatalogEntry {id:string;name:string;summary:string;source:string;tags?:string[]}
+
+export interface RuleSourceReference {
+  kind:RuleSourceKind;
+  title:string;
+  ruleset:string;
+  url:string;
+  license:string;
+}
+export interface RuleLedgerEntry {
+  id:string;
+  name:string;
+  domain:RuleAuditDomain;
+  automation:RuleAutomationState;
+  source:RuleSourceReference;
+  behavior:string;
+  implementation:string[];
+  tests:string[];
+  reviewed:string;
+}
+export interface FunctionInventoryEntry {
+  id:string;
+  label:string;
+  kind:'control'|'automatic'|'import'|'persistence';
+  ruleIds:string[];
+  stateRead:string[];
+  stateChanged:string[];
+  failureStates:string[];
+}
+export interface RulesAuditSnapshot {
+  rules:number;
+  functions:number;
+  counts:Record<RuleAutomationState,number>;
+  domains:Record<RuleAuditDomain,number>;
+  verifiedThrough:string;
+}
 
 export interface OwnedContentMatch {
   characterId?:string;

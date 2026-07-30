@@ -9,6 +9,12 @@ test('settings use the in-memory fallback when browser storage is unavailable',a
   assert.equal(await loadBooleanSetting('test-setting',false),true);
 });
 
+test('walkthrough completion persists independently from character data',async()=>{
+  assert.equal(await loadBooleanSetting('walkthrough-completed-v1',false),false);
+  await saveBooleanSetting('walkthrough-completed-v1',true);
+  assert.equal(await loadBooleanSetting('walkthrough-completed-v1',false),true);
+});
+
 test('art overrides can be stored and removed through the fallback layer',async()=>{
   const image='data:image/png;base64,iVBORw0KGgo=';
   await saveArtOverride('character','form:wolf',image);

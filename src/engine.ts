@@ -4,7 +4,7 @@ import type {
   Spell,TransformProfile,TransformationEffects,TransformationOption,TransitionResult
 } from './types.js';
 import {
-  CLASS_FEATURES,CREATURES,MOON_FORM_SPELL_LEVELS,RULES_VERSION,SKILL_ABILITIES,TRANSFORMATION_PROFILES,
+  CLASS_FEATURES,CREATURES,MOON_FORM_SPELL_LEVELS,RULES_VERSION,SKILL_ABILITIES,SUBCLASS_FEATURES,TRANSFORMATION_PROFILES,
   SPECIES_FEATURES,classLevel,subclass
 } from './content-registry.js';
 
@@ -19,6 +19,8 @@ const recordValue=<T>(record:Record<string,T>,name:string):T|undefined=>record[O
 const resource=(state:GameState,id:string)=>state.resources[id];
 const cloneResource=(r:ResourcePool):ResourcePool=>({...r});
 const hasCondition=(state:GameState,...conditions:string[])=>conditions.some(condition=>state.conditions.includes(condition));
+export function exhaustionPenalty(state:GameState){return boundedWhole(state.exhaustionLevel,0,0,6)*2}
+function deadFromExhaustion(state:GameState){return boundedWhole(state.exhaustionLevel,0,0,6)>=6}
 const isIncapacitated=(state:GameState)=>hasCondition(state,'Incapacitated','Unconscious','Paralyzed','Petrified','Stunned');
 const hasZeroSpeedCondition=(state:GameState)=>hasCondition(state,'Grappled','Restrained','Paralyzed','Petrified','Stunned','Unconscious');
 const autoFailsPhysicalSaves=(state:GameState)=>hasCondition(state,'Unconscious','Paralyzed','Petrified','Stunned');
@@ -62,7 +64,7 @@ function activeConditionImmunities(character:Character,state:GameState,option=ac
   return new Set(values.map(value=>normalized(value)));
 }
 function effectivelyIncapacitated(character:Character,state:GameState,immunities=activeConditionImmunities(character,state)){
-  return ['Incapacitated','Unconscious','Paralyzed','Petrified','Stunned'].some(condition=>state.conditions.includes(condition)&&!immunities.has(normalized(condition)));
+  return state.life.dead||state.hp===0||deadFromExhaustion(state)||['Incapacitated','Unconscious','Paralyzed','Petrified','Stunned'].some(condition=>state.conditions.includes(condition)&&!immunities.has(normalized(condition)));
 }
 function policyFor(option:TransformationOption):RetentionPolicy{
   const base=TRANSFORMATION_PROFILES[option.profile]?.retains??TRANSFORMATION_PROFILES.custom!.retains;
@@ -119,8 +121,8 @@ function overlayOption(character:Character,state:GameState|undefined,id:string):
 function activeOverlayOptions(character:Character,state:GameState){return state.overlays.map(id=>overlayOption(character,state,id)).filter((x):x is TransformationOption=>Boolean(x))}
 function addSpellOverlayOptions(options:TransformationOption[],character:Character,state:GameState|undefined,spellName:string,ids:string[]){
   if(!preparedSpell(character,spellName))return;
-  const activeIds=new Set(state?.overlays??[]);const activeGroup=ids.some(id=>activeIds.has(id));const castAllowed=canNormallyCast(character,state);const level=spellOnSheet(character,spellName)?.slotLevel??spellOnSheet(character,spellName)?.level??0;const slotReady=slotAvailable(state,character,level);
-  for(const id of ids){const base=builtInOverlayOption(character,state,id);if(!base)continue;const active=activeIds.has(id);const switching=Boolean(base.switchGroup&&activeGroup&&!active);const usable=active||switching||(castAllowed&&slotReady);const reason=!castAllowed?'Current form, condition, or Rage blocks spellcasting.':!slotReady?`No level ${level} or higher spell slot remains.`:undefined;options.push({...base,label:active?`End ${base.label}`:base.label,actionCost:active?(base.endActionCost??'none'):base.actionCost,usable,...(!active&&!usable&&reason?{reason}:{}),...(active?{deactivate:true}:{})});}
+  const activeIds=new Set(state?.overlays??[]);const activeGroup=ids.some(id=>activeIds.has(id));const castAllowed=canNormallyCast(character,state);const level=spellOnSheet(character,spellName)?.slotLevel??spellOnSheet(character,spellName)?.level??0;const slotReady=slotAvailable(state,character,level);const slotSpellBlocked=Boolean(state?.turn.slotSpellCast&&level>0);
+  for(const id of ids){const base=builtInOverlayOption(character,state,id);if(!base)continue;const active=activeIds.has(id);const switching=Boolean(base.switchGroup&&activeGroup&&!active);const usable=active||switching||(castAllowed&&slotReady&&!slotSpellBlocked);const reason=!castAllowed?'Current form, condition, or Rage blocks spellcasting.':slotSpellBlocked?'A spell slot has already been expended to cast a spell this turn.':!slotReady?`No level ${level} or higher spell slot remains.`:undefined;options.push({...base,label:active?`End ${base.label}`:base.label,actionCost:active?(base.endActionCost??'none'):base.actionCost,usable,...(!active&&!usable&&reason?{reason}:{}),...(active?{deactivate:true}:{})});}
 }
 
 export function availableTransformations(character:Character,state?:GameState):TransformationOption[]{
@@ -132,19 +134,19 @@ export function availableTransformations(character:Character,state?:GameState):T
     for(const id of character.knownForms){const form=creature(character,id);if(!form||normalized(form.type)!=='beast'||form.cr>limits.maxCr||(form.speeds.fly&&!limits.fly))continue;const usable=!pool||pool.current>0;options.push({id:`wildshape:${id}`,label:form.name,profile:'wildshape',formId:id,source:limits.moon?'Circle of the Moon Wild Shape':'Wild Shape',actionCost:'bonus',usable,...(!usable?{reason:'No Wild Shape uses remaining.'}:{})});}
   }
   if(preparedSpell(character,'Polymorph')){
-    const castAllowed=canNormallyCast(character,state);const usable=castAllowed&&slotAvailable(state,character,4);const reason=!castAllowed?'Current form or Rage blocks Polymorph.':'No level 4 or higher spell slot remains.';
+    const castAllowed=canNormallyCast(character,state);const slotSpellBlocked=Boolean(state?.turn.slotSpellCast);const usable=castAllowed&&!slotSpellBlocked&&slotAvailable(state,character,4);const reason=!castAllowed?'Current form or Rage blocks Polymorph.':slotSpellBlocked?'A spell slot has already been expended to cast a spell this turn.':'No level 4 or higher spell slot remains.';
     for(const form of allForms(character))if(normalized(form.type)==='beast'&&form.cr<=character.totalLevel)options.push({id:`polymorph:${form.id}`,label:`${form.name} — Polymorph`,profile:'polymorph',formId:form.id,source:'Polymorph',actionCost:'magic-action',spellName:'Polymorph',spellLevel:4,concentration:true,usable,...(!usable?{reason}:{})});
   }
   if(preparedSpell(character,'True Polymorph')){
-    const castAllowed=canNormallyCast(character,state);const usable=castAllowed&&slotAvailable(state,character,9);const reason=!castAllowed?'Current form or Rage blocks True Polymorph.':'No level 9 or higher spell slot remains.';
+    const castAllowed=canNormallyCast(character,state);const slotSpellBlocked=Boolean(state?.turn.slotSpellCast);const usable=castAllowed&&!slotSpellBlocked&&slotAvailable(state,character,9);const reason=!castAllowed?'Current form or Rage blocks True Polymorph.':slotSpellBlocked?'A spell slot has already been expended to cast a spell this turn.':'No level 9 or higher spell slot remains.';
     for(const form of allForms(character))if(form.cr<=character.totalLevel)options.push({id:`true-polymorph:${form.id}`,label:`${form.name} — True Polymorph`,profile:'true-polymorph',formId:form.id,source:'True Polymorph — creature into creature',actionCost:'magic-action',spellName:'True Polymorph',spellLevel:9,concentration:true,duration:'Concentration, up to 1 hour; permanent until dispelled after the full hour',usable,...(!usable?{reason}:{})});
   }
   if(preparedSpell(character,'Shapechange')&&(profile==='base'||profile==='shapechange')){
-    const switching=profile==='shapechange';const usable=switching||(canNormallyCast(character,state)&&slotAvailable(state,character,9));const reason=state?.rage.active?'Rage blocks spellcasting.':switching?'':'No level 9 or higher spell slot remains.';
+    const switching=profile==='shapechange';const slotSpellBlocked=Boolean(state?.turn.slotSpellCast);const usable=switching||(canNormallyCast(character,state)&&!slotSpellBlocked&&slotAvailable(state,character,9));const reason=state?.rage.active?'Rage blocks spellcasting.':switching?'':slotSpellBlocked?'A spell slot has already been expended to cast a spell this turn.':'No level 9 or higher spell slot remains.';
     for(const id of character.seenForms){const form=creature(character,id);if(form&&form.cr<=character.totalLevel&&!['construct','undead'].includes(normalized(form.type)))options.push({id:`shapechange:${id}`,label:`${form.name} — Shapechange`,profile:'shapechange',formId:id,source:'Shapechange',actionCost:'magic-action',spellName:'Shapechange',spellLevel:9,concentration:true,switchGroup:'shapechange',usable,...(!usable?{reason}:{})});}
   }
   if(preparedSpell(character,'Animal Shapes')){
-    const switching=profile==='animal-shapes';const usable=switching||(canNormallyCast(character,state)&&slotAvailable(state,character,8));const reason=!canNormallyCast(character,state)?'Current state blocks spellcasting.':'No level 8 or higher spell slot remains.';
+    const switching=profile==='animal-shapes';const slotSpellBlocked=Boolean(state?.turn.slotSpellCast);const usable=switching||(canNormallyCast(character,state)&&!slotSpellBlocked&&slotAvailable(state,character,8));const reason=!canNormallyCast(character,state)?'Current state blocks spellcasting.':switching?'':slotSpellBlocked?'A spell slot has already been expended to cast a spell this turn.':'No level 8 or higher spell slot remains.';
     for(const form of allForms(character))if(normalized(form.type)==='beast'&&form.cr<=4&&!['Huge','Gargantuan'].includes(form.size))options.push({id:`animal-shapes:${form.id}`,label:`${form.name} — Animal Shapes`,profile:'animal-shapes',formId:form.id,source:'Animal Shapes',actionCost:'magic-action',endActionCost:'bonus',spellName:'Animal Shapes',spellLevel:8,switchGroup:'animal-shapes',duration:'24 hours',usable,...(!usable?{reason}:{})});
   }
   addSpellOverlayOptions(options,character,state,'Alter Self',['spell:alter-self:aquatic','spell:alter-self:appearance','spell:alter-self:weapons-slashing','spell:alter-self:weapons-piercing','spell:alter-self:weapons-bludgeoning']);
@@ -162,7 +164,7 @@ export function availableTransformations(character:Character,state?:GameState):T
 
 export function createInitialState(character:Character):GameState{
   return {
-    stateVersion:3,hp:character.hp.current,tempHp:0,
+    stateVersion:5,hp:character.hp.current,tempHp:0,life:{dead:false,stable:false,deathSaveSuccesses:0,deathSaveFailures:0},exhaustionLevel:0,relentlessRageDc:10,
     rage:{active:false,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false},
     turn:{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,slotSpellCast:false,attackRollsMade:0,oncePerTurn:{}},
     resources:Object.fromEntries(character.resources.map(r=>[r.id,cloneResource(r)])),
@@ -180,7 +182,7 @@ function physicalFromForm(character:Character,option:TransformationOption,effect
 }
 function armorActive(state:GameState,option:TransformationOption){return option.profile==='base'||option.profile==='overlay'||(state.equipment.transformBehavior==='wear'&&state.equipment.formCanWear===true)}
 function shieldActive(state:GameState,option:TransformationOption){return armorActive(state,option)&&state.equipment.shield}
-function getClassFeatureRules(character:Character):ImportedFeatureRule[]{return [...character.classes.flatMap(c=>(recordValue(CLASS_FEATURES,c.name)??[]).filter(f=>(f.level??1)<=c.level)),...character.features]}
+function getClassFeatureRules(character:Character):ImportedFeatureRule[]{return [...character.classes.flatMap(c=>[...(recordValue(CLASS_FEATURES,c.name)??[]),...(c.subclass?recordValue(SUBCLASS_FEATURES,c.subclass)??[]:[])].filter(f=>(f.level??1)<=c.level)),...character.features]}
 function getSpeciesRules(character:Character):ImportedFeatureRule[]{return (recordValue(SPECIES_FEATURES,character.species)??[]).filter(f=>(f.level??1)<=character.totalLevel)}
 function retentionAllows(feature:ImportedFeatureRule,option:TransformationOption){
   if(option.profile==='base'||option.profile==='overlay')return true;if(!policyFor(option).classFeatures)return false;
@@ -189,8 +191,9 @@ function retentionAllows(feature:ImportedFeatureRule,option:TransformationOption
 }
 function evaluateFeatures(character:Character,state:GameState,option:TransformationOption,canCast:boolean):EvaluatedFeature[]{
   const result:EvaluatedFeature[]=[];const profile=option.profile;
+  const fullyCalculated=new Set(['rage','barbarian-unarmored-defense','danger-sense','reckless-attack','fast-movement','relentless-rage','wild-shape','wild-resurgence','beast-spells','second-wind','action-surge','monk-unarmored-defense','unarmored-movement','lay-on-hands','aura-of-protection','radiant-strikes','roving','feral-senses','reliable-talent','eldritch-mind']);
   for(const feature of getClassFeatureRules(character)){
-    let status:EvaluatedFeature['status']='active';let reason='Retained class feature; normal prerequisites still apply.';
+    const automation=feature.automation??(fullyCalculated.has(feature.id)?'calculated':'conditional');let status:EvaluatedFeature['status']=automation==='calculated'?'active':automation==='conditional'?'conditional':'ruling';let reason=automation==='calculated'?'Calculated from the current sheet and state.':automation==='conditional'?'Available when its target, equipment, or battlefield prerequisites are met.':automation==='reference'?'Reference only; Altered does not execute this feature.':'Unsupported automation; resolve this feature from its source.';
     if(!retentionAllows(feature,option)){status='inactive';reason=`Not retained by the ${profile} transformation policy.`;}
     if(status==='active'&&feature.requires?.spellcasting&&!canCast){status='inactive';reason='Requires spellcasting, which the current state blocks.';}
     if(status==='active'&&feature.requires?.concentration&&!state.concentration){status='inactive';reason='Requires an active Concentration effect.';}
@@ -209,13 +212,15 @@ function evaluateFeatures(character:Character,state:GameState,option:Transformat
 }
 function moonSpellAllowed(character:Character,spell:Spell){const level=recordValue(MOON_FORM_SPELL_LEVELS,spell.name);return sameText(subclass(character,'Druid'),'Circle of the Moon')&&level!==undefined&&classLevel(character,'Druid')>=level&&sameText(spell.sourceClass,'Druid')}
 export function spellActiveEffect(spell:Spell){if(spell.activeEffect)return spell.activeEffect;if(sameText(spell.name,'Barkskin'))return {id:'barkskin',duration:'1 hour',acMinimum:17,summary:'The target has Armor Class 17 if its AC would otherwise be lower.'};return undefined}
-function evaluateSpells(character:Character,state:GameState,option:TransformationOption,baseCanCast:boolean){return character.spells.map(spell=>{const prepared=spell.prepared!==false;const circleAccess=moonSpellAllowed(character,spell);let available=baseCanCast&&prepared;let reason=available?'Spellcasting is allowed.':'Spellcasting is blocked in the current form.';if(option.profile==='wildshape'&&circleAccess&&prepared&&!state.rage.active){available=true;reason='Available through Circle of the Moon while in Wild Shape.';}if(option.profile==='wildshape'&&classLevel(character,'Druid')>=18&&!state.rage.active){available=prepared&&!(spell.materialCost||spell.materialConsumed);reason=!prepared?'The spell is not prepared or otherwise available.':available?'Available through Beast Spells.':'Beast Spells excludes costly or consumed Material components.';}if(state.rage.active){available=false;reason='Rage blocks all spellcasting, including Circle spells.';}const level=spell.slotLevel??spell.level;if(available&&level>0&&state.turn.slotSpellCast){available=false;reason='2024 rule: a spell slot has already been expended to cast a spell on this turn. Cantrips and non-spell actions remain available.';}if(available&&level>0&&!slotAvailable(state,character,level)){available=false;reason=`No level ${level} or higher spell slot remains.`;}if(available){const error=actionError(state,spell.castingTime,activeConditionImmunities(character,state,option));if(error){available=false;reason=error;}}return {...spell,...(circleAccess?{specialAccess:'circle-of-the-moon' as const}:{}),available,reason};});}
+function evaluateSpells(character:Character,state:GameState,option:TransformationOption,baseCanCast:boolean){return character.spells.map(spell=>{const prepared=spell.prepared!==false;const circleAccess=moonSpellAllowed(character,spell);let available=baseCanCast&&prepared;let reason=available?'Spellcasting is allowed.':'Spellcasting is blocked in the current form.';if(option.profile==='wildshape'&&circleAccess&&prepared&&!state.rage.active){available=true;reason='Available through Circle of the Moon while in Wild Shape.';}if(option.profile==='wildshape'&&classLevel(character,'Druid')>=18&&!state.rage.active){available=prepared&&!(spell.materialCost||spell.materialConsumed);reason=!prepared?'The spell is not prepared or otherwise available.':available?'Available through Beast Spells.':'Beast Spells excludes costly or consumed Material components.';}if(state.rage.active){available=false;reason='Rage blocks all spellcasting, including Circle spells.';}const level=spell.slotLevel??spell.level;if(available&&level>0&&state.turn.slotSpellCast){available=false;reason='2024 rule: a spell slot has already been expended to cast a spell on this turn. Cantrips and non-spell actions remain available.';}if(available&&level>0&&!slotAvailable(state,character,level)){available=false;reason=`No level ${level} or higher spell slot remains.`;}if(available){const error=actionError(state,spell.castingTime,activeConditionImmunities(character,state,option));if(error){available=false;reason=error;}}return {...spell,...(spell.attackBonus!==undefined?{attackBonus:spell.attackBonus-exhaustionPenalty(state)}:{}),...(circleAccess?{specialAccess:'circle-of-the-moon' as const}:{}),available,reason};});}
 function resolveSpeeds(character:Character,state:GameState,option:TransformationOption,effects:TransformationEffects[]){
   const form=creature(character,option.formId);const speeds=form&&option.profile!=='overlay'?{...form.speeds}:{walk:character.speed};
   if(retainedClassFeatures(option)){const barb=classLevel(character,'Barbarian');if(barb>=5&&!(armorActive(state,option)&&state.equipment.armorCategory==='heavy'))speeds.walk=(speeds.walk??0)+10;const monk=classLevel(character,'Monk');if(monk>=2&&!armorActive(state,option)&&!shieldActive(state,option))speeds.walk=(speeds.walk??0)+monkMovement(monk);const ranger=classLevel(character,'Ranger');if(ranger>=6&&!(armorActive(state,option)&&state.equipment.armorCategory==='heavy')){speeds.walk=(speeds.walk??0)+10;speeds.climb=Math.max(speeds.climb??0,speeds.walk);speeds.swim=Math.max(speeds.swim??0,speeds.walk);}for(const feature of character.features){if(!retentionAllows(feature,option))continue;const bonus=feature.grants?.speedBonus??0;if(bonus)speeds.walk=(speeds.walk??0)+bonus;}}
   const equalToWalk=new Set<'climb'|'swim'|'fly'|'burrow'>();
   for(const effect of effects){for(const [key,value] of Object.entries(effect.speedSet??{}))if(value!==undefined)speeds[key as keyof typeof speeds]=value;for(const [key,value] of Object.entries(effect.speedBonus??{}))if(value!==undefined)speeds[key as keyof typeof speeds]=(speeds[key as keyof typeof speeds]??0)+value;for(const key of effect.speedEqualToWalk??[])equalToWalk.add(key);}
   for(const key of equalToWalk)speeds[key]=speeds.walk??0;
+  const exhaustionSpeedPenalty=boundedWhole(state.exhaustionLevel,0,0,6)*5;
+  if(exhaustionSpeedPenalty)for(const key of Object.keys(speeds) as (keyof typeof speeds)[])speeds[key]=Math.max(0,(speeds[key]??0)-exhaustionSpeedPenalty);
   const immunities=new Set(unique(effects.flatMap(effect=>effect.conditionImmunities??[])).map(value=>normalized(value)));
   const activeZeroSpeed=['Grappled','Restrained','Paralyzed','Petrified','Stunned','Unconscious'].some(condition=>state.conditions.includes(condition)&&!immunities.has(normalized(condition)));
   if(activeZeroSpeed)for(const key of Object.keys(speeds) as (keyof typeof speeds)[])speeds[key]=0;return speeds;
@@ -238,15 +243,17 @@ function conditionApplies(state:GameState,condition:string,immunities:Set<string
 function resolveSaves(character:Character,state:GameState,option:TransformationOption,abilities:Character['abilities'],effects:TransformationEffects[]):Record<Ability,DerivedRoll>{
   const form=creature(character,option.formId);const pb=proficiencyBonus(character.totalLevel);const retain=retainedProficiencies(option);const output={} as Record<Ability,DerivedRoll>;const conditionImmunities=effectConditionImmunities(form,effects);const incapacitated=effectivelyIncapacitated(character,state,conditionImmunities);
   for(const a of ABILITIES){
-    const rank=retain?(character.proficiencies.saves[a]??0):0;const formValue=form?.saves[a];let modifier=characterSaveValue(character,option,abilities,a,rank,pb);let source=rank?'Retained character proficiency':'Current ability modifier';
+    const importedRank=retain?(character.proficiencies.saves[a]??0):0;const slippery=retain&&retainedClassFeatures(option)&&classLevel(character,'Rogue')>=15&&(a==='wis'||a==='cha');const rank=(slippery?Math.max(1,importedRank):importedRank) as ProficiencyRank;const formValue=form?.saves[a];let modifier=slippery&&importedRank===0?abilityMod(abilities[a])+pb:characterSaveValue(character,option,abilities,a,rank,pb);let source=slippery&&importedRank===0?'Slippery Mind proficiency':rank?'Retained character proficiency':'Current ability modifier';
     if(form&&!retain){modifier=formValue??abilityMod(form.abilities[a]);source=`${form.name} stat block`;}else if(form&&formValue!==undefined&&formValue>modifier){modifier=formValue;source=`Higher ${form.name} modifier`;}
     if(option.profile==='wildshape'&&sameText(subclass(character,'Druid'),'Circle of the Moon')&&classLevel(character,'Druid')>=6&&a==='con'){modifier+=abilityMod(character.abilities.wis);source+=' + Improved Circle Forms';}
     if(retainedClassFeatures(option)&&classLevel(character,'Paladin')>=6&&!incapacitated){modifier+=Math.max(1,abilityMod(character.abilities.cha));source+=' + Aura of Protection';}
     for(const feature of character.features){if(!retentionAllows(feature,option)||feature.grants?.saveBonusAbility!==a||!feature.grants.saveBonusFromAbility)continue;modifier+=abilityMod(abilities[feature.grants.saveBonusFromAbility]);source+=` + ${feature.name}`;}
+    modifier-=exhaustionPenalty(state);if(state.exhaustionLevel>0)source+=` - Exhaustion ${state.exhaustionLevel}`;
     const advantageSources=effects.filter(e=>e.saveAdvantage?.includes(a)).map(()=> 'Active transformation');const disadvantageSources=effects.filter(e=>e.saveDisadvantage?.includes(a)).map(()=> 'Active transformation');
     if(retainedClassFeatures(option)&&classLevel(character,'Barbarian')>=2&&a==='dex'&&!incapacitated)advantageSources.push('Danger Sense');if(retainedClassFeatures(option)&&state.rage.active&&a==='str')advantageSources.push('Rage');if(conditionApplies(state,'Restrained',conditionImmunities)&&a==='dex')disadvantageSources.push('Restrained');
     const automaticFailure=(a==='str'||a==='dex')&&['Unconscious','Paralyzed','Petrified','Stunned'].some(condition=>conditionApplies(state,condition,conditionImmunities))?'This condition automatically fails Strength and Dexterity saving throws.':undefined;
-    output[a]={name:`${a.toUpperCase()} save`,modifier,source,proficiency:rank,...(formValue!==undefined?{beastModifier:formValue}:{}),...(advantageSources.length?{advantageSources}:{}),...(disadvantageSources.length?{disadvantageSources}:{}),...(automaticFailure?{automaticFailure}:{})};
+    const minimumTotal=retainedClassFeatures(option)&&classLevel(character,'Barbarian')>=18&&a==='str'?abilities.str:undefined;
+    output[a]={name:`${a.toUpperCase()} save`,modifier,source,proficiency:rank,...(formValue!==undefined?{beastModifier:formValue}:{}),...(advantageSources.length?{advantageSources}:{}),...(disadvantageSources.length?{disadvantageSources}:{}),...(automaticFailure?{automaticFailure}:{}),...(minimumTotal!==undefined?{minimumTotal,minimumSource:'Indomitable Might'}:{})};
   }
   return output;
 }
@@ -254,10 +261,13 @@ function resolveSkills(character:Character,state:GameState,option:Transformation
   const form=creature(character,option.formId);const pb=proficiencyBonus(character.totalLevel);const retain=retainedProficiencies(option);const conditionImmunities=effectConditionImmunities(form,effects);const names=unique([...Object.keys(SKILL_ABILITIES),...Object.keys(form?.skills??{}),...Object.keys(character.proficiencies.skills)]);const out:Record<string,DerivedRoll>={};
   for(const name of names){
     const a=SKILL_ABILITIES[name]??'wis';const rank=retain?(character.proficiencies.skills[name]??0):0;const formValue=form?.skills[name];let modifier=characterSkillValue(character,option,abilities,name,a,rank,pb);let source=rank?'Retained character proficiency':'Current ability modifier';
+    if(retain&&retainedClassFeatures(option)&&classLevel(character,'Bard')>=2&&rank===0&&formValue===undefined){const bonus=Math.floor(pb/2);modifier+=bonus;source+=` + Jack of All Trades ${bonus}`;}
     if(form&&!retain){modifier=formValue??abilityMod(form.abilities[a]);source=`${form.name} stat block`;}else if(form&&formValue!==undefined&&formValue>modifier){modifier=formValue;source=`Higher ${form.name} modifier`;}
-    let alternate:DerivedRoll['alternate'];if(retainedClassFeatures(option)&&state.rage.active&&classLevel(character,'Barbarian')>=3&&['Acrobatics','Intimidation','Perception','Stealth','Survival'].includes(name))alternate={modifier:abilityMod(abilities.str)+pb*rank,source:'Primal Knowledge: make this as a Strength check while Raging'};
+    modifier-=exhaustionPenalty(state);if(state.exhaustionLevel>0)source+=` - Exhaustion ${state.exhaustionLevel}`;
+    const reliable=retainedClassFeatures(option)&&classLevel(character,'Rogue')>=7&&rank>0;const indomitable=retainedClassFeatures(option)&&classLevel(character,'Barbarian')>=18&&a==='str';
+    let alternate:DerivedRoll['alternate'];if(retainedClassFeatures(option)&&state.rage.active&&classLevel(character,'Barbarian')>=3&&['Acrobatics','Intimidation','Perception','Stealth','Survival'].includes(name))alternate={modifier:abilityMod(abilities.str)+pb*rank-exhaustionPenalty(state),source:`Primal Knowledge: make this as a Strength check while Raging${state.exhaustionLevel>0?` - Exhaustion ${state.exhaustionLevel}`:''}`,...(reliable?{minimumD20:10}:{}),...(classLevel(character,'Barbarian')>=18?{minimumTotal:abilities.str}:{}),...(reliable||classLevel(character,'Barbarian')>=18?{minimumSource:[reliable?'Reliable Talent':'',classLevel(character,'Barbarian')>=18?'Indomitable Might':''].filter(Boolean).join(' + ')}:{})};
     const advantageSources=effects.filter(e=>e.checkAdvantage?.includes(a)).map(()=> 'Active transformation');const disadvantageSources=effects.filter(e=>e.checkDisadvantage?.includes(a)).map(()=> 'Active transformation');if(conditionApplies(state,'Poisoned',conditionImmunities))disadvantageSources.push('Poisoned');const conditionalSources=conditionApplies(state,'Frightened',conditionImmunities)?['Frightened imposes Disadvantage only while the source is in line of sight.']:[];
-    out[name]={name,modifier,source,proficiency:rank,...(formValue!==undefined?{beastModifier:formValue}:{}),...(advantageSources.length?{advantageSources}:{}),...(disadvantageSources.length?{disadvantageSources}:{}),...(conditionalSources.length?{conditionalSources}:{}),...(alternate?{alternate}:{})};
+    out[name]={name,modifier,source,proficiency:rank,...(formValue!==undefined?{beastModifier:formValue}:{}),...(advantageSources.length?{advantageSources}:{}),...(disadvantageSources.length?{disadvantageSources}:{}),...(conditionalSources.length?{conditionalSources}:{}),...(reliable?{minimumD20:10,minimumSource:'Reliable Talent'}:{}),...(indomitable?{minimumTotal:abilities.str,minimumSource:reliable?'Reliable Talent + Indomitable Might':'Indomitable Might'}:{}),...(alternate?{alternate}:{})};
   }
   return out;
 }
@@ -269,8 +279,11 @@ function resolveInitiative(character:Character,state:GameState,option:Transforma
   const disadvantageSources=effects.filter(effect=>effect.checkDisadvantage?.includes('dex')).map(()=> 'Active transformation');
   if(retainedClassFeatures(option)&&classLevel(character,'Barbarian')>=7)advantageSources.push('Feral Instinct');
   if(retainedClassFeatures(option)&&classLevel(character,'Fighter')>=3&&sameText(subclass(character,'Fighter'),'Champion'))advantageSources.push('Remarkable Athlete');
+  if(conditionApplies(state,'Invisible',conditionImmunities))advantageSources.push('Invisible');
+  if(['Incapacitated','Unconscious','Paralyzed','Petrified','Stunned'].some(condition=>conditionApplies(state,condition,conditionImmunities)))disadvantageSources.push('Incapacitated');
   if(conditionApplies(state,'Poisoned',conditionImmunities))disadvantageSources.push('Poisoned');
   const conditionalSources=conditionApplies(state,'Frightened',conditionImmunities)?['Frightened imposes Disadvantage only while the source is in line of sight.']:[];
+  modifier-=exhaustionPenalty(state);if(state.exhaustionLevel>0)sources.push(`minus ${exhaustionPenalty(state)} from Exhaustion ${state.exhaustionLevel}`);
   return {name:'Initiative',modifier,source:sources.join(' + '),proficiency,...(advantageSources.length?{advantageSources}:{}),...(disadvantageSources.length?{disadvantageSources}:{}),...(conditionalSources.length?{conditionalSources}:{})};
 }
 function baseActions(character:Character,abilities:Character['abilities'],size:string):CreatureAction[]{
@@ -281,11 +294,12 @@ function baseActions(character:Character,abilities:Character['abilities'],size:s
     {id:'unarmed-shove',name:'Unarmed Strike — Shove',type:'save',cost:'action',saveAbility:'str',saveAbilityOptions:['str','dex'],dc,range:'5 ft.',effectsOnFail:[{condition:'Prone',targetSizeMax,note:'Instead of Prone, you can push the target 5 feet away.'}],notes:'The target chooses a Strength or Dexterity save. It must be no more than one size larger than you.'}
   ];
 }
-function resolvedActions(character:Character,option:TransformationOption,effects:TransformationEffects[],canAttack:boolean,abilities:Character['abilities']):CreatureAction[]{
+function resolvedActions(character:Character,state:GameState,option:TransformationOption,effects:TransformationEffects[],canAttack:boolean,abilities:Character['abilities']):CreatureAction[]{
   const form=creature(character,option.formId);const size=effects.map(effect=>effect.size).filter((value):value is string=>Boolean(value)).at(-1)??form?.size??character.size;const actions:CreatureAction[]=form&&option.profile!=='overlay'?[...form.actions]:baseActions(character,abilities,size);for(const effect of effects)actions.push(...(effect.actions??[]));
   const monk=classLevel(character,'Monk');if(canAttack&&retainedClassFeatures(option)&&monk>=1){const stats=abilities;const strMod=abilityMod(stats.str),dexMod=abilityMod(stats.dex),mod=Math.max(strMod,dexMod),chosen:Ability=dexMod>=strMod?'dex':'str';actions.push({id:'monk-unarmed',name:'Monk Unarmed Strike',type:'attack',cost:'action',attackBonus:proficiencyBonus(character.totalLevel)+mod,ability:chosen,kind:'unarmed',reach:5,damage:[{expression:`${monkDie(monk)}${mod>=0?'+':''}${mod}`,type:'Bludgeoning'}],notes:'Separate Unarmed Strike; Beast attacks do not become Unarmed Strikes.'});}
-  if(canAttack)return actions;
-  return actions.filter(action=>action.type==='automatic'&&!action.damage?.length&&!action.effects?.length);
+  const adjusted=actions.map(action=>action.type==='attack'?{...action,attackBonus:action.attackBonus-exhaustionPenalty(state)}:action);
+  if(canAttack)return adjusted;
+  return adjusted.filter(action=>action.type==='automatic'&&!action.damage?.length&&!action.effects?.length);
 }
 export function resolveSheet(character:Character,state:GameState):ResolvedSheet{
   const option=activeOption(state);const profile=option.profile;const form=creature(character,option.formId);const effects=effectList(character,state,option);const abilities=physicalFromForm(character,option,effects);
@@ -300,12 +314,17 @@ export function resolveSheet(character:Character,state:GameState):ResolvedSheet{
   for(const effect of effects){resistances.push(...(effect.resistances??[]));immunities.push(...(effect.immunities??[]));vulnerabilities.push(...(effect.vulnerabilities??[]));}
   const conditionImmunities=effectConditionImmunities(form,effects);if(state.rage.active&&retainedClassFeatures(option))resistances.push('Bludgeoning','Piercing','Slashing');if(conditionApplies(state,'Petrified',conditionImmunities))resistances.push(...ALL_DAMAGE_TYPES);
   if(sameText(state.concentration?.name,'Fount of Moonlight'))resistances.push('Radiant');
-  const resolvedConditionImmunities=unique([...(form?.conditionImmunities??[]),...effects.flatMap(effect=>effect.conditionImmunities??[])]);const attackDamageModifiers=effects.map(effect=>effect.attackDamageModifier).filter((value):value is NonNullable<TransformationEffects['attackDamageModifier']>=>Boolean(value));
+  const mindlessRage=state.rage.active&&retainedClassFeatures(option)&&classLevel(character,'Barbarian')>=6&&sameText(subclass(character,'Barbarian'),'Path of the Berserker');
+  const resolvedConditionImmunities=unique([...(form?.conditionImmunities??[]),...effects.flatMap(effect=>effect.conditionImmunities??[]),...(conditionApplies(state,'Petrified',conditionImmunities)?['Poisoned']:[]),...(mindlessRage?['Charmed','Frightened']:[])]);const attackDamageModifiers=effects.map(effect=>effect.attackDamageModifier).filter((value):value is NonNullable<TransformationEffects['attackDamageModifier']>=>Boolean(value));
   const effectCreatureType=effects.map(effect=>effect.creatureType).filter((value):value is string=>Boolean(value)).at(-1);const creatureType=effectCreatureType??(form&&!policyFor(option).creatureType?form.type:character.creatureType);
-  return {profile,...(form?{form}:{}),creatureType,size:effects.map(e=>e.size).filter(Boolean).at(-1)??form?.size??character.size,abilities,ac:ac.value,acSource:ac.source,acCandidates:ac.candidates,speeds:resolveSpeeds(character,state,option,effects),initiative:resolveInitiative(character,state,option,abilities,effects),saves:resolveSaves(character,state,option,abilities,effects),skills:resolveSkills(character,state,option,abilities,effects),actions:resolvedActions(character,option,effects,canAttack,abilities),resistances:unique(resistances),immunities:unique(immunities),vulnerabilities:unique(vulnerabilities),senses:unique([...(form?.senses??[]),...effects.flatMap(e=>e.senses??[])]),canSpeak,canCast,canConcentrate,canAttack,canManipulateObjects,conditionImmunities:resolvedConditionImmunities,attackDamageModifiers,features,spells:evaluateSpells(character,state,option,baseCanCast)};
+  const senses=unique([...(form?.senses??[]),...effects.flatMap(e=>e.senses??[]),...(retainedClassFeatures(option)&&classLevel(character,'Ranger')>=18?['Blindsight 30 ft. (Feral Senses)']:[])]);
+  return {profile,...(form?{form}:{}),creatureType,size:effects.map(e=>e.size).filter(Boolean).at(-1)??form?.size??character.size,abilities,ac:ac.value,acSource:ac.source,acCandidates:ac.candidates,speeds:resolveSpeeds(character,state,option,effects),initiative:resolveInitiative(character,state,option,abilities,effects),saves:resolveSaves(character,state,option,abilities,effects),skills:resolveSkills(character,state,option,abilities,effects),actions:resolvedActions(character,state,option,effects,canAttack,abilities),resistances:unique(resistances),immunities:unique(immunities),vulnerabilities:unique(vulnerabilities),senses,canSpeak,canCast,canConcentrate,canAttack,canManipulateObjects,conditionImmunities:resolvedConditionImmunities,attackDamageModifiers,features,spells:evaluateSpells(character,state,option,baseCanCast)};
 }
 
 function actionError(state:GameState,cost:ActionCost,conditionImmunities:Iterable<string>=[]):string|null{
+  if(state.life.dead&&cost!=='none')return 'The character is dead and cannot take actions.';
+  if(state.hp===0&&cost!=='none')return state.pendingRelentlessRage?'Resolve Relentless Rage before taking another action.':'At 0 Hit Points, the character cannot take actions.';
+  if(deadFromExhaustion(state)&&cost!=='none')return 'Exhaustion level 6 causes death; no actions can be taken.';
   const immune=new Set([...conditionImmunities].map(value=>normalized(value)));
   const incapacitated=['Incapacitated','Unconscious','Paralyzed','Petrified','Stunned'].some(condition=>state.conditions.includes(condition)&&!immune.has(normalized(condition)));
   if(incapacitated&&cost!=='none'&&cost!=='free')return 'The Incapacitated condition prevents Actions, Bonus Actions, and Reactions.';
@@ -363,10 +382,10 @@ export function startTransformation(character:Character,state:GameState,option:T
     }
     const error=actionError(state,option.actionCost,activeConditionImmunities(character,state));if(error)return {state,message:error};if(option.resourceId&&!hasResource(state,option.resourceId,option.resourceCost??1))return {state,message:`No ${option.resourceId} resource remains.`};
     const existingGroup=option.switchGroup?overlayInSwitchGroup(character,state,option.switchGroup):undefined;const switchingSameSpell=Boolean(existingGroup&&option.switchGroup);
-    if(option.spellName&&!switchingSameSpell){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&!slotAvailable(state,character,level))return {state,message:`No level ${level} or higher spell slot remains.`};}
+    if(option.spellName&&!switchingSameSpell){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&state.turn.slotSpellCast)return {state,message:'2024 rule: a spell slot has already been expended to cast a spell on this turn.'};if(level>0&&!slotAvailable(state,character,level))return {state,message:`No level ${level} or higher spell slot remains.`};}
     if(option.concentration&&!switchingSameSpell&&state.rage.active)return {state,message:'Rage blocks Concentration.'};
     spendActionCost(state,option.actionCost,activeConditionImmunities(character,state));if(option.resourceId)spendResource(state,option.resourceId,option.resourceCost??1);
-    if(option.spellName&&!switchingSameSpell){const level=option.spellLevel??0;if(level>0)consumeAvailableSpellSlot(character,state,level);if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell'};}}
+    if(option.spellName&&!switchingSameSpell){const level=option.spellLevel??0;if(level>0){consumeAvailableSpellSlot(character,state,level);state.turn.slotSpellCast=true;}if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell'};}}
     else if(option.concentration&&!switchingSameSpell){if(state.concentration)endConcentration(state,`${option.label} replaced the previous Concentration effect.`,character);state.concentration={name:option.label,source:option.source};}
     if(existingGroup)removeOverlay(state,existingGroup);if(!state.overlays.includes(id))state.overlays.push(id);
     const incoming=incomingTempHp(character,option,false);const choice=applyIncomingTempHp(state,option,incoming);if(choice)return choice;
@@ -377,13 +396,13 @@ export function startTransformation(character:Character,state:GameState,option:T
   const activeTransform=state.activeTransform;const active=activeTransform?.option;const switchingSameEffect=Boolean(active&&active.profile===option.profile&&((active.switchGroup&&active.switchGroup===option.switchGroup)||['wildshape','shapechange','animal-shapes'].includes(option.profile)));
   const switchingWildshape=active?.profile==='wildshape'&&option.profile==='wildshape';const switchingShapechange=active?.profile==='shapechange'&&option.profile==='shapechange';const switchingAnimalShapes=active?.profile==='animal-shapes'&&option.profile==='animal-shapes';
   const error=actionError(state,option.actionCost,activeConditionImmunities(character,state));if(error)return {state,message:error};if(option.profile==='wildshape'&&!hasResource(state,'wild-shape'))return {state,message:'No Wild Shape uses remaining.'};if(option.resourceId&&!hasResource(state,option.resourceId,option.resourceCost??1))return {state,message:`No ${option.resourceId} resource remains.`};
-  if(option.spellName&&!switchingSameEffect){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&!slotAvailable(state,character,level))return {state,message:`No level ${level} or higher spell slot remains.`};}
+  if(option.spellName&&!switchingSameEffect){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&state.turn.slotSpellCast)return {state,message:'2024 rule: a spell slot has already been expended to cast a spell on this turn.'};if(level>0&&!slotAvailable(state,character,level))return {state,message:`No level ${level} or higher spell slot remains.`};}
   if(option.concentration&&!switchingSameEffect&&state.rage.active)return {state,message:'Rage blocks Concentration.'};
   spendActionCost(state,option.actionCost,activeConditionImmunities(character,state));if(option.profile==='wildshape')spendResource(state,'wild-shape');if(option.resourceId)spendResource(state,option.resourceId,option.resourceCost??1);
   const replacingDifferentEffect=Boolean(active&&!switchingSameEffect);const oldSource=active?tempHpSourceName(active):undefined;
   if(active&&(switchingWildshape||replacingDifferentEffect)&&activeTransform?.tempHpSource&&state.tempHpSource===oldSource){state.tempHp=0;delete state.tempHpSource;}
   if(activeTransform?.spellConcentration&&!switchingSameEffect&&state.concentration?.name===(activeTransform.option.spellName??activeTransform.option.label))endConcentration(state,`${activeTransform.option.label} was replaced by ${option.label}.`,character);
-  if(option.spellName&&!switchingSameEffect){const level=option.spellLevel??0;if(level>0)consumeAvailableSpellSlot(character,state,level);if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell'};}}
+  if(option.spellName&&!switchingSameEffect){const level=option.spellLevel??0;if(level>0){consumeAvailableSpellSlot(character,state,level);state.turn.slotSpellCast=true;}if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell'};}}
   else if(option.concentration&&!switchingSameEffect){if(state.concentration)endConcentration(state,`${option.label} replaced the previous Concentration effect.`,character);state.concentration={name:option.label,source:option.source};}
   const incoming=incomingTempHp(character,option,switchingSameEffect);const retainsExistingTransformTemp=Boolean(switchingSameEffect&&activeTransform?.tempHpSource&&state.tempHpSource===tempHpSourceName(option));
   clearActionRecharges(state);state.activeTransform={option,startedTurn:state.turn.number,duration:duration(character,option),tempHpSource:incoming>0||retainsExistingTransformTemp,...(option.concentration?{spellConcentration:true}:{})};
@@ -420,6 +439,7 @@ export function startRage(character:Character,state:GameState):TransitionResult{
   spendActionCost(state,'bonus',immunities);spendResource(state,'rage');
   const persistent=classLevel(character,'Barbarian')>=15;
   state.rage={active:true,endsAtTurn:persistent?Number.MAX_SAFE_INTEGER:state.turn.number+1,usedThisTurn:true,recklessDeclared:false,extendedThisTurn:persistent};
+  const mindless=classLevel(character,'Barbarian')>=6&&sameText(subclass(character,'Barbarian'),'Path of the Berserker');if(mindless)state.conditions=state.conditions.filter(condition=>condition!=='Charmed'&&condition!=='Frightened');
   const endedConcentration=Boolean(state.concentration);
   if(endedConcentration)endConcentration(state,'Rage prevents maintaining Concentration.',character);
   return {state,message:endedConcentration?'Rage started. Concentration ended. You now resist Bludgeoning, Piercing, and Slashing damage and have Advantage on Strength checks and saves; spellcasting is blocked.':'Rage started. You now resist Bludgeoning, Piercing, and Slashing damage and have Advantage on Strength checks and saves; spellcasting is blocked.'};
@@ -496,14 +516,17 @@ export function endTurn(character:Character,state:GameState):TransitionResult{
 }
 function expiresDuringShortRest(duration:string){const value=normalized(duration);return value.includes('round')||value.includes('minute')||/(^|\D)1 hour(\D|$)/.test(value)}
 export function shortRest(state:GameState):TransitionResult{
+  if(state.life.dead||state.hp===0)return {state,message:'A Short Rest cannot restore a dead character or a character at 0 Hit Points.'};
   for(const r of Object.values(state.resources)){if(r.recovery==='short-all')r.current=r.max;else if(r.recovery==='short-one')r.current=Math.min(r.max,r.current+1);}
   if(state.rage.active)endRage(state,'Rage ended during the Short Rest.');
+  state.relentlessRageDc=10;delete state.pendingRelentlessRage;
   const expired=state.activeSpellEffects.filter(effect=>expiresDuringShortRest(effect.duration)).map(effect=>effect.name);state.activeSpellEffects=state.activeSpellEffects.filter(effect=>!expiresDuringShortRest(effect.duration));
   restoreTurnBudget(state);
   return {state,message:`Short Rest completed; eligible resources recovered and Rage ended if it was active.${expired.length?` ${expired.join(', ')} expired during the one-hour rest.`:''}`};
 }
 function durationPersistsThroughLongRest(duration:string|undefined){const value=normalized(duration);return value.includes('until ended')||value.includes('until dispelled')||value.includes('permanent')||value.includes('24 hour')||value.includes('day');}
 export function longRest(character:Character,state:GameState):TransitionResult{
+  if(state.life.dead||state.hp<1)return {state,message:'A Long Rest cannot start while dead or at 0 Hit Points.'};
   const notes:string[]=[];
   if(state.concentration){const name=state.concentration.name;endConcentration(state,'A Long Rest ends Concentration.',character);notes.push(`${name} ended.`);}
   const active=state.activeTransform;
@@ -517,7 +540,9 @@ export function longRest(character:Character,state:GameState):TransitionResult{
   for(const r of Object.values(state.resources))if(r.recovery!=='manual')r.current=r.max;
   for(const slot of Object.values(state.spellSlots))slot.current=slot.max;
   state.hp=character.hp.max;state.tempHp=0;delete state.tempHpSource;
+  if(state.exhaustionLevel>0){state.exhaustionLevel--;notes.push(`Exhaustion reduced to level ${state.exhaustionLevel}.`);if(state.exhaustionLevel===0)state.conditions=state.conditions.filter(condition=>condition!=='Exhaustion');}
   state.rage={active:false,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false};state.concentrationChecks=[];clearActionRecharges(state);state.actionUses={};
+  state.relentlessRageDc=10;delete state.pendingRelentlessRage;
   restoreTurnBudget(state);
   return {state,message:`Long Rest completed; HP, slots, and eligible resources restored. Temporary Hit Points ended. Existing conditions were preserved.${notes.length?` ${notes.join(' ')}`:''}`};
 }
@@ -585,6 +610,19 @@ export function useWildResurgence(character:Character,state:GameState,mode:'slot
 export function applyCondition(character:Character,state:GameState,condition:string):TransitionResult{
   const sheet=resolveSheet(character,state);
   if(sheet.conditionImmunities.some(value=>value.toLowerCase()===condition.toLowerCase()))return {state,message:`${condition} was not applied; the current form is immune.`};
+  if(condition==='Exhaustion'){
+    if(state.exhaustionLevel>=6)return {state,message:'Exhaustion is already level 6; the character is dead.'};
+    state.exhaustionLevel=Math.min(6,state.exhaustionLevel+1);if(!state.conditions.includes('Exhaustion'))state.conditions.push('Exhaustion');
+    const messages=[`Exhaustion increased to level ${state.exhaustionLevel}. D20 Tests are reduced by ${exhaustionPenalty(state)} and every Speed is reduced by ${state.exhaustionLevel*5} feet.`];
+    if(state.exhaustionLevel===6){
+      state.hp=0;state.life={dead:true,stable:false,deathSaveSuccesses:0,deathSaveFailures:0};delete state.pendingRelentlessRage;
+      if(state.concentration){const name=state.concentration.name;endConcentration(state,'Death ends Concentration.',character);messages.push(`${name} ended.`);}
+      if(state.activeTransform?.option.profile==='wildshape'){const name=state.activeTransform.option.label;endTransformation(state,false,character);messages.push(`${name} ended.`);}
+      if(state.rage.active){endRage(state,'Rage ended because the character died.');messages.push('Rage ended.');}
+      messages.push('Exhaustion level 6 causes death; actions and healing are unavailable.');
+    }
+    return {state,message:messages.join(' ')};
+  }
   if(!state.conditions.includes(condition))state.conditions.push(condition);
   const messages=[`${condition} applied.`];const incapacitating=['Incapacitated','Unconscious','Paralyzed','Petrified','Stunned'].includes(condition);
   if(incapacitating&&state.concentration){const name=state.concentration.name;endConcentration(state,'Incapacitation ends Concentration.',character);messages.push(`${name} ended because Concentration ended.`);}
@@ -595,7 +633,14 @@ export function applyCondition(character:Character,state:GameState,condition:str
   if(state.rage.active){const persistent=classLevel(character,'Barbarian')>=15;if((!persistent&&incapacitating)||(persistent&&condition==='Unconscious')){endRage(state);messages.push('Rage ended.');}}
   return {state,message:messages.join(' ')};
 }
-export function removeCondition(state:GameState,condition:string):TransitionResult{state.conditions=state.conditions.filter(c=>c!==condition);return {state,message:`${condition} removed.`};}
+export function removeCondition(state:GameState,condition:string):TransitionResult{
+  if(condition==='Exhaustion'&&state.exhaustionLevel>0){
+    state.exhaustionLevel--;if(state.exhaustionLevel===0)state.conditions=state.conditions.filter(c=>c!=='Exhaustion');
+    return {state,message:state.exhaustionLevel?`Exhaustion reduced to level ${state.exhaustionLevel}.`:'Exhaustion removed.'};
+  }
+  state.conditions=state.conditions.filter(c=>c!==condition);return {state,message:`${condition} removed.`};
+}
+export function clearConditions(state:GameState):TransitionResult{state.conditions=[];state.exhaustionLevel=0;return {state,message:'Conditions cleared.'}}
 export function concentrationSaveMode(character:Character,state:GameState){
   const advantage:string[]=[];const disadvantage:string[]=[];
   if(character.features.some(f=>f.id==='eldritch-mind'))advantage.push('Eldritch Mind');
@@ -646,8 +691,9 @@ export function attackRollSources(character:Character,state:GameState,action:Cre
   if(sheet?.form?.traits.some(trait=>sameText(trait.name,'Pack Tactics')))conditional.push('Pack Tactics grants Advantage when an eligible ally is within 5 feet of the target.');
   return {...resolveAdvantage({advantage,disadvantage}),conditional};
 }
-export function criticalHitThreshold(character:Character,action:CreatureAction){
+export function criticalHitThreshold(character:Character,action:CreatureAction,state?:GameState){
   if(action.type!=='attack'||(action.kind!=='weapon'&&action.kind!=='unarmed'))return 20;
+  if(state&&!retainedClassFeatures(activeOption(state)))return 20;
   const fighter=character.classes.find(entry=>sameText(entry.name,'Fighter'));const isChampion=normalized(fighter?.subclass).includes('champion');
   return isChampion&&fighter&&fighter.level>=15?18:isChampion&&fighter&&fighter.level>=3?19:20;
 }
@@ -662,14 +708,14 @@ export function criticalDiceExpression(expression:string){return expression.repl
 export function attackBonuses(character:Character,state:GameState,sheet:ResolvedSheet,action:CreatureAction):DamagePacket[]{
   if(action.type!=='attack')return [];
   const packets:DamagePacket[]=[];
-  if(state.rage.active&&classLevel(character,'Barbarian')>=1&&action.ability==='str'&&(action.kind==='weapon'||action.kind==='unarmed'))packets.push({expression:String(rageDamage(classLevel(character,'Barbarian'))),type:action.damage[0]?.type??'Bludgeoning',label:'Rage Damage'});
+  if(state.rage.active&&retainedClassFeatures(activeOption(state))&&classLevel(character,'Barbarian')>=1&&action.ability==='str'&&(action.kind==='weapon'||action.kind==='unarmed'))packets.push({expression:String(rageDamage(classLevel(character,'Barbarian'))),type:action.damage[0]?.type??'Bludgeoning',label:'Rage Damage'});
   const hasPrimalStrike=character.features.some(feature=>feature.id==='primal-strike');
   if(sheet.profile==='wildshape'&&hasPrimalStrike&&classLevel(character,'Druid')>=7&&!state.turn.oncePerTurn['primal-strike']&&(action.kind==='beast'||action.kind==='weapon')){
     for(const type of ['Cold','Fire','Lightning','Thunder'] as DamageType[])packets.push({expression:classLevel(character,'Druid')>=15?'2d8':'1d8',type,label:`Optional Primal Strike — ${type}`});
   }
   if(sheet.profile==='wildshape'&&sameText(subclass(character,'Druid'),'Circle of the Moon')&&classLevel(character,'Druid')>=14&&!state.turn.oncePerTurn['lunar-form']&&action.kind==='beast')packets.push({expression:'2d10',type:'Radiant',label:'Optional Lunar Form'});
   if(sameText(state.concentration?.name,'Fount of Moonlight')&&action.range===undefined&&['beast','weapon','unarmed'].includes(action.kind))packets.push({expression:'2d6',type:'Radiant',label:'Fount of Moonlight'});
-  if(classLevel(character,'Paladin')>=11&&(action.kind==='unarmed'||(action.kind==='weapon'&&action.reach!==undefined)))packets.push({expression:'1d8',type:'Radiant',label:'Radiant Strikes'});
+  if(retainedClassFeatures(activeOption(state))&&classLevel(character,'Paladin')>=11&&(action.kind==='unarmed'||(action.kind==='weapon'&&action.reach!==undefined)))packets.push({expression:'1d8',type:'Radiant',label:'Radiant Strikes'});
   for(const modifier of sheet.attackDamageModifiers){
     if(!modifier.appliesTo.includes(action.kind as 'weapon'|'unarmed'))continue;
     packets.push({expression:modifier.mode==='subtract'?`-${modifier.expression}`:modifier.expression,type:action.damage[0]?.type??'Bludgeoning',label:modifier.mode==='subtract'?'Reduce damage (minimum 1)':'Enlarge damage',doubleOnCritical:modifier.mode!=='subtract'});
@@ -695,6 +741,59 @@ export function rollDice(expression:string,random:()=>number=Math.random):{total
   return {total,rolls};
 }
 
+function markDead(character:Character,state:GameState,reason:string){
+  delete state.pendingRelentlessRage;
+  state.life={dead:true,stable:false,deathSaveSuccesses:0,deathSaveFailures:0};
+  if(!state.conditions.includes('Unconscious'))applyCondition(character,state,'Unconscious');
+  return reason;
+}
+function fallUnconscious(character:Character,state:GameState){
+  state.life.stable=false;
+  const result=applyCondition(character,state,'Unconscious');
+  return result.message;
+}
+export function resolveRelentlessRage(character:Character,state:GameState,total?:number):TransitionResult{
+  const pending=state.pendingRelentlessRage;if(!pending)return {state,message:'No Relentless Rage saving throw is pending.'};
+  delete state.pendingRelentlessRage;
+  if(total===undefined){
+    const consequence=fallUnconscious(character,state);
+    return {state,message:`Relentless Rage was declined. ${consequence}`};
+  }
+  const result=boundedWhole(total,0,0,100);state.relentlessRageDc=Math.min(100,pending.dc+5);
+  if(result>=pending.dc){
+    const restored=Math.min(character.hp.max,classLevel(character,'Barbarian')*2);
+    state.hp=restored;state.life={dead:false,stable:false,deathSaveSuccesses:0,deathSaveFailures:0};
+    state.conditions=state.conditions.filter(condition=>condition!=='Unconscious');
+    return {state,message:`Relentless Rage succeeded with ${result} against DC ${pending.dc}. Hit Points changed to ${restored}; the next DC is ${state.relentlessRageDc} until a Short or Long Rest.`};
+  }
+  const consequence=fallUnconscious(character,state);
+  return {state,message:`Relentless Rage failed with ${result} against DC ${pending.dc}; the next DC is ${state.relentlessRageDc} until a Short or Long Rest. ${consequence}`};
+}
+export function resolveDeathSave(character:Character,state:GameState,roll:number):TransitionResult{
+  if(state.life.dead)return {state,message:'The character is dead; a Death Saving Throw cannot be made.'};
+  if(state.hp>0)return {state,message:'Death Saving Throws are made only at 0 Hit Points.'};
+  if(state.pendingRelentlessRage)return {state,message:'Resolve Relentless Rage before making a Death Saving Throw.'};
+  if(state.life.stable)return {state,message:'The character is Stable and does not make Death Saving Throws.'};
+  const natural=boundedWhole(roll,1,1,20);const survivor=classLevel(character,'Fighter')>=18&&sameText(subclass(character,'Fighter'),'Champion')&&retainedClassFeatures(activeOption(state));
+  if(natural===20||(survivor&&natural>=18)){
+    state.hp=1;state.life={dead:false,stable:false,deathSaveSuccesses:0,deathSaveFailures:0};state.conditions=state.conditions.filter(condition=>condition!=='Unconscious');
+    return {state,message:survivor&&natural<20?`Champion Survivor treated ${natural} as a 20 on the Death Saving Throw: regained 1 Hit Point and consciousness.`:'Natural 20 on the Death Saving Throw: regained 1 Hit Point and consciousness.'};
+  }
+  if(natural===1)state.life.deathSaveFailures=Math.min(3,state.life.deathSaveFailures+2);
+  else if(natural>=10)state.life.deathSaveSuccesses=Math.min(3,state.life.deathSaveSuccesses+1);
+  else state.life.deathSaveFailures=Math.min(3,state.life.deathSaveFailures+1);
+  if(state.life.deathSaveFailures>=3)return {state,message:markDead(character,state,`Death Saving Throw ${natural}: third failure; the character died.`)};
+  if(state.life.deathSaveSuccesses>=3){
+    state.life={dead:false,stable:true,deathSaveSuccesses:0,deathSaveFailures:0};
+    return {state,message:`Death Saving Throw ${natural}: third success; the character is Stable and remains Unconscious at 0 Hit Points.`};
+  }
+  return {state,message:`Death Saving Throw ${natural}: ${state.life.deathSaveSuccesses} success${state.life.deathSaveSuccesses===1?'':'es'} and ${state.life.deathSaveFailures} failure${state.life.deathSaveFailures===1?'':'s'}.`};
+}
+export function deathSaveMode(character:Character,state:GameState):{mode:AttackRollMode;sources:string[]}{
+  const survivor=classLevel(character,'Fighter')>=18&&sameText(subclass(character,'Fighter'),'Champion')&&retainedClassFeatures(activeOption(state));
+  return {mode:survivor?'advantage':'normal',sources:survivor?['Champion Survivor']:[]};
+}
+
 export function applyDamage(state:GameState,sheet:ResolvedSheet,amount:number,type:DamageType,character?:Character):TransitionResult{
   let adjusted=boundedWhole(amount,0);const notes:string[]=[];
   if(sheet.immunities.includes(type)){adjusted=0;notes.push('Immunity reduced damage to 0.');}
@@ -702,7 +801,8 @@ export function applyDamage(state:GameState,sheet:ResolvedSheet,amount:number,ty
     if(sheet.resistances.includes(type)){adjusted=Math.floor(adjusted/2);notes.push('Resistance halved the damage.');}
     if(sheet.vulnerabilities.includes(type)){adjusted*=2;notes.push('Vulnerability doubled the damage.');}
   }
-  const absorbed=Math.min(state.tempHp,adjusted);state.tempHp-=absorbed;state.hp=Math.max(0,state.hp-(adjusted-absorbed));
+  const hpBefore=state.hp,wasAtZero=hpBefore===0,retainedAtImpact=character?retainedClassFeatures(activeOption(state)):false;
+  const absorbed=Math.min(state.tempHp,adjusted);state.tempHp-=absorbed;const hpDamage=adjusted-absorbed;state.hp=Math.max(0,state.hp-hpDamage);
   if(absorbed)notes.push(`${absorbed} absorbed by Temporary HP.`);
   const active=state.activeTransform?.option;
   if(state.tempHp===0&&active&&(active.profile==='polymorph'||active.effects?.endsAtZeroTemporaryHp)){
@@ -722,12 +822,32 @@ export function applyDamage(state:GameState,sheet:ResolvedSheet,amount:number,ty
     }
     if(state.activeTransform?.option.effects?.endsAtZeroHp){const ended=state.activeTransform.option.label;delete state.activeTransform;clearActionRecharges(state);notes.push(`${ended} ended because Hit Points reached 0.`);}
   }
+  if(character&&adjusted>0&&state.hp===0){
+    if(wasAtZero){
+      delete state.pendingRelentlessRage;state.life.stable=false;
+      if(hpDamage>=character.hp.max)notes.push(markDead(character,state,'Damage at 0 Hit Points equaled or exceeded the Hit Point maximum; the character died.'));
+      else{
+        state.life.deathSaveFailures=Math.min(3,state.life.deathSaveFailures+1);
+        if(state.life.deathSaveFailures>=3)notes.push(markDead(character,state,'Damage at 0 Hit Points caused the third Death Save failure; the character died.'));
+        else notes.push(`Damage at 0 Hit Points caused one Death Save failure (${state.life.deathSaveFailures}/3).`);
+      }
+    }else{
+      const remaining=Math.max(0,hpDamage-hpBefore);
+      if(remaining>=character.hp.max)notes.push(markDead(character,state,'Massive damage caused instant death.'));
+      else if(classLevel(character,'Barbarian')>=11&&state.rage.active&&retainedAtImpact&&!state.life.dead){
+        state.pendingRelentlessRage={dc:state.relentlessRageDc,damage:adjusted,source:type};
+        notes.push(`Relentless Rage is available: make a DC ${state.relentlessRageDc} Constitution saving throw before resolving unconsciousness.`);
+      }else notes.push(fallUnconscious(character,state));
+    }
+  }
   if(adjusted>0&&state.concentration){const dc=concentrationCheckDc(adjusted);state.concentrationChecks.push({dc,damage:adjusted,source:type});notes.push(`Concentration save DC ${dc} required.`);}
   return {state,message:`Applied ${adjusted} ${type} damage. ${notes.join(' ')}`.trim()};
 }
 
 export function heal(state:GameState,character:Character,amount:number):TransitionResult{
+  if(state.life.dead||deadFromExhaustion(state))return {state,message:'The character is dead; ordinary healing cannot restore Hit Points.'};
   const before=state.hp;state.hp=Math.min(character.hp.max,state.hp+boundedWhole(amount,0));
+  if(before===0&&state.hp>0){state.life={dead:false,stable:false,deathSaveSuccesses:0,deathSaveFailures:0};delete state.pendingRelentlessRage;state.conditions=state.conditions.filter(condition=>condition!=='Unconscious');}
   return {state,message:`Recovered ${state.hp-before} Hit Points.`};
 }
 export function concentrationCheckDc(damageTaken:number){return Math.min(30,Math.max(10,Math.floor(boundedWhole(damageTaken,0)/2)))}

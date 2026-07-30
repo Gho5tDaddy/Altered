@@ -1,4 +1,4 @@
-import type {Ability,ActionCost,Character,Creature,DamagePacket,DamageType,ProficiencyRank,ResourcePool,Spell} from './types.js';
+import type {Ability,ActionCost,Character,CharacterItem,CharacterRuleset,Creature,DamagePacket,DamageType,ProficiencyRank,ResourcePool,Spell} from './types.js';
 import {CREATURES,MOON_FORM_SPELL_LEVELS} from './content-registry.js';
 import {parseCharacter} from './schema.js';
 
@@ -20,6 +20,8 @@ export interface DdbImportCoverage {
 export interface DdbImportReport {
   sourceId:string;
   character:Character;
+  blocked:boolean;
+  blockReason?:string;
   warnings:DdbImportWarning[];
   coverage:DdbImportCoverage[];
   supportRequests:{creatures:string[]};
@@ -394,6 +396,39 @@ function parseFeats(data:JsonObject):string[]{
   return [...new Set(array(data.feats).map(raw=>string(object(object(raw).definition).name)).filter(Boolean))].slice(0,100);
 }
 
+function definitionRuleset(definition:JsonObject):CharacterRuleset{
+  const text=[definition.rulesVersion,definition.ruleset,definition.source,definition.sourceName,definition.book].map(string).join(' ').toLowerCase();
+  const sources=array(definition.sources).map(raw=>{const source=object(raw);return [source.name,source.sourceName,source.book,source.description].map(string).join(' ');}).join(' ').toLowerCase();
+  if(definition.isLegacy===true||definition.is2014===true||/\b(2014|legacy)\b/.test(`${text} ${sources}`))return 'legacy';
+  if(definition.is2024===true||definition.isLegacy===false||/\b(2024|revised)\b/.test(`${text} ${sources}`))return '2024';
+  return 'unknown';
+}
+function rulesetAssessment(data:JsonObject):{ruleset:CharacterRuleset;evidence:string[];reviewRequired:boolean}{
+  const definitions:JsonObject[]=[];
+  const add=(raw:unknown)=>{const entry=object(raw),definition=object(entry.definition);if(Object.keys(definition).length)definitions.push(definition);const subclass=object(entry.subclassDefinition);if(Object.keys(subclass).length)definitions.push(subclass);};
+  array(data.classes).forEach(add);array(data.feats).forEach(add);array(data.inventory).forEach(add);add({definition:data.race});
+  for(const group of Object.values(object(data.spells)))array(group).forEach(add);
+  for(const parent of array(data.classSpells))array(object(parent).spells).forEach(add);
+  const states=definitions.map(definitionRuleset);const current=states.filter(value=>value==='2024').length,legacy=states.filter(value=>value==='legacy').length,unknown=states.filter(value=>value==='unknown').length;
+  const ruleset:CharacterRuleset=legacy&&current?'mixed':legacy?'legacy':current?'2024':'unknown';
+  return {
+    ruleset,
+    evidence:[`${current} current definitions`,`${legacy} legacy definitions`,`${unknown} definitions without a ruleset marker`],
+    // A positive 2024 marker permits import, but unmarked nested definitions
+    // remain an explicit manual-review boundary.
+    reviewRequired:ruleset!=='2024'||unknown>0,
+  };
+}
+function parseItems(data:JsonObject):CharacterItem[]{
+  return array(data.inventory).slice(0,300).flatMap((raw,index)=>{
+    const item=object(raw),definition=object(item.definition);const name=string(definition.name);if(!name)return [];
+    const id=String(whole(definition.id)||whole(item.id)||slug(`${name}-${index}`));const requiresAttunement=whole(definition.canAttune)===1||Boolean(definition.requiresAttunement);const equipped=Boolean(item.equipped),attuned=Boolean(item.isAttuned);
+    const sourceIds=[finite(definition.sourceId),...array(definition.sources).flatMap(source=>[finite(object(source).sourceId),finite(object(source).id)])].filter((value):value is number=>value!==undefined).map(String);
+    const ruleset=definitionRuleset(definition);const included=equipped&&(!requiresAttunement||attuned);
+    return [{id:`ddb-item-${id}`,name,type:string(definition.type)||'Item',equipped,attuned,requiresAttunement,ruleset,sourceIds:[...new Set(sourceIds)].slice(0,20),mechanics:included?'included-in-imported-totals':ruleset==='legacy'||ruleset==='mixed'?'review-required':'reference-only'} satisfies CharacterItem];
+  });
+}
+
 function legalKnownForms(data:JsonObject,classes:Character['classes'],warnings:DdbImportWarning[]):{knownForms:string[];unmapped:string[]}{
   const druid=classes.find(entry=>entry.name.toLowerCase()==='druid');if(!druid||druid.level<2)return {knownForms:[],unmapped:[]};
   const moon=(druid.subclass??'').toLowerCase()==='circle of the moon'&&druid.level>=3;
@@ -478,6 +513,9 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
   const sourceId=String(whole(data.id)||whole(payload.id));if(!/^\d{5,15}$/.test(sourceId))throw new Error('D&D Beyond response did not include a valid character ID.');
   if(expectedId&&sourceId!==expectedId)throw new Error(`D&D Beyond returned character ${sourceId}, but ${expectedId} was requested.`);
   const warnings:DdbImportWarning[]=[{code:'undocumented-adapter',severity:'info',message:'D&D Beyond does not publish a supported character-data API. Altered validates the response, but this adapter may need updates if their service changes.'}];
+  const ruleset=rulesetAssessment(data);const blocked=ruleset.ruleset==='legacy'||ruleset.ruleset==='mixed';const blockReason=blocked?`Altered is configured for 2024 rules only, but D&D Beyond identified this character as ${ruleset.ruleset} rules. Update the character to 2024 rules before importing.`:undefined;
+  if(blocked)warnings.push({code:'non-2024-ruleset',severity:'warning',message:blockReason!});
+  else if(ruleset.reviewRequired)warnings.push({code:'ruleset-review',severity:'warning',message:'Some D&D Beyond definitions did not include a reliable 2024/legacy marker. The character has positive 2024 evidence, but verify the unmarked subclass, feats, spells, and items before confirming.'});
   const classes=parseClasses(data);const totalLevel=classes.reduce((sum,entry)=>sum+entry.level,0);
   if(totalLevel<1||totalLevel>20)throw new Error(`D&D Beyond reported an invalid total level (${totalLevel}).`);
   const modifiers=collectModifiers(data);const abilities=parseAbilities(data,modifiers);const race=parseRace(data);
@@ -485,7 +523,7 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
   const defense=parseEquipmentAndAc(data,abilities,classes,modifiers);const formSelection=legalKnownForms(data,classes,warnings);const knownForms=formSelection.knownForms;
   const druid=classes.find(entry=>entry.name.toLowerCase()==='druid');
   if(druid&&druid.level>=2&&knownForms.length===0)warnings.push({code:'wild-shape-not-provided',severity:'warning',message:'D&D Beyond did not provide recognizable Wild Shape selections. No forms were guessed; add or review known forms in Altered before transforming.'});
-  const parsedSpells=parseSpells(data,abilities,totalLevel);const moonSpells=restoreMoonCircleSpells(parsedSpells,classes,abilities,totalLevel);const spells=moonSpells.spells;const feats=parseFeats(data);const resources=parseResources(data,totalLevel);
+  const parsedSpells=parseSpells(data,abilities,totalLevel);const moonSpells=restoreMoonCircleSpells(parsedSpells,classes,abilities,totalLevel);const spells=moonSpells.spells;const feats=parseFeats(data);const resources=parseResources(data,totalLevel);const items=parseItems(data);
   if(moonSpells.added)warnings.push({code:'circle-moon-spells-restored',severity:'info',message:`D&D Beyond omitted ${moonSpells.added} always-prepared Circle of the Moon spell${moonSpells.added===1?'':'s'} from its character payload. Altered restored the current 2024 Circle spell list for this Druid level.`});
   const activeItems=array(data.inventory).filter(raw=>Boolean(object(raw).equipped));
   if(activeItems.length)warnings.push({code:'item-text-review',severity:'warning',message:'Numeric armor, saving-throw, ability, speed, and hit-point item modifiers were imported. Review special item text and attack-only bonuses; Altered does not copy proprietary descriptions.'});
@@ -494,19 +532,20 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
   const raw={
     schemaVersion:1,id:`ddb-${sourceId}`,name:string(data.name)||`D&D Beyond ${sourceId}`,species:race.species,creatureType:'Humanoid',size:race.size,totalLevel,classes,abilities,hp,
     ac:defense.ac,speed:parseSpeed(data,race.speed,modifiers),proficiencies:proficiencies.proficiencies,skillBonuses:proficiencies.skillBonuses,saveBonuses:proficiencies.saveBonuses,
-    knownForms,seenForms:knownForms,spells,spellSlots:parseSpellSlots(data,classes),feats,features:[],resources,equipment:defense.equipment,customForms:[],
+    knownForms,seenForms:knownForms,spells,spellSlots:parseSpellSlots(data,classes),feats,features:[],resources,equipment:defense.equipment,items,provenance:{provider:'dndbeyond',sourceId,ruleset:ruleset.ruleset,rulesetEvidence:ruleset.evidence,reviewRequired:ruleset.reviewRequired},customForms:[],
   };
   const character=parseCharacter(raw);
   const coverage:DdbImportCoverage[]=[
+    {label:'2024 ruleset',status:ruleset.ruleset==='2024'&&!ruleset.reviewRequired?'verified':'review',detail:`${ruleset.ruleset.toUpperCase()} · ${ruleset.evidence.join(' · ')}`},
     {label:'Identity and levels',status:'verified',detail:`${character.name} · ${character.classes.map(entry=>`${entry.name} ${entry.level}${entry.subclass?` (${entry.subclass})`:''}`).join(' / ')}`},
     {label:'Ability scores, HP, and speed',status:'verified',detail:`${ABILITIES.map(key=>`${key.toUpperCase()} ${character.abilities[key]}`).join(' · ')} · HP ${character.hp.current}/${character.hp.max} · ${character.speed} ft.`},
     {label:'Armor Class and equipment',status:defense.review?'review':'verified',detail:`AC ${character.ac} · ${character.equipment.armorCategory} armor · ${character.equipment.shield?'shield':'no shield'}`},
     {label:'Saving throws and skills',status:'verified',detail:`${Object.values(character.proficiencies.saves).filter(rank=>rank>0).length} save proficiencies · ${Object.values(character.proficiencies.skills).filter(rank=>rank>0).length} skill proficiencies`},
     {label:'Prepared and known spells',status:spells.length?'verified':'not-provided',detail:`${spells.length} spell${spells.length===1?'':'s'} available${moonSpells.added?` · ${moonSpells.added} Circle spell${moonSpells.added===1?'':'s'} restored`:''} · ${Object.keys(character.spellSlots).length} slot levels`},
     {label:'Wild Shape selections',status:druid&&druid.level>=2?(knownForms.length?'verified':'review'):'not-provided',detail:knownForms.length?knownForms.map(id=>CREATURES[id]?.name??id).join(', '):'No form names were provided or matched'},
-    {label:'Special items and homebrew',status:activeItems.length||homebrew?'review':'not-provided',detail:`${activeItems.length} equipped item${activeItems.length===1?'':'s'} · ${homebrew} homebrew entr${homebrew===1?'y':'ies'}`},
+    {label:'Items and homebrew',status:activeItems.length||homebrew?'review':'not-provided',detail:`${items.length} item record${items.length===1?'':'s'} · ${activeItems.length} equipped · ${homebrew} homebrew entr${homebrew===1?'y':'ies'}`},
   ];
-  return {sourceId,character,warnings,coverage,supportRequests:{creatures:formSelection.unmapped}};
+  return {sourceId,character,blocked,...(blockReason?{blockReason}:{}),warnings,coverage,supportRequests:{creatures:formSelection.unmapped}};
 }
 
 export function ddbCoverageLabel(status:CoverageStatus):string{

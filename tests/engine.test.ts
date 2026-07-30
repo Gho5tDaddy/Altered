@@ -4,8 +4,8 @@ import type {AttackAction,Character} from '../src/types.js';
 import {CREATURES} from '../src/content-registry.js';
 import {parseCharacter} from '../src/schema.js';
 import {
-  applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,criticalDiceExpression,criticalHitThreshold,declareRecklessAttack,
-  endConcentration,endSpellEffect,endTransformation,endTurn,extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
+  applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,criticalDiceExpression,criticalHitThreshold,deathSaveMode,declareRecklessAttack,
+  clearConditions,endConcentration,endSpellEffect,endTransformation,endTurn,extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,removeCondition,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
 } from '../src/engine.js';
 
 function must<T>(value:T|undefined):T{if(value===undefined)throw new Error('Expected value was missing.');return value}
@@ -368,7 +368,7 @@ test('Enlarge and Reduce apply size, Strength modes, and attack-damage modifiers
 
 test('Gaseous Form blocks ordinary actions, grants immunity to Prone, and ends at 0 HP',()=>{
   const c=character({classes:[{name:'Wizard',level:5}],totalLevel:5,hp:{current:8,max:8},spells:[{name:'Gaseous Form',level:3,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true}],spellSlots:{'3':{current:1,max:1}}});const state=createInitialState(c);const gaseous=availableTransformations(c,state).find(o=>o.id==='spell:gaseous-form');assert.ok(gaseous);startTransformation(c,state,gaseous);let sheet=resolveSheet(c,state);assert.equal(sheet.canAttack,false);assert.equal(sheet.canCast,false);assert.equal(sheet.canSpeak,false);assert.equal(sheet.speeds.fly,10);assert.equal(sheet.actions.length,1);assert.equal(sheet.actions[0]?.id,'gaseous-form-dash');assert.match(applyCondition(c,state,'Prone').message,/immune/);assert.equal(state.conditions.includes('Prone'),false);
-  applyDamage(state,sheet,8,'Force',c);sheet=resolveSheet(c,state);assert.equal(state.overlays.includes('spell:gaseous-form'),false);assert.equal(state.concentration,undefined);assert.equal(sheet.canAttack,true);
+  applyDamage(state,sheet,8,'Force',c);sheet=resolveSheet(c,state);assert.equal(state.overlays.includes('spell:gaseous-form'),false);assert.equal(state.concentration,undefined);assert.equal(sheet.canAttack,false);assert.ok(state.conditions.includes('Unconscious'));
 });
 
 test('private overlay mechanics can end at zero HP without hard-coded spell identifiers',()=>{
@@ -495,4 +495,88 @@ test('Invisible grants attack Advantage and transformed condition immunity can s
 
 test('overlay ability changes update base-form attack calculations',()=>{
   const c=character({classes:[{name:'Fighter',level:5}],totalLevel:5,knownForms:[],seenForms:[],spells:[],spellSlots:{},abilities:{str:10,dex:12,con:12,int:10,wis:10,cha:10},transformationGrants:[{id:'mighty',label:'Mighty Form',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',effects:{abilitySet:{str:18}}}]});const state=createInitialState(c);const option=availableTransformations(c,state).find(entry=>entry.grantId==='mighty');assert.ok(option);startTransformation(c,state,option);const unarmed=resolveSheet(c,state).actions.find(action=>action.id==='unarmed');assert.ok(unarmed&&unarmed.type==='attack');assert.equal(unarmed.attackBonus,7);assert.equal(unarmed.damage[0]?.expression,'5');
+});
+
+test('Exhaustion levels reduce every D20 Test and Speed, recover one per Long Rest, and cause death at level 6',()=>{
+  const c=character({classes:[{name:'Fighter',level:5}],totalLevel:5,knownForms:[],seenForms:[],spells:[],spellSlots:{}});
+  const state=createInitialState(c);const base=resolveSheet(c,state);const baseAttack=base.actions.find(action=>action.type==='attack');assert.ok(baseAttack?.type==='attack');
+  applyCondition(c,state,'Exhaustion');applyCondition(c,state,'Exhaustion');
+  let sheet=resolveSheet(c,state);const tiredAttack=sheet.actions.find(action=>action.id===baseAttack.id);assert.ok(tiredAttack?.type==='attack');
+  assert.equal(state.exhaustionLevel,2);assert.equal(tiredAttack.attackBonus,baseAttack.attackBonus-4);
+  assert.equal(sheet.saves.wis.modifier,base.saves.wis.modifier-4);
+  assert.equal(sheet.skills.Perception?.modifier,(base.skills.Perception?.modifier??0)-4);
+  assert.equal(sheet.initiative.modifier,base.initiative.modifier-4);
+  assert.equal(sheet.speeds.walk,(base.speeds.walk??0)-10);
+  removeCondition(state,'Exhaustion');assert.equal(state.exhaustionLevel,1);
+  longRest(c,state);assert.equal(state.exhaustionLevel,0);assert.ok(!state.conditions.includes('Exhaustion'));
+  for(let level=0;level<6;level++)applyCondition(c,state,'Exhaustion');
+  sheet=resolveSheet(c,state);assert.equal(state.hp,0);assert.equal(sheet.canAttack,false);assert.match(heal(state,c,10).message,/cannot restore/i);assert.match(spendActionCost(state,'action')??'',/dead/);
+  assert.match(longRest(c,state).message,/cannot start/);
+  clearConditions(state);assert.equal(state.exhaustionLevel,0);assert.deepEqual(state.conditions,[]);
+});
+
+test('transformation spells obey the one-slot-spell-per-turn rule and mark their slot expenditure',()=>{
+  const c=character({spells:[
+    {name:'Barkskin',level:2,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'bonus'},
+    {name:'Polymorph',level:4,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action',concentration:true}
+  ],spellSlots:{'2':{current:1,max:1},'4':{current:1,max:1}}});const state=createInitialState(c);
+  const polymorph=availableTransformations(c,state).find(option=>option.profile==='polymorph');assert.ok(polymorph);
+  const barkskin=castSpell(c,state,'Barkskin');assert.match(barkskin.message,/Cast Barkskin/);assert.equal(state.turn.slotSpellCast,true);assert.equal(state.turn.actionsRemaining,1);
+  const blocked=availableTransformations(c,state).find(option=>option.id===polymorph.id);assert.ok(blocked);assert.equal(blocked.usable,false);assert.match(blocked.reason??'',/already been expended/);
+  const beforeSlot=state.spellSlots['4']?.current;const beforeActions=state.turn.actionsRemaining;const result=startTransformation(c,state,polymorph);
+  assert.match(result.message,/already been expended/);assert.equal(state.spellSlots['4']?.current,beforeSlot);assert.equal(state.turn.actionsRemaining,beforeActions);
+  startNewTurn(state);const ready=availableTransformations(c,state).find(option=>option.id===polymorph.id);assert.ok(ready?.usable);startTransformation(c,state,ready);
+  assert.equal(state.spellSlots['4']?.current,0);assert.equal(state.turn.slotSpellCast,true);
+});
+
+test('2024 Relentless Rage queues its save, restores twice Barbarian level, and raises then resets its DC',()=>{
+  const c=character({classes:[{name:'Barbarian',level:11}],totalLevel:11,knownForms:[],seenForms:[],spells:[],spellSlots:{},hp:{current:60,max:60}});
+  const state=createInitialState(c);startRage(c,state);applyDamage(state,resolveSheet(c,state),60,'Force',c);
+  assert.equal(state.hp,0);assert.equal(state.pendingRelentlessRage?.dc,10);assert.ok(!state.conditions.includes('Unconscious'));
+  resolveRelentlessRage(c,state,10);assert.equal(state.hp,22);assert.equal(state.relentlessRageDc,15);assert.ok(!state.conditions.includes('Unconscious'));
+  applyDamage(state,resolveSheet(c,state),22,'Force',c);assert.equal(state.pendingRelentlessRage?.dc,15);
+  resolveRelentlessRage(c,state,14);assert.equal(state.hp,0);assert.equal(state.relentlessRageDc,20);assert.ok(state.conditions.includes('Unconscious'));assert.equal(state.rage.active,false);
+  heal(state,c,1);shortRest(state);assert.equal(state.relentlessRageDc,10);
+});
+
+test('0 HP, massive damage, damage at 0, healing, and Death Saving Throws follow the 2024 life-state rules',()=>{
+  const c=character({classes:[{name:'Fighter',level:1}],totalLevel:1,knownForms:[],seenForms:[],spells:[],spellSlots:{},hp:{current:10,max:10}});
+  const state=createInitialState(c);applyDamage(state,resolveSheet(c,state),10,'Force',c);
+  assert.equal(state.hp,0);assert.ok(state.conditions.includes('Unconscious'));assert.equal(state.life.dead,false);
+  applyDamage(state,resolveSheet(c,state),1,'Force',c);assert.equal(state.life.deathSaveFailures,1);
+  resolveDeathSave(c,state,1);assert.equal(state.life.dead,true);assert.match(heal(state,c,5).message,/dead/);
+  const healed=createInitialState(c);applyDamage(healed,resolveSheet(c,healed),10,'Force',c);heal(healed,c,3);
+  assert.equal(healed.hp,3);assert.ok(!healed.conditions.includes('Unconscious'));assert.deepEqual(healed.life,{dead:false,stable:false,deathSaveSuccesses:0,deathSaveFailures:0});
+  const critical=createInitialState(c);applyDamage(critical,resolveSheet(c,critical),20,'Force',c);assert.equal(critical.life.dead,true);
+  const saves=createInitialState(c);applyDamage(saves,resolveSheet(c,saves),10,'Force',c);
+  resolveDeathSave(c,saves,10);resolveDeathSave(c,saves,12);resolveDeathSave(c,saves,15);assert.equal(saves.life.stable,true);
+  const naturalTwenty=createInitialState(c);applyDamage(naturalTwenty,resolveSheet(c,naturalTwenty),10,'Force',c);resolveDeathSave(c,naturalTwenty,20);assert.equal(naturalTwenty.hp,1);assert.ok(!naturalTwenty.conditions.includes('Unconscious'));
+});
+
+test('retained class features govern Feral Senses, Champion criticals, Rage Damage, Radiant Strikes, and Petrified immunity',()=>{
+  const ranger=character({classes:[{name:'Ranger',level:18}],totalLevel:18,knownForms:[],seenForms:[],spells:[],spellSlots:{}});const rangerState=createInitialState(ranger);
+  assert.ok(resolveSheet(ranger,rangerState).senses.includes('Blindsight 30 ft. (Feral Senses)'));
+  applyCondition(ranger,rangerState,'Petrified');assert.ok(resolveSheet(ranger,rangerState).conditionImmunities.includes('Poisoned'));
+  const form={id:'featureless',name:'Featureless Form',type:'Construct',cr:1,size:'Medium',ac:13,hp:20,hitDice:'3d8+6',abilities:{str:16,dex:12,con:14,int:8,wis:10,cha:8},saves:{},skills:{},speeds:{walk:30},senses:[],resistances:[],immunities:[],vulnerabilities:[],traits:[],actions:[{id:'blade',name:'Blade',type:'attack',cost:'action',attackBonus:5,ability:'str',kind:'weapon',reach:5,damage:[{expression:'1d8+3',type:'Slashing'}]}],source:{ruleset:'Private',page:'Fixture',verified:'Test'}};
+  const grant={id:'featureless-form',label:'Featureless Form',profile:'custom' as const,formIds:['featureless'],source:'Fixture',actionCost:'free' as const,retention:{hp:true,hitDice:true,mentalAbilities:false,proficiencies:false,creatureType:false,classFeatures:false,feats:false,spellcasting:false,speech:false}};
+  const c=character({classes:[{name:'Barbarian',level:1},{name:'Paladin',level:11}],totalLevel:12,knownForms:[],seenForms:[],spells:[],spellSlots:{},customForms:[form],transformationGrants:[grant]});
+  const state=createInitialState(c);startRage(c,state);const option=availableTransformations(c,state).find(entry=>entry.formId==='featureless');assert.ok(option);startTransformation(c,state,option);const sheet=resolveSheet(c,state);const attack=sheet.actions.find(entry=>entry.id==='blade');assert.ok(attack?.type==='attack');
+  assert.equal(attackBonuses(c,state,sheet,attack).some(packet=>packet.label==='Rage Damage'||packet.label==='Radiant Strikes'),false);assert.equal(sheet.senses.includes('Blindsight 30 ft. (Feral Senses)'),false);
+  const champion=character({classes:[{name:'Fighter',level:15,subclass:'Champion'}],totalLevel:15,knownForms:[],seenForms:[],spells:[],spellSlots:{},customForms:[form],transformationGrants:[grant]});const championState=createInitialState(champion);const championOption=availableTransformations(champion,championState).find(entry=>entry.formId==='featureless');assert.ok(championOption);startTransformation(champion,championState,championOption);const championAttack=resolveSheet(champion,championState).actions.find(entry=>entry.id==='blade');assert.ok(championAttack);assert.equal(criticalHitThreshold(champion,championAttack,championState),20);
+});
+
+test('2024 Jack of All Trades, Reliable Talent, Slippery Mind, and Indomitable Might alter only eligible rolls',()=>{
+  const bard=character({classes:[{name:'Bard',level:2}],totalLevel:2,knownForms:[],seenForms:[],spells:[],spellSlots:{},proficiencies:{saves:{dex:1,cha:1},skills:{Performance:1}}});const bardSheet=resolveSheet(bard,createInitialState(bard));
+  assert.equal(bardSheet.skills.Athletics?.modifier,Math.floor((bard.abilities.str-10)/2)+1);assert.equal(bardSheet.skills.Performance?.modifier,Math.floor((bard.abilities.cha-10)/2)+2);
+  const rogue=character({classes:[{name:'Rogue',level:15}],totalLevel:15,knownForms:[],seenForms:[],spells:[],spellSlots:{},proficiencies:{saves:{dex:1,int:1},skills:{Stealth:2,Perception:1}}});const rogueSheet=resolveSheet(rogue,createInitialState(rogue));
+  assert.equal(rogueSheet.skills.Stealth?.minimumD20,10);assert.equal(rogueSheet.skills.Athletics?.minimumD20,undefined);assert.equal(rogueSheet.saves.wis.proficiency,1);assert.equal(rogueSheet.saves.cha.proficiency,1);
+  const barbarian=character({classes:[{name:'Barbarian',level:18}],totalLevel:18,knownForms:[],seenForms:[],spells:[],spellSlots:{},abilities:{str:22,dex:14,con:18,int:8,wis:10,cha:8},proficiencies:{saves:{str:1,con:1},skills:{Athletics:1}}});const barbSheet=resolveSheet(barbarian,createInitialState(barbarian));
+  assert.equal(barbSheet.saves.str.minimumTotal,22);assert.equal(barbSheet.skills.Athletics?.minimumTotal,22);assert.equal(barbSheet.skills.Perception?.minimumTotal,undefined);
+});
+
+test('SRD subclass features are classified honestly and Berserker Mindless Rage and Champion Survivor execute',()=>{
+  const berserker=character({classes:[{name:'Barbarian',level:6,subclass:'Path of the Berserker'}],totalLevel:6,knownForms:[],seenForms:[],spells:[],spellSlots:{}});const berserkerState=createInitialState(berserker);applyCondition(berserker,berserkerState,'Frightened');startRage(berserker,berserkerState);const berserkerSheet=resolveSheet(berserker,berserkerState);
+  assert.ok(!berserkerState.conditions.includes('Frightened'));assert.ok(berserkerSheet.conditionImmunities.includes('Frightened'));assert.equal(berserkerSheet.features.find(feature=>feature.id==='mindless-rage')?.status,'active');assert.equal(berserkerSheet.features.find(feature=>feature.id==='berserker-frenzy')?.status,'conditional');
+  const champion=character({classes:[{name:'Fighter',level:18,subclass:'Champion'}],totalLevel:18,knownForms:[],seenForms:[],spells:[],spellSlots:{},hp:{current:10,max:100}});const state=createInitialState(champion);applyDamage(state,resolveSheet(champion,state),10,'Force',champion);
+  assert.equal(deathSaveMode(champion,state).mode,'advantage');resolveDeathSave(champion,state,18);assert.equal(state.hp,1);
 });

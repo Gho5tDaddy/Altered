@@ -15,6 +15,7 @@
       <div class="brand-mark" aria-hidden="true">A</div>
       <div class="brand-copy"><h1>ALTERED</h1><p>Rules-aware transformation character sheet</p></div>
       <div class="top-actions">
+        <button id="open-help" class="button secondary" type="button">Help</button>
         <button id="open-import-center" class="button secondary" type="button">Import & Content</button>
         <button id="export-character" class="button secondary" type="button">Export</button>
         <button id="open-settings" class="button secondary" type="button">Settings</button>
@@ -37,6 +38,25 @@
           <div class="transform-panel">
             <label for="form-select">Choose form</label>
             <select id="form-select"></select>
+            <div class="form-browse-tools">
+              <div>
+                <label for="form-search">Search forms</label>
+                <input id="form-search" type="search" autocomplete="off" placeholder="Name or source">
+              </div>
+              <div>
+                <label for="form-filter">Filter</label>
+                <select id="form-filter">
+                  <option value="all">All forms</option>
+                  <option value="usable">Available now</option>
+                  <option value="wildshape">Wild Shape</option>
+                  <option value="spell">Spell forms</option>
+                  <option value="overlay">Additive forms</option>
+                  <option value="custom">Private/custom</option>
+                </select>
+              </div>
+            </div>
+            <div id="form-results-status" class="form-results-status" role="status" aria-live="polite"></div>
+            <div id="form-status-strip" class="status-strip" aria-label="Selected form status"></div>
             <div class="transform-buttons">
               <button id="transform-button" class="button primary" type="button">Transform</button>
               <button id="end-form-button" class="button secondary" type="button">End Form</button>
@@ -102,7 +122,100 @@
     </main>
   </div>
 
+  <section id="walkthrough" class="walkthrough" role="dialog" aria-modal="false" aria-labelledby="walkthrough-title" hidden>
+    <div class="walkthrough-card">
+      <div class="walkthrough-progress"><span id="walkthrough-step">Step 1 of 5</span><button id="skip-walkthrough" class="text-button" type="button">Skip</button></div>
+      <h2 id="walkthrough-title">Welcome to Altered</h2>
+      <p id="walkthrough-copy"></p>
+      <div class="walkthrough-actions">
+        <button id="walkthrough-back" class="button secondary" type="button">Back</button>
+        <button id="walkthrough-next" class="button primary" type="button">Next</button>
+      </div>
+    </div>
+  </section>
 
+  <dialog id="help-dialog" class="wide-dialog" aria-labelledby="help-dialog-title">
+    <div class="dialog-card help-card">
+      <div class="section-title"><h2 id="help-dialog-title">Help & Tutorial</h2><button id="close-help" class="text-button" type="button">Close</button></div>
+      <div class="help-intro">
+        <div><strong>Your transformation companion</strong><p>Find a topic, open one compact card, or restart the guided tour.</p></div>
+        <button id="start-walkthrough" class="button primary compact" type="button">Start Walkthrough</button>
+      </div>
+      <label for="help-search">Search help</label>
+      <input id="help-search" type="search" autocomplete="off" placeholder="Try “import”, “Wild Shape”, or “resources”">
+      <div id="help-search-status" class="help-search-status" role="status" aria-live="polite"></div>
+      <div id="help-topics" class="help-topics">
+        <details class="help-topic" data-help-keywords="what altered purpose app transformation character sheet">
+          <summary><span aria-hidden="true">✦</span> What Altered is</summary>
+          <p>Altered is a private, rules-aware 2024 character sheet built around forms and transformations. It keeps your character, active form, resources, rolls, and conditions together during play.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="purpose what app is for table gameplay transformation turn">
+          <summary><span aria-hidden="true">◎</span> What the app is for</summary>
+          <p>Use Altered during play to see the statistics, actions, spells, defenses, resources, and rule changes that apply to your current form. It supports the character sheet; it does not replace the DM or invent missing rules.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="supported transformation types wild shape polymorph true polymorph shapechange animal shapes overlay custom">
+          <summary><span aria-hidden="true">◈</span> Supported transformation types</summary>
+          <p>Altered supports Base Form, Wild Shape, Polymorph, True Polymorph, Shapechange, Animal Shapes, additive overlays, and validated private custom transformations. The active card explains which statistics are retained.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="getting started next beginner first turn">
+          <summary><span aria-hidden="true">➜</span> Getting Started</summary>
+          <ol><li>Choose or import a character.</li><li>Choose a form and check its status chips.</li><li>Transform, then use the Actions, Spells, and Features tabs.</li><li>Press New Turn when Action or Bonus Action counters are spent.</li></ol>
+        </details>
+        <details class="help-topic" data-help-keywords="loading characters choose sample switch">
+          <summary><span aria-hidden="true">♙</span> Loading characters</summary>
+          <p>Use the Character selector near the top. Switching characters safely creates that character’s own combat state and returns the sheet to Base Form.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="importing characters dnd beyond public json private content">
+          <summary><span aria-hidden="true">⇩</span> Importing characters</summary>
+          <p>Open <strong>Import & Content</strong>. For D&amp;D Beyond, temporarily make the character Public, paste its link or ID, then review every warning before confirming. Altered JSON backups and private rules packs remain supported.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="browsing forms search filters available locked">
+          <summary><span aria-hidden="true">⌕</span> Browsing forms, search, and filters</summary>
+          <p>Type in <strong>Search forms</strong> to match a form name or source. Use <strong>Filter</strong> for available, Wild Shape, spell, additive, or private forms. Locked choices stay visible in the full list so their requirements can be understood.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="activating forms transform selected available resource">
+          <summary><span aria-hidden="true">✧</span> Activating forms</summary>
+          <p>Select a form, read the status chips and short reason, then press Transform or Activate. The app spends the correct action and resource only after all requirements pass.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="ending forms return normal base release revert">
+          <summary><span aria-hidden="true">↶</span> Ending forms and returning to normal</summary>
+          <p>Press <strong>End Form</strong> beside the form selector. If it is disabled, its tooltip and status explain the missing Bonus Action or external ending condition. Base Form returns automatically when a rule ends the form.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="tracking resources action bonus reaction slots turns rest active changed">
+          <summary><span aria-hidden="true">◇</span> Tracking resources and turns</summary>
+          <p>Green availability chips show what remains this turn. Resource chips show current/maximum uses. Active effects summarize ongoing changes. New Turn refreshes turn actions; rests recover only what the 2024 rule allows.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="images artwork upload crop reset portrait lazy">
+          <summary><span aria-hidden="true">▣</span> Images</summary>
+          <p>Upload artwork for the current character or form. Altered crops without distortion, optimizes the image locally, and stores it only on this device. Reset Art restores the built-in portrait.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="settings aura motion catalog">
+          <summary><span aria-hidden="true">⚙</span> Settings</summary>
+          <p>Settings controls the magical form aura and reduced motion. It also shows the verified rules packs and legal SRD support-catalog status.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="troubleshooting cannot use locked unavailable import private update">
+          <summary><span aria-hidden="true">△</span> Troubleshooting</summary>
+          <ul><li><strong>Can’t transform?</strong> Check the selected status and action/resource chips.</li><li><strong>Spell unavailable?</strong> Check Rage, form spellcasting, Action, and spell slots.</li><li><strong>Import blocked?</strong> Confirm the character is Public and uses 2024—not Legacy—rules.</li><li><strong>Looks out of date?</strong> Reload once while the local server is running.</li></ul>
+        </details>
+        <details class="help-topic" data-help-keywords="faq save offline paid content phone delete reset">
+          <summary><span aria-hidden="true">?</span> FAQ</summary>
+          <p><strong>Does it save?</strong> Yes, locally. <strong>Does it work offline?</strong> The installed PWA keeps its validated built-in rules. <strong>Does it copy paid books?</strong> No; paid mechanics require your character data or private structured pack. <strong>Can I use a phone?</strong> Yes, when Altered is started in LAN mode on the same private network.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="about version privacy legal rules 2024">
+          <summary><span aria-hidden="true">A</span> About</summary>
+          <p>Altered is a local-first personal utility for D&amp;D 5e 2024 transformation play. It separates public SRD rules, private owned content, imported character facts, and mutable combat state to keep calculations explainable and private.</p>
+        </details>
+      </div>
+      <div id="help-empty" class="empty" hidden>No help topics match that search.</div>
+      <div class="status-legend" aria-label="Status legend">
+        <span class="ui-status available"><span aria-hidden="true">✓</span>Available</span>
+        <span class="ui-status active"><span aria-hidden="true">✦</span>Active</span>
+        <span class="ui-status selected"><span aria-hidden="true">◆</span>Selected</span>
+        <span class="ui-status locked"><span aria-hidden="true">⌁</span>Locked</span>
+        <span class="ui-status warning"><span aria-hidden="true">!</span>Warning</span>
+      </div>
+    </div>
+  </dialog>
 
 
   <dialog id="import-dialog" class="wide-dialog" aria-labelledby="import-dialog-title">

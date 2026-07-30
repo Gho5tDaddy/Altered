@@ -1,0 +1,541 @@
+{
+  "artifact": "Altered D&D 5e 2024 rules audit evidence",
+  "version": "0.24.0",
+  "generatedAt": "2026-07-30T21:28:19.585Z",
+  "rules": {
+    "rules": 48,
+    "functions": 16,
+    "counts": {
+      "calculated": 30,
+      "conditional": 18,
+      "reference": 0,
+      "unsupported": 0
+    },
+    "domains": {
+      "core": 13,
+      "conditions": 6,
+      "classes": 12,
+      "subclasses": 2,
+      "forms": 7,
+      "spells": 2,
+      "items": 2,
+      "import": 2,
+      "product": 2
+    },
+    "verifiedThrough": "2026-07-30",
+    "ledgerSha256": "faae8c8fde7fe9379c4e9a2d5317b538c06cb1dcc3eb0857f6f03b1c20a98ea4"
+  },
+  "content": {
+    "packs": [
+      {
+        "id": "altered-srd-creatures",
+        "domain": "creatures",
+        "version": "0.24.0",
+        "ruleset": "2024 Revised Fifth Edition",
+        "verified": "2026-07-30",
+        "records": 16,
+        "sha256": "93c5ab58d5ea5b9ce17b426e64224205671dbadc69ffe496d9c3fbc0df8fe8dd"
+      },
+      {
+        "id": "altered-core-class-features",
+        "domain": "class-features",
+        "version": "0.24.0",
+        "ruleset": "2024 Revised Fifth Edition",
+        "verified": "2026-07-30",
+        "records": 93,
+        "sha256": "5d68038b9535d4e8fe7fdbe6a3a38c85e2a8af7b88394e8b7606fbe4b321d962"
+      },
+      {
+        "id": "altered-core-species-features",
+        "domain": "species-features",
+        "version": "0.24.0",
+        "ruleset": "2024 Revised Fifth Edition",
+        "verified": "2026-07-30",
+        "records": 11,
+        "sha256": "ac7d7763c8b09909f0fccbb028e2aac6ddac0cb4f3297aec2340ff6322f45943"
+      },
+      {
+        "id": "altered-core-feat-hooks",
+        "domain": "feats",
+        "version": "0.24.0",
+        "ruleset": "2024 Revised Fifth Edition",
+        "verified": "2026-07-30",
+        "records": 1,
+        "sha256": "e4fa7e7294590b3864dd4b5505afa4a472ae951a10c14c4858025fd34e0f63f1"
+      },
+      {
+        "id": "altered-spell-hooks",
+        "domain": "spells",
+        "version": "0.24.0",
+        "ruleset": "2024 Revised Fifth Edition",
+        "verified": "2026-07-30",
+        "records": 13,
+        "sha256": "9940c455bd3280bfdb9a06b1bb112ba0e3938da62ce554b9187f4e62f7c654fe"
+      },
+      {
+        "id": "altered-item-hooks",
+        "domain": "items",
+        "version": "0.24.0",
+        "ruleset": "2024 Revised Fifth Edition",
+        "verified": "2026-07-30",
+        "records": 0,
+        "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+      },
+      {
+        "id": "altered-core-conditions",
+        "domain": "conditions",
+        "version": "0.24.0",
+        "ruleset": "2024 Revised Fifth Edition",
+        "verified": "2026-07-30",
+        "records": 15,
+        "sha256": "3ccf54ae67d5961717bfa99d09dd66f136f6b8248798849f2ad79bd5f6bb4607"
+      },
+      {
+        "id": "altered-transformation-profiles",
+        "domain": "transformation-profiles",
+        "version": "0.24.0",
+        "ruleset": "2024 Revised Fifth Edition",
+        "verified": "2026-07-30",
+        "records": 8,
+        "sha256": "899b51877067ea7c30752993b5e8fe9f18ba86be3f1f5d787f6e981555767cf4"
+      }
+    ],
+    "totalRecords": 157,
+    "manifestSha256": "13707d97156c24bde072677f4cbf7709afb5c5dfddda151ff0383976127d7b5c"
+  },
+  "interactionMatrix": [
+    {
+      "functionId": "transform-select",
+      "ruleIds": [
+        "core.action-economy",
+        "core.slot-spell-limit",
+        "form.wild-shape",
+        "form.polymorph",
+        "form.true-polymorph",
+        "form.shapechange",
+        "form.animal-shapes",
+        "form.overlays"
+      ],
+      "stateRead": [
+        "character",
+        "active form",
+        "resources",
+        "spell slots",
+        "turn",
+        "conditions"
+      ],
+      "stateChanged": [
+        "active form",
+        "overlays",
+        "resources",
+        "spell slots",
+        "turn",
+        "Concentration",
+        "Temporary HP"
+      ],
+      "failureStates": [
+        "illegal form",
+        "resource empty",
+        "action unavailable",
+        "casting blocked",
+        "unsupported profile"
+      ]
+    },
+    {
+      "functionId": "end-form",
+      "ruleIds": [
+        "core.action-economy",
+        "form.wild-shape",
+        "form.polymorph",
+        "form.true-polymorph",
+        "form.shapechange",
+        "form.animal-shapes"
+      ],
+      "stateRead": [
+        "active form",
+        "turn",
+        "conditions"
+      ],
+      "stateChanged": [
+        "active form",
+        "turn",
+        "Concentration",
+        "Temporary HP"
+      ],
+      "failureStates": [
+        "no active form",
+        "required action unavailable",
+        "permanent True Polymorph"
+      ]
+    },
+    {
+      "functionId": "creature-action",
+      "ruleIds": [
+        "core.action-economy",
+        "core.d20-tests",
+        "core.advantage",
+        "core.critical-hits",
+        "core.multiattack",
+        "condition.exhaustion"
+      ],
+      "stateRead": [
+        "resolved sheet",
+        "turn",
+        "conditions",
+        "recharge",
+        "uses"
+      ],
+      "stateChanged": [
+        "turn",
+        "recharge",
+        "uses",
+        "once-per-turn",
+        "activity"
+      ],
+      "failureStates": [
+        "action unavailable",
+        "recharging",
+        "uses exhausted",
+        "attacks blocked"
+      ]
+    },
+    {
+      "functionId": "spell-cast",
+      "ruleIds": [
+        "core.action-economy",
+        "core.slot-spell-limit",
+        "core.concentration",
+        "spell.imported",
+        "condition.exhaustion"
+      ],
+      "stateRead": [
+        "resolved spells",
+        "turn",
+        "slots",
+        "Rage",
+        "conditions"
+      ],
+      "stateChanged": [
+        "turn",
+        "slots",
+        "Concentration",
+        "active effects",
+        "activity"
+      ],
+      "failureStates": [
+        "unprepared",
+        "slot unavailable",
+        "casting blocked",
+        "action unavailable",
+        "unsupported resolution"
+      ]
+    },
+    {
+      "functionId": "roll-save-skill-initiative",
+      "ruleIds": [
+        "core.d20-tests",
+        "core.advantage",
+        "core.initiative",
+        "condition.exhaustion",
+        "condition.visibility",
+        "condition.frightened"
+      ],
+      "stateRead": [
+        "resolved roll",
+        "conditions",
+        "situational mode"
+      ],
+      "stateChanged": [
+        "latest result",
+        "activity"
+      ],
+      "failureStates": [
+        "automatic failure",
+        "dead at Exhaustion 6"
+      ]
+    },
+    {
+      "functionId": "rage",
+      "ruleIds": [
+        "core.action-economy",
+        "core.concentration",
+        "class.barbarian"
+      ],
+      "stateRead": [
+        "class",
+        "turn",
+        "resources",
+        "armor",
+        "conditions",
+        "active form"
+      ],
+      "stateChanged": [
+        "Rage",
+        "turn",
+        "resources",
+        "Concentration"
+      ],
+      "failureStates": [
+        "no feature",
+        "no resource",
+        "Heavy armor",
+        "action unavailable",
+        "feature not retained"
+      ]
+    },
+    {
+      "functionId": "class-resources",
+      "ruleIds": [
+        "class.druid",
+        "class.fighter",
+        "class.paladin",
+        "class.sorcerer"
+      ],
+      "stateRead": [
+        "class",
+        "resources",
+        "turn",
+        "active form"
+      ],
+      "stateChanged": [
+        "resources",
+        "turn",
+        "HP",
+        "slots"
+      ],
+      "failureStates": [
+        "no feature",
+        "resource empty",
+        "action unavailable",
+        "feature not retained"
+      ]
+    },
+    {
+      "functionId": "damage-healing",
+      "ruleIds": [
+        "core.damage",
+        "core.zero-hp",
+        "core.temporary-hp",
+        "core.concentration"
+      ],
+      "stateRead": [
+        "resolved defenses",
+        "HP",
+        "Temporary HP",
+        "life state",
+        "Concentration",
+        "active effects"
+      ],
+      "stateChanged": [
+        "HP",
+        "Temporary HP",
+        "Death Saves",
+        "life state",
+        "Concentration checks",
+        "form",
+        "active effects"
+      ],
+      "failureStates": [
+        "non-finite input",
+        "dead character"
+      ]
+    },
+    {
+      "functionId": "zero-hp-resolution",
+      "ruleIds": [
+        "core.zero-hp",
+        "class.barbarian"
+      ],
+      "stateRead": [
+        "HP",
+        "life state",
+        "class",
+        "Rage",
+        "current save DC"
+      ],
+      "stateChanged": [
+        "HP",
+        "life state",
+        "Death Saves",
+        "conditions",
+        "Rage"
+      ],
+      "failureStates": [
+        "no pending trigger",
+        "already Stable",
+        "dead character"
+      ]
+    },
+    {
+      "functionId": "conditions",
+      "ruleIds": [
+        "condition.exhaustion",
+        "condition.incapacitated",
+        "condition.visibility",
+        "condition.frightened",
+        "condition.grappled",
+        "condition.other-core"
+      ],
+      "stateRead": [
+        "conditions",
+        "condition immunities",
+        "active effects"
+      ],
+      "stateChanged": [
+        "conditions",
+        "Exhaustion",
+        "form",
+        "Rage",
+        "Concentration",
+        "overlays"
+      ],
+      "failureStates": [
+        "condition immunity",
+        "maximum Exhaustion"
+      ]
+    },
+    {
+      "functionId": "turns-rests",
+      "ruleIds": [
+        "core.action-economy",
+        "core.rests",
+        "class.barbarian"
+      ],
+      "stateRead": [
+        "turn",
+        "resources",
+        "HP",
+        "conditions",
+        "durations"
+      ],
+      "stateChanged": [
+        "turn",
+        "resources",
+        "slots",
+        "HP",
+        "Exhaustion",
+        "forms",
+        "effects"
+      ],
+      "failureStates": [
+        "Long Rest at 0 HP"
+      ]
+    },
+    {
+      "functionId": "ddb-import",
+      "ruleIds": [
+        "import.ddb",
+        "import.provenance",
+        "item.owned-effects"
+      ],
+      "stateRead": [
+        "public character ID",
+        "source payload",
+        "live SRD catalog"
+      ],
+      "stateChanged": [
+        "pending reviewed character"
+      ],
+      "failureStates": [
+        "private character",
+        "identity mismatch",
+        "legacy/unidentified source",
+        "malformed payload",
+        "catalog unavailable"
+      ]
+    },
+    {
+      "functionId": "json-owned-content",
+      "ruleIds": [
+        "form.custom",
+        "subclass.srd-and-owned",
+        "product.offline-integrity"
+      ],
+      "stateRead": [
+        "selected files",
+        "schema"
+      ],
+      "stateChanged": [
+        "characters",
+        "private packs"
+      ],
+      "failureStates": [
+        "oversized file",
+        "invalid schema",
+        "non-private pack",
+        "unknown profile"
+      ]
+    },
+    {
+      "functionId": "persistence",
+      "ruleIds": [
+        "product.offline-integrity"
+      ],
+      "stateRead": [
+        "character",
+        "combat state",
+        "settings"
+      ],
+      "stateChanged": [
+        "local storage"
+      ],
+      "failureStates": [
+        "storage unavailable",
+        "corrupt or stale state"
+      ]
+    },
+    {
+      "functionId": "rules-status",
+      "ruleIds": [
+        "product.rules-update"
+      ],
+      "stateRead": [
+        "pinned baseline",
+        "live catalog status"
+      ],
+      "stateChanged": [
+        "rules status only"
+      ],
+      "failureStates": [
+        "offline",
+        "source changed",
+        "unexpected document"
+      ]
+    },
+    {
+      "functionId": "automatic-effect-cleanup",
+      "ruleIds": [
+        "core.concentration",
+        "core.temporary-hp",
+        "form.wild-shape",
+        "form.polymorph",
+        "form.overlays"
+      ],
+      "stateRead": [
+        "HP",
+        "Temporary HP",
+        "conditions",
+        "Concentration",
+        "durations"
+      ],
+      "stateChanged": [
+        "form",
+        "overlays",
+        "Concentration",
+        "Temporary HP"
+      ],
+      "failureStates": []
+    }
+  ],
+  "verification": {
+    "command": "npm run audit",
+    "result": "passed before this artifact was generated",
+    "scope": [
+      "TypeScript strict typecheck",
+      "Node rules-engine and schema tests",
+      "content registry and provenance tests",
+      "static UI, PWA, proxy, storage, and security contract tests"
+    ]
+  },
+  "legalBoundary": "SRD 5.2.1 mechanics are redistributable under CC BY 4.0. Public and user-owned D&D Beyond data is normalized for private use without copying paid descriptive text."
+}

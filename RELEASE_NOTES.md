@@ -1,4 +1,22 @@
-# Altered v0.23.2 release notes
+# Altered v0.24.0 release notes
+
+Fresh installations and standalone downloads now open with the validated Ferocitus character already loaded at full resources. Ferocitus remains a local, rules-safe character record without copied source-book text and includes the six selected Wild Shape forms.
+
+The six current Ferocitus forms—Brown Bear, Dire Wolf, Giant Octopus, Giant Spider, Lion, and Tiger—now include built-in artwork. Images load lazily in the PWA, are cached for offline use, and are embedded directly into the self-contained standalone file. Existing per-character and per-form uploads still take priority, while Reset Art restores the matching built-in image.
+
+Altered now includes a searchable Help center and a short optional walkthrough for new users. The walkthrough focuses only on choosing a character, finding a form, reading the turn budget, using the focused sheet tabs, and operating the turn controls. It can be skipped or closed at any point, remembers completion, gracefully omits missing interface targets, and can always be restarted from Help.
+
+Form browsing now supports compact search and purpose filters. Selected, active, available, locked, warning, and requirements-missing states use a consistent icon, label, border, and color system so the interface does not rely on color alone. Artwork presentation, focus indicators, touch targets, responsive Help cards, and reduced-motion behavior received localized polish; no gameplay engine, save schema, import/export format, or dependency architecture was replaced.
+
+This release completes the first source-ledgered 2024 rules audit pass. The most important change is that the sheet now treats “displayed” and “automated” as different promises: every supported class and SRD subclass feature is labeled by what Altered can actually calculate.
+
+Gameplay corrections include cumulative Exhaustion; the full 0 HP, Unconscious, Death Save, stabilization, and massive-damage flow; executable Relentless Rage; 2024 one-slot-spell-per-turn enforcement across transformation spells; and missing retained class mechanics such as Reliable Talent, Jack of All Trades, Indomitable Might, Slippery Mind, Feral Senses, Mindless Rage, and Champion Survivor.
+
+D&D Beyond imports now retain private item provenance and ruleset evidence without copying paid descriptions or applying numeric modifiers twice. Clearly Legacy or mixed characters are blocked because Altered is intentionally 2024-only; unidentified markers remain visible for review.
+
+Run `npm run audit` to typecheck, run the complete automated suite, and regenerate `AUDIT_EVIDENCE.json`.
+
+## Previous v0.23.2 notes
 
 ## Status
 

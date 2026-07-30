@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.24.0
+
+- Bundled the validated Ferocitus character as the fresh-install default with full resources and all six selected forms, so the standalone phone file no longer depends on an earlier local import.
+- Added app-ready built-in artwork for Brown Bear, Dire Wolf, Giant Octopus, Giant Spider, Lion, and Tiger in both the PWA and self-contained standalone build.
+- Added an always-available, searchable Help center with compact guidance for setup, importing, forms, controls, resources, artwork, settings, troubleshooting, FAQ, and app scope.
+- Added an optional five-step first-launch walkthrough that never blocks the sheet, skips unavailable targets, can be closed at any time, persists completion separately from character data, and can be restarted from Help.
+- Added compact form search and purpose filters, clearer selected/active/available/requirements-missing states, and consistent icon-plus-label status chips that never depend on color alone.
+- Improved portrait cropping and lazy loading, touch targets, focus treatment, reduced-motion handling, responsive Help layout, and restrained fantasy panel accents without adding runtime dependencies.
+- Added a source-linked rules ledger, state-changing function inventory, content manifest generator, interaction matrix, and gap register.
+- Added cumulative 2024 Exhaustion and the complete player-character 0 HP, instant-death, Unconscious, Death Save, stabilization, and healing flow.
+- Made Relentless Rage executable with its increasing Constitution-save DC and twice-level HP result.
+- Enforced the one-spell-slot-expenditure-per-turn rule across ordinary spells and transformation spells while keeping Actions and Bonus Actions independent.
+- Added Jack of All Trades, Reliable Talent, Slippery Mind, Indomitable Might, Feral Senses, Mindless Rage, and Champion Survivor.
+- Added all twelve SRD subclass feature sets with honest calculated, conditional, reference-only, or unsupported classifications.
+- Prevented Rage Damage, Radiant Strikes, Champion critical ranges, and other class mechanics from leaking into forms that replace class features.
+- Added D&D Beyond item provenance and 2024 ruleset evidence, with a hard import block for clearly Legacy or mixed-rules characters.
+- Added persistent life-state and Relentless Rage migration to local saves, plus prominent zero-HP controls and explanations.
+- Expanded automated coverage to 146 rules, import, schema, UI, storage, service-worker, catalog, artwork, and security checks.
+
 ## v0.23.2
 
 - Extended the strong persistent pulsing glow to every non-base transformation, including replacement forms and additive spell, class, species, item, and private overlays.

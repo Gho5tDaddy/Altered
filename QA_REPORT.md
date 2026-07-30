@@ -1,4 +1,40 @@
-# Altered v0.23.2 QA report
+# Altered v0.24.0 QA report
+
+## v0.24.0 rules-audit verification
+
+- Strict TypeScript typecheck: passing.
+- Automated engine, schema, import, content, storage, UI-contract, PWA, proxy, and security checks: 141 passing before live browser QA.
+- New truth-table coverage: Exhaustion, spell-slot turn limit, Relentless Rage, 0 HP and Death Saves, feature-retention leakage, Feral Senses, Jack of All Trades, Reliable Talent, Slippery Mind, Indomitable Might, Mindless Rage, Champion Survivor, item provenance, and 2024-only import blocking.
+- Reproducible evidence: `npm run audit` generates `AUDIT_EVIDENCE.json`, including content-pack record counts and SHA-256 hashes plus the rule/function interaction matrix.
+- Remaining conditional and unsupported boundaries are recorded in `AUDIT_GAP_REGISTER.md`; none are presented as fully calculated.
+
+## v0.24.0 final live browser verification
+
+The generated `dist` PWA was loaded from the local production server and exercised through the visible browser UI.
+
+Verified:
+
+- The searchable Help center opens from the persistent top-bar control, filters its fifteen concise topics, exposes a visible no-results state, and can restart the walkthrough.
+- The five walkthrough targets advance in order, remain non-modal, can be skipped or closed, produce no runtime errors, and stay completed after a full reload.
+- Form search returns the expected form while retaining Base Form and the current selection for recovery; status chips explain selection, active state, missing requirements, and action cost.
+- All six supplied form images load under the exact matching creature ID, expose useful alternative text, preserve their aspect ratio with cover cropping, and remain available in both PWA and standalone builds. Tiger was also verified as the active pulsing form with no browser warnings or errors.
+- A storage-clean launch now selects bundled Ferocitus automatically with 80/80 HP, full Wild Shape and Rage resources, all six forms, and no browser warnings or errors.
+- A startup production-bundle failure caused by a missing newly imported module was reproduced, fixed by automatically bundling every compiled source module, and regression-checked with a clean page load.
+- Final fresh-page browser diagnostics contained zero console/runtime errors.
+- Barkskin spent its Bonus Action, left the Action available, raised Armor Class to 17, and continued through Wild Shape.
+- Brown Bear Moon Wild Shape exposed Starry Wisp, Cure Wounds, Moonbeam, and Conjure Animals while the Magic Action was available; Rage blocked spellcasting with a visible explanation.
+- Brown Bear Multiattack produced independent Bite and Claw attack rolls, to-hit totals, damage packets, on-hit guidance, and a potential-damage total.
+- Wild Shape and Rage retained independent Action/Bonus Action state, resource spending, and disabled-state explanations.
+- The transformed portrait ran three continuous visual effects (`alteredLivingAura`, `alteredPortraitPulse`/`alteredPortraitGlow`, and `alteredVisibleFormPulse`) with infinite iteration until form release; Base Form retained only the one-time dissipation animation.
+- Exhaustion level 2 reduced every displayed D20 Test by 4 and every Speed by 10 feet, and exposed a clear one-level reduction control.
+- Import & Content, Settings, all five sheet tabs, rules-catalog status checking, Export, and Clear Activity executed without a browser error. Clear Activity preserved non-log state and disabled itself when empty.
+- The live SRD support status remained current at 1,808 legal SRD 5.2.1 records.
+- The desktop viewport had no horizontal overflow. The existing 390 × 844 responsive regression remained covered by the prior live pass and the current CSS/UI contract checks.
+- A partially unmarked D&D Beyond payload now remains importable only with an explicit ruleset-review warning; Legacy and mixed payloads remain blocked from the 2024-only engine.
+
+Final automated result after the bundled Ferocitus pass: **146/146 passing**.
+
+## Previous v0.23.2 QA evidence
 
 ## Automated verification
 

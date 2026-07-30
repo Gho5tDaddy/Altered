@@ -1,0 +1,140 @@
+// Validated, rules-safe Altered export of Ferocitus. Full source-book text is
+// deliberately excluded; imported entries retain only executable character facts.
+export const FEROCITUS_CHARACTER:unknown={
+  schemaVersion:1,
+  id:'ddb-152187683',
+  name:'Ferocitus',
+  species:'Goliath',
+  creatureType:'Humanoid',
+  size:'Medium',
+  totalLevel:6,
+  classes:[
+    {name:'Barbarian',level:1,subclass:null},
+    {name:'Druid',level:5,subclass:'Circle of the Moon'},
+  ],
+  abilities:{str:15,dex:14,con:16,int:12,wis:16,cha:12},
+  hp:{current:80,max:80},
+  ac:16,
+  speed:35,
+  proficiencies:{
+    saves:{str:1,dex:0,con:1,int:0,wis:0,cha:0},
+    skills:{Intimidation:1,Athletics:1,'Animal Handling':1,Nature:1},
+  },
+  knownForms:['brown-bear','dire-wolf','giant-octopus','giant-spider','lion','tiger'],
+  seenForms:['brown-bear','dire-wolf','giant-octopus','giant-spider','lion','tiger'],
+  spells:[
+    {
+      name:'Speak with Animals',level:1,sourceClass:'Imported',ability:'wis',castingTime:'magic-action',
+      id:'ddb-spell-2619059',prepared:true,components:'V, S',
+      summary:'Imported from D&D Beyond; verify full spell text in your source.',
+    },
+    {
+      name:'Guidance',level:0,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',
+      id:'ddb-spell-2618971',prepared:true,concentration:true,components:'V, S',
+      summary:'Imported from D&D Beyond; verify full spell text in your source.',
+    },
+    {
+      name:'Faerie Fire',level:1,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',
+      id:'ddb-spell-2618858',prepared:true,concentration:true,components:'V',saveDc:14,saveAbility:'dex',
+      summary:'Imported from D&D Beyond; verify full spell text in your source.',
+    },
+    {
+      name:'Healing Word',level:1,sourceClass:'Druid',ability:'wis',castingTime:'bonus',
+      id:'ddb-spell-2619143',prepared:true,components:'V',healing:'2d4+3',
+      summary:'Imported from D&D Beyond; verify full spell text in your source.',
+    },
+    {
+      name:'Absorb Elements',level:1,sourceClass:'Druid',ability:'wis',castingTime:'reaction',
+      id:'ddb-spell-2368',prepared:true,components:'S',
+      damage:[
+        {expression:'1d6',type:'Acid'},{expression:'1d6',type:'Cold'},{expression:'1d6',type:'Fire'},
+        {expression:'1d6',type:'Lightning'},{expression:'1d6',type:'Thunder'},
+      ],
+      resolution:'manual',
+      summary:'Conditional damage rider imported from D&D Beyond; resolve its trigger and damage type from your source.',
+    },
+    {
+      name:'Thorn Whip',level:0,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',
+      id:'ddb-spell-2619176',prepared:true,components:'V, S, M',attackBonus:6,
+      damage:[{expression:'1d6',type:'Piercing'}],
+      summary:'Imported from D&D Beyond; verify full spell text in your source.',
+    },
+    {
+      name:'Entangle',level:1,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',
+      id:'ddb-spell-2619186',prepared:true,concentration:true,components:'V, S',saveDc:14,saveAbility:'str',
+      summary:'Imported from D&D Beyond; verify full spell text in your source.',
+    },
+    {
+      name:'Longstrider',level:1,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',
+      id:'ddb-spell-2619004',prepared:true,components:'V, S, M',
+      summary:'Imported from D&D Beyond; verify full spell text in your source.',
+    },
+    {
+      name:'Barkskin',level:2,sourceClass:'Druid',ability:'wis',castingTime:'bonus',
+      id:'ddb-spell-2618907',prepared:true,components:'V, S, M',
+      summary:'Imported from D&D Beyond; verify full spell text in your source.',
+      activeEffect:{
+        id:'barkskin',duration:'1 hour',
+        summary:'The target has Armor Class 17 if its AC would otherwise be lower.',
+        acMinimum:17,
+      },
+    },
+    {
+      name:'Starry Wisp',level:0,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',
+      id:'rules-circle-moon-starry-wisp',prepared:true,components:'V, S',attackBonus:6,
+      damage:[{expression:'2d8',type:'Radiant'}],specialAccess:'circle-of-the-moon',
+      summary:'Ranged spell attack. On a hit, the target sheds Dim Light and cannot benefit from Invisible until the end of your next turn.',
+    },
+    {
+      name:'Cure Wounds',level:1,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',
+      id:'rules-circle-moon-cure-wounds',prepared:true,components:'V, S',healing:'2d8+3',
+      higherSlotHealing:'2d8',specialAccess:'circle-of-the-moon',
+      summary:'Touch one creature to restore Hit Points. Adds 2d8 for every slot level above 1.',
+    },
+    {
+      name:'Moonbeam',level:2,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',
+      id:'rules-circle-moon-moonbeam',prepared:true,concentration:true,components:'V, S, M',
+      saveDc:14,saveAbility:'con',damage:[{expression:'2d10',type:'Radiant'}],halfOnSave:true,
+      higherSlotDamage:[{expression:'1d10',type:'Radiant'}],specialAccess:'circle-of-the-moon',resolution:'save',
+      summary:'Concentration, up to 1 minute. A creature in the beam makes a Constitution save; half damage on success.',
+    },
+    {
+      name:'Conjure Animals',level:3,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',
+      id:'rules-circle-moon-conjure-animals',prepared:true,concentration:true,components:'V, S',
+      saveDc:14,saveAbility:'dex',damage:[{expression:'3d10',type:'Slashing'}],halfOnSave:true,
+      higherSlotDamage:[{expression:'1d10',type:'Slashing'}],specialAccess:'circle-of-the-moon',resolution:'save',
+      summary:'Concentration, up to 10 minutes. Creatures in the spectral pack make Dexterity saves; half damage on success.',
+    },
+  ],
+  spellSlots:{1:{max:4,current:4},2:{max:3,current:3},3:{max:2,current:2}},
+  feats:['Sentinel','Weapon Mastery','Farmer Ability Score Improvements','Tough','Dark Bargain'],
+  features:[],
+  resources:[
+    {id:'wild-shape',name:'Wild Shape',current:2,max:2,recovery:'short-one'},
+    {id:'wild-resurgence-slot',name:'Wild Resurgence Slot Exchange',current:1,max:1,recovery:'long-all'},
+    {id:'rage',name:'Rage',current:2,max:2,recovery:'short-one'},
+    {id:'goliath-large-form',name:'Large Form',current:1,max:1,recovery:'long-all'},
+    {id:'stone-s-endurance-stone-giant',name:'Stone’s Endurance (Stone Giant)',current:3,max:3,recovery:'long-all'},
+  ],
+  equipment:{armorCategory:'none',shield:false,transformBehavior:'merge'},
+  items:[],
+  provenance:{provider:'local',ruleset:'unknown',rulesetEvidence:[],reviewRequired:true},
+  customForms:{},
+  skillBonuses:{
+    Acrobatics:2,'Animal Handling':6,Arcana:1,Athletics:5,Deception:1,History:1,Insight:3,
+    Intimidation:4,Investigation:1,Medicine:3,Nature:4,Perception:3,Performance:1,
+    Persuasion:1,Religion:1,'Sleight of Hand':2,Stealth:2,Survival:3,
+  },
+  saveBonuses:{str:6,dex:3,con:7,int:2,wis:4,cha:2},
+  transformationGrants:[
+    {
+      id:'goliath-large-form',label:'Large Form',profile:'overlay',formIds:[],
+      source:'Goliath species trait',actionCost:'bonus',endActionCost:'none',duration:'10 minutes',
+      resourceId:'goliath-large-form',resourceCost:1,availableProfiles:['base','overlay'],
+      effects:{
+        size:'Large',speedBonus:{walk:10},resistances:[],immunities:[],vulnerabilities:[],
+        checkAdvantage:['str'],
+      },
+    },
+  ],
+};

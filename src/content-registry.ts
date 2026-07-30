@@ -3,7 +3,7 @@ import type {
   ContentRegistrySnapshot,Creature,ImportedFeatureRule,TransformationProfileDefinition
 } from './types.js';
 import {
-  CLASS_FEATURES as RAW_CLASS_FEATURES,CREATURES as RAW_CREATURES,MOON_FORM_SPELL_LEVELS,
+  CLASS_FEATURES as RAW_CLASS_FEATURES,CREATURES as RAW_CREATURES,MOON_FORM_SPELL_LEVELS,SUBCLASS_FEATURES as RAW_SUBCLASS_FEATURES,
   RULES_VERSION,SKILL_ABILITIES,SPECIES_FEATURES as RAW_SPECIES_FEATURES,classLevel,subclass
 } from './rules-data.js';
 
@@ -23,6 +23,7 @@ export const CONDITIONS:Record<string,ConditionDefinition>=records({
   Blinded:{id:'blinded',name:'Blinded',summary:'Cannot see. Attack rolls are hindered and attacks against the creature are helped.',tags:['sense','attack'],attackAdvantageAgainst:true,attackDisadvantage:true},
   Charmed:{id:'charmed',name:'Charmed',summary:'Cannot attack the charmer and the charmer has social influence.',tags:['mental']},
   Deafened:{id:'deafened',name:'Deafened',summary:'Cannot hear and automatically fails checks that require hearing.',tags:['sense']},
+  Exhaustion:{id:'exhaustion',name:'Exhaustion',summary:'Cumulative levels reduce every D20 Test by 2 and Speed by 5 feet per level. Level 6 causes death.',tags:['level','check','save','attack','movement'],cumulative:true,maximumLevel:6,d20PenaltyPerLevel:2,speedPenaltyPerLevel:5},
   Frightened:{id:'frightened',name:'Frightened',summary:'Has Disadvantage on checks and attacks while the source of fear is visible and cannot willingly move closer.',tags:['mental','attack']},
   Grappled:{id:'grappled',name:'Grappled',summary:'Speed becomes 0; attacks against a target other than the grappler have Disadvantage.',tags:['movement','attack'],speedBecomesZero:true},
   Incapacitated:{id:'incapacitated',name:'Incapacitated',summary:'Cannot take actions, Bonus Actions, or Reactions; Concentration ends.',tags:['action','concentration'],blocksActions:true,blocksBonusActions:true,blocksReactions:true,endsConcentration:true,endsWildShape:true},
@@ -69,14 +70,14 @@ const featEntries:Record<string,CatalogEntry>={
 
 const itemEntries:Record<string,CatalogEntry>={};
 
-const PACK_VERSION='0.23.2';
+const PACK_VERSION='0.24.0';
 const PACKS=[
   {metadata:metadata({id:'altered-srd-creatures',name:'SRD 5.2.1 Creature Forms',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'creatures',priority:100,license:'CC BY 4.0 source data; original Altered presentation',source:'Official SRD 5.2.1',verified:RULES_VERSION.reviewed,builtIn:true,description:'Verified creature stat blocks available to bundled transformations.'}),records:records(RAW_CREATURES)},
-  {metadata:metadata({id:'altered-core-class-features',name:'Core Class Interaction Rules',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'class-features',priority:100,license:'CC BY 4.0 mechanical summaries authored for Altered',source:'Official SRD 5.2.1',verified:RULES_VERSION.reviewed,builtIn:true,description:'Structured transformation-relevant mechanics for SRD classes; additional subclasses can be supplied by private packs.'}),records:featureRecord(RAW_CLASS_FEATURES)},
+  {metadata:metadata({id:'altered-core-class-features',name:'Core Class and Subclass Interaction Rules',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'class-features',priority:100,license:'CC BY 4.0 mechanical summaries authored for Altered',source:'Official SRD 5.2.1',verified:RULES_VERSION.reviewed,builtIn:true,description:'Structured transformation-relevant mechanics for the twelve SRD classes and their SRD subclasses; additional owned subclasses can be supplied by private packs.'}),records:featureRecord({...RAW_CLASS_FEATURES,...Object.fromEntries(Object.entries(RAW_SUBCLASS_FEATURES).map(([name,features])=>[`Subclass ${name}`,features]))})},
   {metadata:metadata({id:'altered-core-species-features',name:'Core Species Interaction Rules',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'species-features',priority:100,license:'CC BY 4.0 mechanical summaries authored for Altered',source:'Official SRD 5.2.1',verified:RULES_VERSION.reviewed,builtIn:true,description:'Structured transformation-relevant mechanics for SRD species.'}),records:featureRecord(RAW_SPECIES_FEATURES)},
   {metadata:metadata({id:'altered-core-feat-hooks',name:'Recognized Feat Hooks',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'feats',priority:100,license:'Altered schema and transformation logic',source:'Validated character import hooks',verified:RULES_VERSION.reviewed,builtIn:true,description:'Minimal feat identifiers currently evaluated by the rules engine.'}),records:records(featEntries)},
   {metadata:metadata({id:'altered-spell-hooks',name:'Transformation Spell Hooks',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'spells',priority:100,license:'CC BY 4.0 mechanical summaries; validated import hooks',source:'Official SRD 5.2.1 and character imports',verified:RULES_VERSION.reviewed,builtIn:true,description:'Spell identifiers used by the engine; relevant SRD data is available from the support catalog and owned content can be supplied by private packs.'}),records:records(spellEntries)},
-  {metadata:metadata({id:'altered-item-hooks',name:'Item Rule Hooks',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'items',priority:100,license:'Altered schema',source:'Validated character imports',verified:RULES_VERSION.reviewed,builtIn:true,description:'Reserved item domain for equipment and magic-item extension packs.'}),records:records(itemEntries)},
+  {metadata:metadata({id:'altered-item-hooks',name:'Item Rule Hooks',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'items',priority:100,license:'Altered schema',source:'Validated character imports',verified:RULES_VERSION.reviewed,builtIn:true,description:'Imported item provenance and numeric-total integration without redistributing owned descriptive text.'}),records:records(itemEntries)},
   {metadata:metadata({id:'altered-core-conditions',name:'Core Conditions',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'conditions',priority:100,license:'CC BY 4.0 mechanical summaries authored for Altered',source:'Official SRD 5.2.1',verified:RULES_VERSION.reviewed,builtIn:true,description:'Condition records used by combat-state evaluation.'}),records:CONDITIONS},
   {metadata:metadata({id:'altered-transformation-profiles',name:'Transformation Profiles',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'transformation-profiles',priority:100,license:'CC BY 4.0 mechanical summaries authored for Altered',source:'Official SRD 5.2.1',verified:RULES_VERSION.reviewed,builtIn:true,description:'Replacement and retention policies for supported SRD transformations; private packs can add owned-content mechanics.'}),records:TRANSFORMATION_PROFILES}
 ] satisfies ContentPack<unknown>[];
@@ -94,6 +95,7 @@ validatePacks(PACKS);
 export const CONTENT_PACKS=Object.freeze(PACKS);
 export const CREATURES:Record<string,Creature>=RAW_CREATURES;
 export const CLASS_FEATURES=RAW_CLASS_FEATURES;
+export const SUBCLASS_FEATURES=RAW_SUBCLASS_FEATURES;
 export const SPECIES_FEATURES=RAW_SPECIES_FEATURES;
 export {MOON_FORM_SPELL_LEVELS,RULES_VERSION,SKILL_ABILITIES,classLevel,subclass};
 

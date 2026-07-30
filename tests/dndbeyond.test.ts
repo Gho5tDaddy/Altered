@@ -26,8 +26,8 @@ const ferocitusPayload={
     overrideStats:[],
     race:{fullName:'Goliath',sizeId:4,weightSpeeds:{normal:{walk:35,fly:0,swim:0,climb:0,burrow:0}}},
     classes:[
-      {id:1100,level:1,isStartingClass:true,definition:{id:11,name:'Barbarian',spellCastingAbilityId:0,classFeatures:[{id:111,name:'Core Barbarian Traits'}]},subclassDefinition:null},
-      {id:2200,level:5,isStartingClass:false,definition:{id:22,name:'Druid',spellCastingAbilityId:5,classFeatures:[{id:222,name:'Core Druid Traits'}]},subclassDefinition:{name:'Circle of the Moon'}},
+      {id:1100,level:1,isStartingClass:true,definition:{id:11,name:'Barbarian',isLegacy:false,spellCastingAbilityId:0,classFeatures:[{id:111,name:'Core Barbarian Traits'}]},subclassDefinition:null},
+      {id:2200,level:5,isStartingClass:false,definition:{id:22,name:'Druid',isLegacy:false,spellCastingAbilityId:5,classFeatures:[{id:222,name:'Core Druid Traits'}]},subclassDefinition:{name:'Circle of the Moon'}},
     ],
     choices:{
       race:[],
@@ -167,9 +167,22 @@ test('normalizes a Ferocitus-shaped multiclass character without guessing core v
   assert.equal(character.resources.find(resource=>resource.id==='wild-resurgence-slot')?.name,'Wild Resurgence Slot Exchange');
   assert.equal(character.resources.some(resource=>['rage-enter','activate-large-form','wild-resurgence-regain-spell-slot'].includes(resource.id)),false);
   assert.ok(character.transformationGrants?.some(grant=>grant.id==='goliath-large-form'));
-  assert.ok(report.coverage.every(item=>item.status!=='review'||item.label==='Special items and homebrew'));
+  assert.equal(report.blocked,false);
+  assert.equal(character.provenance.provider,'dndbeyond');assert.equal(character.provenance.ruleset,'2024');
+  assert.equal(character.provenance.reviewRequired,true);
+  assert.deepEqual(character.items.map(item=>({name:item.name,equipped:item.equipped,attuned:item.attuned,mechanics:item.mechanics})),[
+    {name:'Cloak of Protection',equipped:true,attuned:true,mechanics:'included-in-imported-totals'},
+    {name:'Insignia of Claws',equipped:true,attuned:true,mechanics:'included-in-imported-totals'},
+  ]);
+  assert.ok(report.coverage.every(item=>item.status!=='review'||['2024 ruleset','Items and homebrew'].includes(item.label)));
+  assert.ok(report.warnings.some(item=>item.code==='ruleset-review'));
   assert.ok(report.warnings.some(item=>item.code==='item-text-review'));
   assert.ok(report.warnings.some(item=>item.code==='circle-moon-spells-restored'));
+});
+
+test('blocks clearly legacy or mixed D&D Beyond characters from the 2024-only engine',()=>{
+  const payload=structuredClone(ferocitusPayload);const first=payload.data.classes[0];assert.ok(first);first.definition.isLegacy=true;
+  const report=importDdbCharacter(payload,'152187683');assert.equal(report.blocked,true);assert.equal(report.character.provenance.ruleset,'mixed');assert.match(report.blockReason??'',/2024 rules only/);assert.ok(report.warnings.some(item=>item.code==='non-2024-ruleset'));
 });
 
 test('restores every always-prepared Circle of the Moon spell D&D Beyond omits at the current Druid level',()=>{

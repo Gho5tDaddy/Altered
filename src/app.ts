@@ -7,11 +7,13 @@ import {normalizeSrdCreature,parseSrdCatalogPage,parseSrdCatalogStatus} from './
 import type {SrdCatalogStatus} from './srd-catalog.js';
 import {installExtensionPack,listExtensionPackRecords,loadArtOverride,loadBooleanSetting,optimizePortrait,removeArtOverride,removeExtensionPack,saveArtOverride,saveBooleanSetting} from './storage.js';
 import {SAMPLE_CHARACTERS} from './sample-data.js';
+import {FEROCITUS_CHARACTER} from './ferocitus-data.js';
 import {applyOwnedContentPack,applyOwnedContentPacks,ownedContentTemplate,parseOwnedContentPack,safeOwnedContentParse} from './owned-content.js';
+import {rulesAuditSnapshot} from './audit-ledger.js';
 import {
   actionCostError,applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,criticalDiceExpression,criticalHitThreshold,
-  completeTruePolymorph,concentrationSaveMode,createInitialState,declareAttack,declareRecklessAttack,endConcentration,endRage,endSpellEffect,endTransformation,endTurn,
-  extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,markOncePerTurn,pendingActionRecharge,remainingActionUses,removeCondition,resolveAdvantage,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollDice,
+  clearConditions,completeTruePolymorph,concentrationSaveMode,createInitialState,deathSaveMode,declareAttack,declareRecklessAttack,endConcentration,endRage,endSpellEffect,endTransformation,endTurn,
+  extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,markOncePerTurn,pendingActionRecharge,remainingActionUses,removeCondition,resolveAdvantage,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollDice,
   proficiencyBonus,rageStartError,rollAttackD20,rulesMetadata,shortRest,spellActiveEffect,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError
 } from './engine.js';
 
@@ -37,8 +39,17 @@ const art:Record<string,string>={
   goat:`<svg viewBox="0 0 240 210" role="img" aria-label="Goat form portrait"><circle cx="120" cy="105" r="80" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><path d="M91 77C64 57 62 33 75 20c4 24 19 35 38 42m36 15c27-20 29-44 16-57-4 24-19 35-38 42" fill="none" stroke="#f1ede5" stroke-width="7" stroke-linecap="round"/><path d="M76 82c0-25 20-39 44-39s44 14 44 39l-8 63-36 31-36-31Z" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><path d="M104 109h6m20 0h6m-24 32h16" stroke="#c9872b" stroke-width="4" stroke-linecap="round"/></svg>`,
   toad:`<svg viewBox="0 0 240 210" role="img" aria-label="Toad form portrait"><circle cx="120" cy="105" r="80" fill="none" stroke="#c9872b" stroke-width="3" opacity=".65"/><ellipse cx="120" cy="128" rx="69" ry="47" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><circle cx="80" cy="87" r="24" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><circle cx="160" cy="87" r="24" fill="#29343b" stroke="#f1ede5" stroke-width="5"/><circle cx="80" cy="87" r="7" fill="#c9872b"/><circle cx="160" cy="87" r="7" fill="#c9872b"/><path d="M83 142c23 15 51 15 74 0" fill="none" stroke="#c9872b" stroke-width="4" stroke-linecap="round"/></svg>`
 };
+const BUILT_IN_FORM_ART:Record<string,string>={
+  'form:brown-bear':'form-brown-bear.jpg',
+  'form:dire-wolf':'form-dire-wolf.jpg',
+  'form:giant-octopus':'form-giant-octopus.jpg',
+  'form:giant-spider':'form-giant-spider.jpg',
+  'form:lion':'form-lion.jpg',
+  'form:tiger':'form-tiger.jpg',
+};
 
-let baseCharacters:Character[]=SAMPLE_CHARACTERS.map(parseCharacter);
+const BUNDLED_CHARACTERS=[FEROCITUS_CHARACTER,...SAMPLE_CHARACTERS];
+let baseCharacters:Character[]=BUNDLED_CHARACTERS.map(parseCharacter);
 let baseCharacter=baseCharacters[0] as Character;
 let characters:Character[]=[...baseCharacters];
 let character=characters[0] as Character;
@@ -61,12 +72,70 @@ let auraTimer:number|undefined;
 const artOverrideCache=new Map<string,string|undefined>();
 const artLoading=new Set<string>();
 const registrySnapshot=contentRegistrySnapshot();
+const auditSnapshot=rulesAuditSnapshot();
 let installedPacks:OwnedContentPack[]=[];
 let pendingActiveSnapshot:Partial<GameState>['activeTransform']|undefined;
 let invalidPackCount=0;
 let pendingDdbImport:DdbImportReport|null=null;
 let srdCatalogStatus:SrdCatalogStatus|null=null;
 let srdCatalogMessage='Checking the live legal SRD support catalog...';
+let formSearch='';
+let formFilter='all';
+let walkthroughStepIndex=0;
+let walkthroughTarget:HTMLElement|undefined;
+const WALKTHROUGH_SETTING='walkthrough-completed-v1';
+type UiStatus='available'|'active'|'inactive'|'locked'|'unavailable'|'requirements'|'selected'|'favorite'|'new'|'importing'|'loading'|'success'|'warning'|'error';
+const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
+  available:{icon:'✓',label:'Available'},active:{icon:'✦',label:'Active'},inactive:{icon:'○',label:'Inactive'},
+  locked:{icon:'⌁',label:'Locked'},unavailable:{icon:'×',label:'Unavailable'},requirements:{icon:'◇',label:'Requirements missing'},
+  selected:{icon:'◆',label:'Selected'},favorite:{icon:'★',label:'Favorite'},new:{icon:'✧',label:'New'},
+  importing:{icon:'⇩',label:'Importing'},loading:{icon:'…',label:'Loading'},success:{icon:'✓',label:'Success'},
+  warning:{icon:'!',label:'Warning'},error:{icon:'×',label:'Error'},
+};
+const WALKTHROUGH_STEPS=[
+  {selector:'.character-strip',title:'Choose your character',copy:'Switch between sample and imported characters here. Each character keeps its own validated sheet and combat state.'},
+  {selector:'.transform-panel',title:'Find and choose a form',copy:'Search or filter forms, then read the Selected and Available or Locked chips before transforming.'},
+  {selector:'#action-economy',title:'Check what remains this turn',copy:'These chips show Action, Bonus Action, Reaction, and spell-slot availability before you press anything.'},
+  {selector:'.tabs',title:'Use the focused sheet sections',copy:'Actions, rolls, spells, features, and rule explanations stay grouped in five keyboard-friendly tabs.'},
+  {selector:'.side-column',title:'Run the turn',copy:'Track damage, healing, turns, rests, conditions, and recent activity here. Help remains available from the top bar.'},
+] as const;
+
+function statusChip(status:UiStatus,label=UI_STATUS[status].label,titleText?:string){
+  const meta=UI_STATUS[status];const node=document.createElement('span');node.className=`ui-status ${status}`;
+  const icon=text('span',meta.icon);icon.setAttribute('aria-hidden','true');node.append(icon,document.createTextNode(label));
+  node.title=titleText??label;return node;
+}
+function availableWalkthroughSteps(){
+  return WALKTHROUGH_STEPS.flatMap(step=>{const target=document.querySelector<HTMLElement>(step.selector);return target&&!target.hidden?[{step,target}]:[];});
+}
+function clearWalkthroughHighlight(){
+  walkthroughTarget?.classList.remove('walkthrough-target');walkthroughTarget=undefined;
+}
+function finishWalkthrough(message:string){
+  clearWalkthroughHighlight();$('#walkthrough').hidden=true;void saveBooleanSetting(WALKTHROUGH_SETTING,true);
+  $('#status-message').textContent=message;
+}
+function renderWalkthroughStep(){
+  const available=availableWalkthroughSteps();if(available.length===0){finishWalkthrough('Walkthrough skipped because its interface targets are unavailable.');return;}
+  walkthroughStepIndex=Math.max(0,Math.min(walkthroughStepIndex,available.length-1));const current=available[walkthroughStepIndex];if(!current)return;
+  clearWalkthroughHighlight();walkthroughTarget=current.target;walkthroughTarget.classList.add('walkthrough-target');
+  walkthroughTarget.scrollIntoView({block:'center',behavior:reduceMotion?'auto':'smooth'});
+  $('#walkthrough-step').textContent=`Step ${walkthroughStepIndex+1} of ${available.length}`;
+  $('#walkthrough-title').textContent=current.step.title;$('#walkthrough-copy').textContent=current.step.copy;
+  const back=$<HTMLButtonElement>('#walkthrough-back');back.disabled=walkthroughStepIndex===0;
+  $('#walkthrough-next').textContent=walkthroughStepIndex===available.length-1?'Finish':'Next';
+}
+function startWalkthrough(){
+  const help=$<HTMLDialogElement>('#help-dialog');if(help.open)help.close();
+  walkthroughStepIndex=0;$('#walkthrough').hidden=false;renderWalkthroughStep();$<HTMLButtonElement>('#walkthrough-next').focus();
+}
+function filterHelpTopics(){
+  const query=$<HTMLInputElement>('#help-search').value.trim().toLowerCase();const terms=query.split(/\s+/).filter(Boolean);
+  const topics=Array.from(document.querySelectorAll<HTMLDetailsElement>('.help-topic'));let visible=0;let sole:HTMLDetailsElement|undefined;
+  for(const topic of topics){const content=`${topic.dataset.helpKeywords??''} ${topic.textContent??''}`.toLowerCase();const matches=terms.every(term=>content.includes(term));topic.hidden=!matches;if(matches){visible++;sole=topic;}else topic.open=false;}
+  if(query&&visible===1&&sole)sole.open=true;
+  $('#help-empty').hidden=visible>0;$('#help-search-status').textContent=query?`${visible} help topic${visible===1?'':'s'} found.`:`${topics.length} concise help topics.`;
+}
 
 function addActivity(message:string){state.log.unshift(message);state.log=state.log.slice(0,25);persist();}
 function notify(message:string){$('#status-message').textContent=message;addActivity(message);}
@@ -103,12 +172,16 @@ function restore(){
     const library:Character[]=[];
     if(Array.isArray(parsed.baseCharacters)){for(const rawCharacter of parsed.baseCharacters.slice(0,50)){try{const entry=parseCharacter(rawCharacter);if(!library.some(existing=>existing.id===entry.id))library.push(entry);}catch{/* one damaged library entry should not block the rest */}}}
     if(library.length===0){const restored=parseCharacter(parsed.baseCharacter??parsed.character);library.push(restored);}
-    for(const sample of SAMPLE_CHARACTERS.map(parseCharacter))if(!library.some(entry=>entry.id===sample.id))library.push(sample);
+    for(const sample of BUNDLED_CHARACTERS.map(parseCharacter))if(!library.some(entry=>entry.id===sample.id))library.push(sample);
     baseCharacters=library;
     const requestedId=typeof parsed.currentCharacterId==='string'?parsed.currentCharacterId:typeof (parsed.baseCharacter as {id?:unknown}|undefined)?.id==='string'?String((parsed.baseCharacter as {id:string}).id):typeof (parsed.character as {id?:unknown}|undefined)?.id==='string'?String((parsed.character as {id:string}).id):library[0]?.id;
     const restored=library.find(entry=>entry.id===requestedId)??library[0];if(!restored)return false;
     const clean=createInitialState(restored);const saved=parsed.state;
     if(saved){clean.hp=boundedWhole(saved.hp,clean.hp,0,restored.hp.max);clean.tempHp=boundedWhole(saved.tempHp,0,0,9999);
+      clean.exhaustionLevel=boundedWhole(saved.exhaustionLevel,Array.isArray(saved.conditions)&&saved.conditions.includes('Exhaustion')?1:0,0,6);
+      clean.relentlessRageDc=boundedWhole(saved.relentlessRageDc,10,10,100);
+      if(saved.life&&typeof saved.life==='object')clean.life={dead:Boolean(saved.life.dead),stable:Boolean(saved.life.stable),deathSaveSuccesses:boundedWhole(saved.life.deathSaveSuccesses,0,0,2),deathSaveFailures:boundedWhole(saved.life.deathSaveFailures,0,0,2)};
+      if(saved.pendingRelentlessRage&&typeof saved.pendingRelentlessRage==='object'&&typeof saved.pendingRelentlessRage.dc==='number')clean.pendingRelentlessRage={dc:boundedWhole(saved.pendingRelentlessRage.dc,clean.relentlessRageDc,10,100),damage:boundedWhole(saved.pendingRelentlessRage.damage,0,0,1_000_000),source:damageTypes.includes(saved.pendingRelentlessRage.source as DamageType)?saved.pendingRelentlessRage.source as DamageType:'Bludgeoning'};
       if(typeof saved.tempHpSource==='string')clean.tempHpSource=saved.tempHpSource.slice(0,120);
       for(const [id,pool] of Object.entries(saved.resources??{})){const target=clean.resources[id];if(target&&pool&&typeof pool==='object')target.current=boundedWhole((pool as {current?:unknown}).current,target.current,0,target.max);}
       for(const [level,slot] of Object.entries(saved.spellSlots??{})){const target=clean.spellSlots[level];if(target&&slot&&typeof slot==='object')target.current=boundedWhole((slot as {current?:unknown}).current,target.current,0,target.max);}
@@ -140,9 +213,9 @@ function applyResult(result:TransitionResult){
   notify(result.message);render();
 }
 function resetLatestResult(){$('#latest-roll').classList.remove('flash');$('#roll-title').textContent='Ready';$('#roll-total').textContent='—';$('#roll-detail').textContent='Press an attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically.';}
-function setCharacter(next:Character){character=next;baseCharacter=baseCharacters.find(entry=>entry.id===next.id)??next;state=createInitialState(character);sheet=resolveSheet(character,state);selectedOptionId='base';currentTab='actions';radiantActions.clear();selectedOptionalBonuses.clear();selectedRollModes.clear();selectedMultiattackVariants.clear();selectedSpellSlots.clear();resetLatestResult();notify(`${character.name} loaded in Base Form.`);render();}
+function setCharacter(next:Character){character=next;baseCharacter=baseCharacters.find(entry=>entry.id===next.id)??next;state=createInitialState(character);sheet=resolveSheet(character,state);selectedOptionId='base';currentTab='actions';formSearch='';formFilter='all';$<HTMLInputElement>('#form-search').value='';$<HTMLSelectElement>('#form-filter').value='all';radiantActions.clear();selectedOptionalBonuses.clear();selectedRollModes.clear();selectedMultiattackVariants.clear();selectedSpellSlots.clear();resetLatestResult();notify(`${character.name} loaded in Base Form.`);render();}
 function reconcileState(next:Character,previous:GameState){
-  const clean=createInitialState(next);clean.hp=Math.min(previous.hp,next.hp.max);clean.tempHp=previous.tempHp;if(previous.tempHpSource)clean.tempHpSource=previous.tempHpSource;
+  const clean=createInitialState(next);clean.hp=Math.min(previous.hp,next.hp.max);clean.tempHp=previous.tempHp;clean.life={...previous.life};clean.exhaustionLevel=previous.exhaustionLevel;clean.relentlessRageDc=previous.relentlessRageDc;if(previous.pendingRelentlessRage)clean.pendingRelentlessRage={...previous.pendingRelentlessRage};if(previous.tempHpSource)clean.tempHpSource=previous.tempHpSource;
   for(const [id,pool] of Object.entries(clean.resources)){const old=previous.resources[id];if(old)pool.current=Math.min(old.current,pool.max);}
   for(const [level,slot] of Object.entries(clean.spellSlots)){const old=previous.spellSlots[level];if(old)slot.current=Math.min(old.current,slot.max);}
   clean.conditions=[...previous.conditions];clean.overlays=previous.overlays.filter(id=>id.startsWith('spell:')||(next.transformationGrants??[]).some(grant=>grant.id===id));clean.activeSpellEffects=previous.activeSpellEffects.map(effect=>({...effect}));clean.recharges=Object.fromEntries(Object.entries(previous.recharges).map(([key,value])=>[key,{...value}]));clean.actionUses={...previous.actionUses};clean.log=[...previous.log];clean.turn={...previous.turn,oncePerTurn:{...previous.turn.oncePerTurn}};clean.rage={...previous.rage};clean.concentrationChecks=previous.concentrationChecks.map(check=>({...check}));
@@ -167,8 +240,8 @@ function queueArtLoad(targetId:string){
 }
 function appendPortrait(container:HTMLElement,targetId:string,fallbackKey:string,label:string,className='main-form-art'){
   const wrapper=document.createElement('div');wrapper.className=className;const key=artCacheKey(targetId);const override=artOverrideCache.get(key);
-  if(override){const image=document.createElement('img');image.src=override;image.alt=`Custom artwork for ${label}`;wrapper.append(image);}
-  else{wrapper.innerHTML=art[fallbackKey]??art['base']??'';queueArtLoad(targetId);}
+  if(override){const image=document.createElement('img');image.src=override;image.alt=`Custom artwork for ${label}`;image.loading='lazy';image.decoding='async';wrapper.append(image);}
+  else{const builtIn=BUILT_IN_FORM_ART[targetId];if(builtIn){const image=document.createElement('img');image.src=builtIn;image.alt=`Built-in artwork for ${label}`;image.loading='lazy';image.decoding='async';wrapper.append(image);}else wrapper.innerHTML=art[fallbackKey]??art['base']??'';queueArtLoad(targetId);}
   container.append(wrapper);return Boolean(override);
 }
 function activeOverlayVisuals(){
@@ -242,14 +315,14 @@ function syncAuraState(){
 }
 function renderContentRegistry(target:HTMLElement,compact=false){
   clear(target);const summary=document.createElement('div');summary.className='registry-summary';
-  const labels:[string,number][]=[['Creatures',registrySnapshot.counts.creatures],['Class rules',registrySnapshot.counts['class-features']],['Species rules',registrySnapshot.counts['species-features']],['Spells',registrySnapshot.counts.spells],['Conditions',registrySnapshot.counts.conditions],['Profiles',registrySnapshot.counts['transformation-profiles']]];
+  const labels:[string,number][]=[['Audited rules',auditSnapshot.rules],['Functions',auditSnapshot.functions],['Creatures',registrySnapshot.counts.creatures],['Class rules',registrySnapshot.counts['class-features']],['Species rules',registrySnapshot.counts['species-features']],['Spells',registrySnapshot.counts.spells],['Conditions',registrySnapshot.counts.conditions],['Profiles',registrySnapshot.counts['transformation-profiles']]];
   for(const [label,count] of labels)summary.append(text('span',`${label}: ${count}`,'registry-chip'));target.append(summary);
   if(compact)return;
   for(const pack of registrySnapshot.packs){const row=document.createElement('div');row.className='content-pack';row.append(text('strong',pack.name),text('span',`v${pack.version}`),text('small',`${pack.domain} · ${pack.source} · verified ${pack.verified}`));target.append(row);}
 }
 function renderSettings(){
   $<HTMLInputElement>('#magic-effects-enabled').checked=magicEffectsEnabled;$<HTMLInputElement>('#reduce-motion').checked=reduceMotion;
-  $('#content-registry-summary').textContent=`${registrySnapshot.packs.length} versioned built-in packs plus ${installedPacks.length} private local packs. Built-in rules are verified through ${registrySnapshot.verifiedThrough}. Character, private content, and combat state remain separate layers.`;
+  $('#content-registry-summary').textContent=`${auditSnapshot.rules} source-ledgered rules cover ${auditSnapshot.functions} state-changing functions (${auditSnapshot.counts.calculated} calculated, ${auditSnapshot.counts.conditional} conditional). ${registrySnapshot.packs.length} versioned built-in packs plus ${installedPacks.length} private local packs are verified through ${registrySnapshot.verifiedThrough}.`;
   renderContentRegistry($('#content-pack-list'));
   $('#srd-catalog-status').textContent=srdCatalogStatus?`${srdCatalogStatus.healthy?'Current':'Needs review'} · ${srdCatalogStatus.recordCount.toLocaleString()} legal SRD 5.2.1 support records · checked ${new Date(srdCatalogStatus.checkedAt).toLocaleString()}. The live catalog supplies relevant import data; validated built-in rules remain available offline.`:srdCatalogMessage;
 }
@@ -269,9 +342,10 @@ function renderDdbReview(report:DdbImportReport){
   const classes=report.character.classes.map(entry=>`${entry.name} ${entry.level}`).join(' / ');
   for(const value of [report.character.name,report.character.species,classes,`HP ${report.character.hp.current}/${report.character.hp.max}`,`AC ${report.character.ac}`,`${report.character.knownForms.length} forms`,`${report.character.spells.length} spells`])summary.append(text('span',value,'ddb-summary-chip'));
   const coverage=$('#dndbeyond-coverage');clear(coverage);
-  for(const item of report.coverage){const row=document.createElement('div');row.className='ddb-coverage-row';const status=text('span',ddbCoverageLabel(item.status),`ddb-coverage-status ${item.status}`);row.append(text('strong',item.label),status,text('span',item.detail));coverage.append(row);}
+  for(const item of report.coverage){const row=document.createElement('div');row.className='ddb-coverage-row';const status=statusChip(item.status==='verified'?'success':item.status==='review'?'warning':'inactive',ddbCoverageLabel(item.status));status.classList.add('ddb-coverage-status',item.status);row.append(text('strong',item.label),status,text('span',item.detail));coverage.append(row);}
   const warnings=$('#dndbeyond-warnings');clear(warnings);
-  for(const item of report.warnings)warnings.append(text('p',item.message,`ddb-warning ${item.severity}`));
+  for(const item of report.warnings){const warning=document.createElement('p');warning.className=`ddb-warning ${item.severity}`;warning.append(statusChip(item.severity==='warning'?'warning':'inactive',item.severity==='warning'?'Warning':'Notice'),document.createTextNode(item.message));warnings.append(warning);}
+  const confirm=$<HTMLButtonElement>('#confirm-dndbeyond-import');confirm.disabled=report.blocked;confirm.textContent=report.blocked?'2024 Rules Required':'Confirm Import';if(report.blockReason)confirm.title=report.blockReason;else confirm.removeAttribute('title');
 }
 async function loadSrdCreature(name:string){
   const params=new URLSearchParams({domain:'creatures',q:name,exact:'1'});
@@ -309,7 +383,7 @@ async function fetchDdbCharacter(explicitSource?:string){
       }
     }
     pendingDdbImport=report;renderDdbReview(report);
-    const reviewCount=report.coverage.filter(item=>item.status==='review').length;setImportStatus(`${report.character.name} is ready for review. ${reviewCount?`${reviewCount} area${reviewCount===1?' needs':'s need'} attention before you confirm.`:'All provided core fields passed validation.'}`);
+    const reviewCount=report.coverage.filter(item=>item.status==='review').length;setImportStatus(report.blocked?report.blockReason??'This character cannot be imported into the 2024-only rules engine.':`${report.character.name} is ready for review. ${reviewCount?`${reviewCount} area${reviewCount===1?' needs':'s need'} attention before you confirm.`:'All provided core fields passed validation.'}`);
   }catch(error){
     setImportStatus(`D&D Beyond import failed: ${error instanceof Error?error.message:'Unknown error'}`);
   }finally{trigger.disabled=false;trigger.textContent='Fetch & Review';}
@@ -394,19 +468,32 @@ function renderCharacterStrip(){
   for(const c of characters){const option=document.createElement('option');option.value=c.id;option.textContent=c.name;select.append(option);}select.value=character.id;
   $('#character-name').textContent=character.name;
   $('#character-build').textContent=`${character.species} · ${character.classes.map(c=>`${c.subclass?`${c.subclass} `:''}${c.name} ${c.level}`).join(' / ')}`;
-  const meta=rulesMetadata();$('#rules-badge').textContent=`${meta.srd} · ${registrySnapshot.packs.length} built-in + ${installedPacks.length} private · verified ${meta.reviewed}`;
+  const meta=rulesMetadata();$('#rules-badge').textContent=`${meta.srd} · ${auditSnapshot.rules} audited rules · verified ${meta.reviewed}`;
 }
 function renderTransformSelector(){
-  const select=$<HTMLSelectElement>('#form-select');const options=availableTransformations(character,state);clear(select);
-  const groups=new Map<string,HTMLOptGroupElement>();
-  const groupName=(o:TransformationOption)=>o.profile==='base'?'Character':o.profile==='wildshape'?'Wild Shape':o.profile==='polymorph'?'Polymorph':o.profile==='true-polymorph'?'True Polymorph':o.profile==='shapechange'?'Shapechange':o.profile==='animal-shapes'?'Animal Shapes':o.profile==='overlay'?'Class, species, spell, item, and private transformations':'Custom replacement forms';
-  for(const o of options){const name=groupName(o);let group=groups.get(name);if(!group){group=document.createElement('optgroup');group.label=name;groups.set(name,group);select.append(group);}const item=document.createElement('option');item.value=o.id;item.textContent=o.label;item.disabled=!o.usable;item.title=o.reason??o.source;group.append(item);}
+  const select=$<HTMLSelectElement>('#form-select');const options=availableTransformations(character,state);
   const activeId=state.activeTransform?.option.id;
   if(activeId&&selectedOptionId==='base'&&options.some(o=>o.id===activeId))selectedOptionId=activeId;
   else if(!options.some(o=>o.id===selectedOptionId))selectedOptionId=activeId??'base';
+  const search=formSearch.trim().toLowerCase();const matchesFilter=(option:TransformationOption)=>{
+    const availableNow=option.usable&&(option.profile==='base'||option.id===activeId||!actionCostError(state,option.actionCost,sheet.conditionImmunities));
+    if(formFilter==='usable'&&!availableNow)return false;
+    if(formFilter==='wildshape'&&option.profile!=='wildshape')return false;
+    if(formFilter==='spell'&&!['polymorph','true-polymorph','shapechange','animal-shapes'].includes(option.profile))return false;
+    if(formFilter==='overlay'&&option.profile!=='overlay')return false;
+    if(formFilter==='custom'&&option.profile!=='custom'&&!/private/i.test(option.source))return false;
+    return !search||`${option.label} ${option.source} ${option.profile}`.toLowerCase().includes(search);
+  };
+  const matched=options.filter(matchesFilter);const visible=options.filter(option=>option.profile==='base'||option.id===selectedOptionId||option.id===activeId||matchesFilter(option));clear(select);
+  const groups=new Map<string,HTMLOptGroupElement>();
+  const groupName=(o:TransformationOption)=>o.profile==='base'?'Character':o.profile==='wildshape'?'Wild Shape':o.profile==='polymorph'?'Polymorph':o.profile==='true-polymorph'?'True Polymorph':o.profile==='shapechange'?'Shapechange':o.profile==='animal-shapes'?'Animal Shapes':o.profile==='overlay'?'Class, species, spell, item, and private transformations':'Custom replacement forms';
+  for(const o of visible){const name=groupName(o);let group=groups.get(name);if(!group){group=document.createElement('optgroup');group.label=name;groups.set(name,group);select.append(group);}const item=document.createElement('option');item.value=o.id;item.textContent=`${o.label}${o.id===activeId?' · Active':o.usable?'':' · Locked'}`;item.title=o.id===activeId?'Currently active':o.reason??o.source;group.append(item);}
   select.value=selectedOptionId;
   const selected=options.find(o=>o.id===selectedOptionId);const active=state.activeTransform?.option;
   const economyError=selected&&selected.profile!=='base'&&selected.id!==active?.id?actionCostError(state,selected.actionCost,sheet.conditionImmunities):null;
+  const results=$('#form-results-status');const hiddenSelection=Boolean(selected&&!matched.some(option=>option.id===selected.id)&&selected.profile!=='base');results.textContent=!search&&formFilter==='all'?'':`${matched.length} of ${options.length} forms shown${hiddenSelection?' · selected form retained':''}.`;
+  const statuses=$('#form-status-strip');clear(statuses);
+  if(selected){statuses.append(statusChip('selected'));if(selected.id===active?.id)statuses.append(statusChip('active'));else if(selected.profile==='base')statuses.append(statusChip('available','Base Form'));else if(selected.usable&&!economyError)statuses.append(statusChip('available'));else statuses.append(statusChip(selected.usable?'requirements':'locked',selected.usable?'Requirements missing':'Locked',economyError??selected.reason));if(selected.profile!=='base')statuses.append(statusChip('inactive',actionCostLabel(selected.actionCost)));}
   $('#form-reason').textContent=active&&selected?.id===active.id?`${active.label} is active. Choose another legal form to change directly, or press End Form to return to ${character.name}.`:economyError??selected?.reason??selected?.source??'';
   const transform=$<HTMLButtonElement>('#transform-button');const transformLabel=selected?.deactivate?selected.label:selected?.profile==='overlay'?'Activate':active&&selected?.id!==active.id?'Change Form':selected?.profile==='base'?'Choose a Form':'Transform';transform.textContent=economyError?`${transformLabel} — ${economyError.replace(/[.!]$/,'')}`:transformLabel;transform.disabled=!selected||!selected.usable||Boolean(economyError)||selected.profile==='base'||selected.id===active?.id;transform.hidden=Boolean(!selected||selected.profile==='base'||selected.id===active?.id);if(economyError)transform.title=economyError;else transform.removeAttribute('title');
   const end=$<HTMLButtonElement>('#end-form-button');const permanentTruePolymorph=active?.profile==='true-polymorph'&&state.activeTransform?.permanentUntilDispelled;const needsBonus=active?.profile==='wildshape'||active?.profile==='animal-shapes';const canEnd=permanentTruePolymorph||!needsBonus||state.turn.bonusRemaining>0;end.textContent=permanentTruePolymorph?'Remove Dispelled Effect':needsBonus&&!canEnd?'End Form — Bonus Action Used':'End Form';end.disabled=!active||!canEnd;end.hidden=!active;if(permanentTruePolymorph)end.title='True Polymorph cannot be ended voluntarily after the full hour. Use this only after the effect is dispelled or otherwise ended externally.';else if(active&&needsBonus&&!canEnd)end.title='Voluntarily ending this form requires a Bonus Action. Start a new turn or regain a Bonus Action first.';else end.removeAttribute('title');
@@ -416,7 +503,8 @@ function healthMetric(){
   const available=state.hp+state.tempHp;
   const node=document.createElement('div');node.className='metric vitality-metric';
   const heading=document.createElement('div');heading.className='vitality-heading';
-  const labels=document.createElement('div');labels.append(text('span','Available Health'),text('small','Damage is taken from Temporary HP first.'));
+  const lifeStatus=state.life.dead?'Dead':state.pendingRelentlessRage?'Relentless Rage pending':state.life.stable?'Stable at 0 HP':state.hp===0?`${state.life.deathSaveSuccesses} successes / ${state.life.deathSaveFailures} failures`:'Damage is taken from Temporary HP first.';
+  const labels=document.createElement('div');labels.append(text('span','Available Health'),text('small',lifeStatus));
   heading.append(labels,text('strong',String(available)));
   const breakdown=document.createElement('div');breakdown.className='vitality-breakdown';
   const hp=document.createElement('div');hp.className='vitality-part hp-part';hp.append(text('span','Hit Points'),text('b',`${state.hp} / ${character.hp.max}`));
@@ -440,6 +528,17 @@ function renderResources(){
 function isMoonDruid(){return character.classes.some(entry=>entry.name.toLowerCase()==='druid'&&(entry.subclass??'').toLowerCase()==='circle of the moon');}
 function renderActiveEffects(){
   const root=$('#active-effects');clear(root);const cards:HTMLElement[]=[];
+  if(state.life.dead||state.hp===0){
+    const panel=document.createElement('article');panel.className='effect-card warning';
+    const status=state.life.dead?'Dead':state.pendingRelentlessRage?`Relentless Rage save DC ${state.pendingRelentlessRage.dc} pending`:state.life.stable?'Stable and Unconscious':`Unconscious · Death Saves ${state.life.deathSaveSuccesses} successes / ${state.life.deathSaveFailures} failures`;
+    panel.append(text('strong',status),text('small',state.life.dead?'Ordinary healing and actions are unavailable. Record a valid revival outside this tracker before continuing.':state.pendingRelentlessRage?'Resolve the Constitution save now. On a success, HP becomes twice the Barbarian level.':'At 0 HP, actions are unavailable. Healing removes Unconscious and resets Death Save marks.'));
+    cards.push(panel);
+  }
+  if(state.exhaustionLevel>0){
+    const panel=document.createElement('article');panel.className='effect-card exhaustion-effect';
+    panel.append(text('strong',`Exhaustion level ${state.exhaustionLevel}`),text('span',`D20 Tests ${signed(-state.exhaustionLevel*2)} · every Speed −${state.exhaustionLevel*5} ft.`,'effect-benefit'),text('small',state.exhaustionLevel>=6?'Level 6 causes death. Actions and ordinary healing are unavailable.':'A completed Long Rest removes one level. Gaining Exhaustion again increases the level.'));
+    cards.push(panel);
+  }
   if(state.rage.active){
     const panel=document.createElement('article');panel.className='effect-card rage-effect';
     panel.append(text('strong','Rage is active'),text('span','B/P/S resistance · Advantage on Strength checks and saves','effect-benefit'),text('small','Spells and Concentration are blocked. Rage Damage applies only to Strength attacks with a weapon or Unarmed Strike—not beast stat-block attacks.'));
@@ -466,6 +565,20 @@ function renderActiveEffects(){
 }
 function renderQuickFeatures(){
   const box=$('#quick-features');clear(box);
+  if(state.pendingRelentlessRage){
+    const pending=state.pendingRelentlessRage;
+    box.append(button(`Roll Relentless Rage · CON DC ${pending.dc}`,()=>{
+      const save=resolveSheet(character,state).saves.con;const mode=resolveAdvantage({advantage:[...(save.advantageSources??[])],disadvantage:[...(save.disadvantageSources??[])]}).mode as RollMode;const result=rollD20Result(save.modifier,mode);
+      showRoll(result.total,`${modeText(result)} ${signed(save.modifier)} = ${result.total} against DC ${pending.dc}.`,'Relentless Rage');
+      applyResult(resolveRelentlessRage(character,state,result.total));
+    },'button primary'));
+    box.append(button('Decline Relentless Rage',()=>applyResult(resolveRelentlessRage(character,state))));
+  }else if(state.hp===0&&!state.life.dead&&!state.life.stable){
+    box.append(button('Roll Death Saving Throw',()=>{
+      const rules=deathSaveMode(character,state);const result=rollD20Result(0,rules.mode);showRoll(result.kept,`${modeText(result)}. No ability modifier applies.${rules.sources.length?` ${rules.sources.join(' · ')}.`:''}`,'Death Saving Throw');applyResult(resolveDeathSave(character,state,result.kept));
+    },'button primary'));
+  }
+  if(state.life.dead||state.hp===0)return;
   if(classLevel(character,'Barbarian')>=1){
     const rageError=state.rage.active?null:rageStartError(character,state);const rageLabel=state.rage.active?'Rage Active · End':state.turn.bonusRemaining===0?'Start Rage — Bonus Action Used':'Start Rage · Bonus Action';const rage=button(rageLabel,()=>applyResult(state.rage.active?endRage(state):startRage(character,state)),'button secondary'+(state.rage.active?' active rage-active-button':''));rage.disabled=Boolean(rageError);if(rageError)rage.title=rageError;box.append(rage);
     if(state.rage.active&&classLevel(character,'Barbarian')<15){const extendError=actionCostError(state,'bonus',sheet.conditionImmunities);const extend=button('Extend Rage · Bonus Action',()=>applyResult(extendRage(character,state)));extend.disabled=Boolean(extendError);if(extendError)extend.title=extendError;box.append(extend);}
@@ -484,13 +597,17 @@ function renderQuickFeatures(){
   if(state.concentration)box.append(button('End Concentration',()=>applyResult(endConcentration(state,'Ended voluntarily.',character))));
 }
 
-function card(title:string,badgeText:string,summary:string){const node=document.createElement('article');node.className='item-card';const head=document.createElement('div');head.className='item-head';head.append(text('strong',title),text('span',badgeText,'badge'));node.append(head,text('p',summary));const options=document.createElement('div');options.className='action-options';node.append(options);const actions=document.createElement('div');actions.className='item-actions';node.append(actions);return {node,options,actions,badge:head.lastElementChild as HTMLElement}}
+function card(title:string,badgeText:string,summary:string,status:UiStatus='available'){
+  const node=document.createElement('article');node.className='item-card';const head=document.createElement('div');head.className='item-head';
+  const indicators=document.createElement('div');indicators.className='item-head-status';const badge=text('span',badgeText,'badge');indicators.append(statusChip(status),badge);head.append(text('strong',title),indicators);
+  node.append(head,text('p',summary));const options=document.createElement('div');options.className='action-options';node.append(options);const actions=document.createElement('div');actions.className='item-actions';node.append(actions);return {node,options,actions,badge};
+}
 type RollMode='normal'|'advantage'|'disadvantage';
 interface D20Result {first:number;second?:number;kept:number;total:number;mode:RollMode;critical:boolean;naturalOne:boolean;naturalTwenty:boolean}
 function rollD20Result(mod:number,mode:RollMode,criticalThreshold=20):D20Result{return rollAttackD20(mod,mode,criticalThreshold)}
 function modeText(result:D20Result){return result.mode==='normal'?`d20 ${result.first}`:`${result.mode==='advantage'?'Advantage':'Disadvantage'} ${result.first}, ${result.second}; kept ${result.kept}`;}
 function showRoll(total:number|string,detail:string,title='Roll result'){const panel=$('#latest-roll');$('#roll-title').textContent=title;$('#roll-total').textContent=String(total);$('#roll-detail').textContent=detail;panel.classList.remove('flash');void panel.offsetWidth;panel.classList.add('flash');addActivity(`${title}: ${detail}`);renderLog();}
-function d20(mod:number,mode:RollMode,label:string){const result=rollD20Result(mod,mode);showRoll(result.total,`${modeText(result)} ${signed(mod)} = ${result.total}`,label);return result.total;}
+function d20(mod:number,mode:RollMode,label:string,minimumD20?:number,minimumTotal?:number,minimumSource?:string){const result=rollD20Result(mod,mode);const treated=minimumD20!==undefined?Math.max(minimumD20,result.kept):result.kept;const raw=treated+mod;const total=minimumTotal!==undefined?Math.max(minimumTotal,raw):raw;const adjustments=[treated!==result.kept?`${minimumSource??'Feature'} treated ${result.kept} as ${treated}`:'',total!==raw?`${minimumSource??'Feature'} raised total ${raw} to ${total}`:''].filter(Boolean).join(' · ');showRoll(total,`${modeText(result)}${treated!==result.kept?` → ${treated}`:''} ${signed(mod)} = ${raw}${total!==raw?` → ${total}`:''}${adjustments?` · ${adjustments}`:''}`,label);return total;}
 function combinedMode(rulesMode:RollMode){return rulesMode;}
 function rollContext(actionId:string,rules:ReturnType<typeof attackRollSources>){
   const selected=selectedRollModes.get(actionId)??'normal';const advantage=[...rules.sources.advantage],disadvantage=[...rules.sources.disadvantage];
@@ -548,7 +665,7 @@ function toggleRow(labelText:string,checked:boolean,onChange:(checked:boolean)=>
 function markOptionalBonus(label:string|undefined){if(label?.includes('Primal'))markOncePerTurn(state,'primal-strike');if(label?.includes('Lunar'))markOncePerTurn(state,'lunar-form');}
 function resolveAttackAction(action:AttackAction){
   if(!prepareLimitedAction(action))return;sheet=resolveSheet(character,state);
-  const context=rollContext(action.id,attackRollSources(character,state,action,sheet));const threshold=criticalHitThreshold(character,action);const attack=rollD20Result(action.attackBonus,context.mode,threshold);
+  const context=rollContext(action.id,attackRollSources(character,state,action,sheet));const threshold=criticalHitThreshold(character,action,state);const attack=rollD20Result(action.attackBonus,context.mode,threshold);
   const radiant=radiantActions.has(action.id);const automatic=attackBonuses(character,state,sheet,action).filter(p=>!p.label?.startsWith('Optional'));
   const selected=optionalSet(action.id);const optional=attackBonuses(character,state,sheet,action).filter(p=>p.label?.startsWith('Optional')&&selected.has(p.label??''));
   const riders=activeRiders(action);const base=action.damage.map((packet,index)=>radiant&&index===0?{...packet,type:'Radiant' as DamageType}:packet);const allPackets=[...base,...automatic,...optional,...riders.flatMap(rider=>rider.damage??[])];const damage=attack.naturalOne?null:packetTotal(allPackets,attack.critical,attackMinimum(action));
@@ -569,7 +686,7 @@ function resolveMultiattack(action:Extract<CreatureAction,{type:'multiattack'}>)
     const status=limitedActionStatus(child);if(status.unavailable){lines.push(`${child.name}: unavailable (${status.recharge?'recharging':'no uses remaining'})`);continue;}
     markActionRechargeUsed(state,child);markLimitedActionUsed(state,child);
     if(child.type==='attack'){
-      const context=rollContext(child.id,attackRollSources(character,state,child,sheet));const threshold=criticalHitThreshold(character,child);const attack=rollD20Result(child.attackBonus,context.mode,threshold);
+      const context=rollContext(child.id,attackRollSources(character,state,child,sheet));const threshold=criticalHitThreshold(character,child,state);const attack=rollD20Result(child.attackBonus,context.mode,threshold);
       const bonuses=attackBonuses(character,state,sheet,child),automatic=bonuses.filter(packet=>!packet.label?.startsWith('Optional')),selected=optionalSet(child.id),optional=bonuses.filter(packet=>packet.label?.startsWith('Optional')&&selected.has(packet.label??'')),riders=activeRiders(child),radiant=radiantActions.has(child.id);
       const base=child.damage.map((packet,index)=>radiant&&index===0?{...packet,type:'Radiant' as DamageType}:packet),damage=attack.naturalOne?null:packetTotal([...base,...automatic,...optional,...riders.flatMap(rider=>rider.damage??[])],attack.critical,attackMinimum(child));optional.forEach(packet=>markOptionalBonus(packet.label));
       combinedDamage+=damage?.total??0;headlines.push(`${child.name}: ${attack.naturalOne?'Natural 1 miss':`${attack.total} to hit`}`);const sources=[...context.sources.advantage.map(value=>`Advantage: ${value}`),...context.sources.disadvantage.map(value=>`Disadvantage: ${value}`),...context.conditional.map(value=>`Conditional: ${value}`)],hitEffects=[...(child.effects??[]),...riders.flatMap(rider=>rider.effects??[])];
@@ -592,20 +709,20 @@ function renderActions(){
   for(const action of sheet.actions){
     const economyError=actionCostError(state,action.cost,sheet.conditionImmunities);
     if(action.type==='attack'){
-      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const limitText=actionLimitText(action);const description=[`${signed(action.attackBonus)} to hit`,action.damage.map(packet=>`${packet.expression} ${packet.type}`).join(' + '),action.effects?.length?`On hit: ${effectsText(action.effects)}`:'',limitText,action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':actionCostLabel(action.cost),description);if(blocked)c.badge.className='badge inactive';
+      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const limitText=actionLimitText(action);const description=[`${signed(action.attackBonus)} to hit`,action.damage.map(packet=>`${packet.expression} ${packet.type}`).join(' + '),action.effects?.length?`On hit: ${effectsText(action.effects)}`:'',limitText,action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':actionCostLabel(action.cost),description,blocked?(limit.unavailable?'locked':'requirements'):'available');if(blocked)c.badge.className='badge inactive';
       c.options.append(rollModePicker(action.id,action.name));
       const radiantEligible=sheet.profile==='wildshape'&&classLevel(character,'Druid')>=6&&action.kind==='beast';if(radiantEligible)c.options.append(toggleRow('Use Radiant damage for this attack',radiantActions.has(action.id),checked=>{checked?radiantActions.add(action.id):radiantActions.delete(action.id);}));
       for(const bonus of attackBonuses(character,state,sheet,action).filter(packet=>packet.label?.startsWith('Optional'))){const label=bonus.label??'Optional damage';c.options.append(toggleRow(`${label} (${bonus.expression} ${bonus.type})`,optionalSet(action.id).has(label),checked=>{const set=optionalSet(action.id);checked?set.add(label):set.delete(label);}));}
       for(const rider of action.riders??[]){const token=riderToken(rider.id);c.options.append(toggleRow(`${rider.label}: ${rider.prerequisite}`,optionalSet(action.id).has(token),checked=>{const set=optionalSet(action.id);checked?set.add(token):set.delete(token);}));}
       const label=limit.recharge?`Awaiting ${limit.recharge.min}–${limit.recharge.max}`:limit.remaining===0?'No uses remaining':economyError??`Roll ${action.name}`;const use=button(label,()=>resolveAttackAction(action),blocked?'button secondary action-roll':'button primary action-roll');use.disabled=blocked;c.actions.append(use);root.append(c.node);
     }else if(action.type==='save'){
-      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const damage=action.damageOnFail?.map(packet=>`${packet.expression} ${packet.type}`).join(' + ')||'Effect on failed save';const detail=[damage,action.halfOnSuccess?'Half damage on a successful save (rounded down)':'',action.effectsOnFail?.length?`On failure: ${effectsText(action.effectsOnFail)}`:'',actionLimitText(action),action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':`${actionCostLabel(action.cost)} · DC ${action.dc} ${saveAbilities(action)}`,detail);if(blocked)c.badge.className='badge inactive';const label=limit.recharge?`Awaiting ${limit.recharge.min}–${limit.recharge.max}`:limit.remaining===0?'No uses remaining':economyError??`Use ${action.name}`;const use=button(label,()=>resolveSaveAction(action),blocked?'button secondary action-roll':'button primary action-roll');use.disabled=blocked;c.actions.append(use);root.append(c.node);
+      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const damage=action.damageOnFail?.map(packet=>`${packet.expression} ${packet.type}`).join(' + ')||'Effect on failed save';const detail=[damage,action.halfOnSuccess?'Half damage on a successful save (rounded down)':'',action.effectsOnFail?.length?`On failure: ${effectsText(action.effectsOnFail)}`:'',actionLimitText(action),action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':`${actionCostLabel(action.cost)} · DC ${action.dc} ${saveAbilities(action)}`,detail,blocked?(limit.unavailable?'locked':'requirements'):'available');if(blocked)c.badge.className='badge inactive';const label=limit.recharge?`Awaiting ${limit.recharge.min}–${limit.recharge.max}`:limit.remaining===0?'No uses remaining':economyError??`Use ${action.name}`;const use=button(label,()=>resolveSaveAction(action),blocked?'button secondary action-roll':'button primary action-roll');use.disabled=blocked;c.actions.append(use);root.append(c.node);
     }else if(action.type==='multiattack'){
-      const names=multiattackSequence(action).map(id=>sheet.actions.find(candidate=>candidate.id===id)?.name??id);const c=card(action.name,actionCostLabel(action.cost),`Rolls each component separately with its own attack roll or saving throw: ${names.join(' → ')}. Damage, critical hits, and on-hit effects are shown per component. Optional choices configured on the individual attack cards are applied when eligible.${action.notes?` ${action.notes}`:''}${economyError?` · ${economyError}`:''}`);if(economyError)c.badge.className='badge inactive';
+      const names=multiattackSequence(action).map(id=>sheet.actions.find(candidate=>candidate.id===id)?.name??id);const c=card(action.name,actionCostLabel(action.cost),`Rolls each component separately with its own attack roll or saving throw: ${names.join(' → ')}. Damage, critical hits, and on-hit effects are shown per component. Optional choices configured on the individual attack cards are applied when eligible.${action.notes?` ${action.notes}`:''}${economyError?` · ${economyError}`:''}`,economyError?'requirements':'available');if(economyError)c.badge.className='badge inactive';
       if(action.variants?.length){const label=document.createElement('label');label.className='slot-picker';label.append(text('span','Multiattack option'));const select=document.createElement('select');select.setAttribute('aria-label',`${action.name} option`);const standard=document.createElement('option');standard.value='';standard.textContent=action.sequence.map(id=>sheet.actions.find(candidate=>candidate.id===id)?.name??id).join(' + ');select.append(standard);for(const variant of action.variants){const option=document.createElement('option');option.value=variant.id;option.textContent=variant.label;option.selected=selectedMultiattackVariants.get(action.id)===variant.id;select.append(option);}select.addEventListener('change',()=>{selectedMultiattackVariants.set(action.id,select.value);renderActions();});label.append(select);c.options.append(label);}
       const use=button(economyError??`Roll ${action.name}`,()=>resolveMultiattack(action),economyError?'button secondary action-roll':'button primary action-roll');use.disabled=Boolean(economyError);c.actions.append(use);root.append(c.node);
     }else{
-      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const detail=[action.prerequisite,action.damage?.length?`${action.damageTiming??'Listed damage'}: ${action.damage.map(packet=>`${packet.expression} ${packet.type}`).join(' + ')}`:'',action.effects?.length?`Effects: ${effectsText(action.effects)}`:'',actionLimitText(action),action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':actionCostLabel(action.cost),detail);if(blocked)c.badge.className='badge inactive';const label=limit.recharge?`Awaiting ${limit.recharge.min}–${limit.recharge.max}`:limit.remaining===0?'No uses remaining':economyError??`Use ${action.name}`;const use=button(label,()=>resolveAutomaticAction(action),blocked?'button secondary action-roll':'button primary action-roll');use.disabled=blocked;c.actions.append(use);root.append(c.node);
+      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const detail=[action.prerequisite,action.damage?.length?`${action.damageTiming??'Listed damage'}: ${action.damage.map(packet=>`${packet.expression} ${packet.type}`).join(' + ')}`:'',action.effects?.length?`Effects: ${effectsText(action.effects)}`:'',actionLimitText(action),action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':actionCostLabel(action.cost),detail,blocked?(limit.unavailable?'locked':'requirements'):'available');if(blocked)c.badge.className='badge inactive';const label=limit.recharge?`Awaiting ${limit.recharge.min}–${limit.recharge.max}`:limit.remaining===0?'No uses remaining':economyError??`Use ${action.name}`;const use=button(label,()=>resolveAutomaticAction(action),blocked?'button secondary action-roll':'button primary action-roll');use.disabled=blocked;c.actions.append(use);root.append(c.node);
     }
   }
 }
@@ -613,8 +730,8 @@ function renderRolls(){
   const root=$('#tab-content');clear(root);const initiative=sheet.initiative;const initiativeSource=sheet.form?`Current form: ${sheet.form.name}. ${initiative.source}.`:`Base form. ${initiative.source}.`;const initiativeCard=card(`Initiative ${signed(initiative.modifier)}`,sheet.form?.name??'Base Form',`${initiativeSource} Initiative is a Dexterity check when combat starts. If you transform after rolling, keep the existing Initiative order.`);
   initiativeCard.options.append(initiativeModePicker());initiativeCard.actions.append(button('Roll Initiative',rollInitiative,'button primary action-roll'));root.append(text('h3','Initiative'),initiativeCard.node);
   const saveTitle=text('h3','Saving Throws');root.append(saveTitle);const saves=document.createElement('div');saves.className='roll-grid';
-  for(const value of Object.values(sheet.saves)){const row=document.createElement('div');row.className='roll-row';const info=document.createElement('div');const ruleMode=resolveAdvantage({advantage:value.advantageSources??[],disadvantage:value.disadvantageSources??[]}).mode as 'normal'|'advantage'|'disadvantage';const notes=[value.source,...(value.advantageSources?.length?[`Advantage: ${value.advantageSources.join(', ')}`]:[]),...(value.disadvantageSources?.length?[`Disadvantage: ${value.disadvantageSources.join(', ')}`]:[]),...(value.automaticFailure?[value.automaticFailure]:[])];info.append(text('strong',`${value.name} ${signed(value.modifier)}`),text('small',notes.join(' · ')));const roll=button(value.automaticFailure?'Automatic Failure':'Roll',()=>d20(value.modifier,combinedMode(ruleMode),value.name),'button compact');roll.disabled=Boolean(value.automaticFailure);row.append(info,roll);saves.append(row);}root.append(saves,text('h3','Skills'));
-  const skills=document.createElement('div');skills.className='roll-grid';for(const value of Object.values(sheet.skills).sort((a,b)=>a.name.localeCompare(b.name))){const row=document.createElement('div');row.className='roll-row';const info=document.createElement('div');const ruleMode=resolveAdvantage({advantage:value.advantageSources??[],disadvantage:value.disadvantageSources??[]}).mode as 'normal'|'advantage'|'disadvantage';const detail=[value.source,...(value.advantageSources?.length?[`Advantage: ${value.advantageSources.join(', ')}`]:[]),...(value.disadvantageSources?.length?[`Disadvantage: ${value.disadvantageSources.join(', ')}`]:[]),...(value.conditionalSources?.length?[`Conditional: ${value.conditionalSources.join(', ')}`]:[]),...(value.alternate?[`Alternate ${signed(value.alternate.modifier)}: ${value.alternate.source}`]:[])].join(' · ');info.append(text('strong',`${value.name} ${signed(value.modifier)}`),text('small',detail));const actions=document.createElement('div');actions.className='inline-actions';actions.append(button('Roll',()=>d20(value.modifier,combinedMode(ruleMode),value.name),'button compact'));if(value.alternate)actions.append(button('Use STR',()=>d20(value.alternate?.modifier??value.modifier,combinedMode(ruleMode),`${value.name} (Strength)`),'button compact'));row.append(info,actions);skills.append(row);}root.append(skills);
+  for(const value of Object.values(sheet.saves)){const row=document.createElement('div');row.className='roll-row';const info=document.createElement('div');const ruleMode=resolveAdvantage({advantage:value.advantageSources??[],disadvantage:value.disadvantageSources??[]}).mode as 'normal'|'advantage'|'disadvantage';const notes=[value.source,...(value.advantageSources?.length?[`Advantage: ${value.advantageSources.join(', ')}`]:[]),...(value.disadvantageSources?.length?[`Disadvantage: ${value.disadvantageSources.join(', ')}`]:[]),...(value.minimumTotal!==undefined?[`${value.minimumSource}: minimum total ${value.minimumTotal}`]:[]),...(value.automaticFailure?[value.automaticFailure]:[])];info.append(text('strong',`${value.name} ${signed(value.modifier)}`),text('small',notes.join(' · ')));const roll=button(value.automaticFailure?'Automatic Failure':'Roll',()=>d20(value.modifier,combinedMode(ruleMode),value.name,value.minimumD20,value.minimumTotal,value.minimumSource),'button compact');roll.disabled=Boolean(value.automaticFailure);row.append(info,roll);saves.append(row);}root.append(saves,text('h3','Skills'));
+  const skills=document.createElement('div');skills.className='roll-grid';for(const value of Object.values(sheet.skills).sort((a,b)=>a.name.localeCompare(b.name))){const row=document.createElement('div');row.className='roll-row';const info=document.createElement('div');const ruleMode=resolveAdvantage({advantage:value.advantageSources??[],disadvantage:value.disadvantageSources??[]}).mode as 'normal'|'advantage'|'disadvantage';const detail=[value.source,...(value.advantageSources?.length?[`Advantage: ${value.advantageSources.join(', ')}`]:[]),...(value.disadvantageSources?.length?[`Disadvantage: ${value.disadvantageSources.join(', ')}`]:[]),...(value.conditionalSources?.length?[`Conditional: ${value.conditionalSources.join(', ')}`]:[]),...(value.minimumD20!==undefined?[`${value.minimumSource}: d20 minimum ${value.minimumD20}`]:[]),...(value.minimumTotal!==undefined?[`${value.minimumSource}: total minimum ${value.minimumTotal}`]:[]),...(value.alternate?[`Alternate ${signed(value.alternate.modifier)}: ${value.alternate.source}`]:[])].join(' · ');info.append(text('strong',`${value.name} ${signed(value.modifier)}`),text('small',detail));const actions=document.createElement('div');actions.className='inline-actions';actions.append(button('Roll',()=>d20(value.modifier,combinedMode(ruleMode),value.name,value.minimumD20,value.minimumTotal,value.minimumSource),'button compact'));if(value.alternate)actions.append(button('Use STR',()=>d20(value.alternate?.modifier??value.modifier,combinedMode(ruleMode),`${value.name} (Strength)`,value.alternate?.minimumD20,value.alternate?.minimumTotal,value.alternate?.minimumSource),'button compact'));row.append(info,actions);skills.append(row);}root.append(skills);
 }
 
 function spellAttackModifier(spell:Spell){const current=Math.floor((sheet.abilities[spell.ability]-10)/2);const base=Math.floor((character.abilities[spell.ability]-10)/2);return spell.attackBonus!==undefined?spell.attackBonus+current-base:proficiencyBonus(character.totalLevel)+current;}
@@ -639,7 +756,7 @@ ${damage?`${damage.total} damage if hit: ${damage.detail}`:'No damage roll on a 
 }
 function castAndResolveSpell(spell:Spell&{available:boolean;reason:string}){const castLevel=chosenSpellLevel(spell);const result=castSpell(character,state,spell.name,castLevel||undefined);const success=result.message.startsWith('Cast ');applyResult(result);if(!success)return;const immediate=spell.resolution!=='manual'&&(spell.attackBonus!==undefined||Boolean(spell.healing)||(!spell.concentration&&Boolean(spell.damage?.length)));const persistent=spellActiveEffect(spell);const timing=persistent?.id==='barkskin'?' Barkskin used your Bonus Action; your Action remains available. Wild Shape and Rage also require a Bonus Action and must wait until a later turn.':'';if(immediate)resolveSpellEffect(spell,castLevel);else showRoll('Cast',`${persistent?`${persistent.summary} Active for ${persistent.duration}.`:spell.concentration?'Concentration started. Use Resolve Effect whenever the spell deals damage or healing.':spell.summary??'Spell activated.'}${timing}`,spell.name);}
 function spellCard(spell:Spell&{available:boolean;reason:string}){
-  const slotLevel=spell.slotLevel??spell.level;const chosen=chosenSpellLevel(spell);const persistent=spellActiveEffect(spell);const resolution=spell.damage?.length&&spell.attackBonus===undefined?(spell.resolution==='automatic'?'Automatic damage':spell.resolution==='manual'?'Conditional/manual effect':`Save DC ${spellSaveDc(spell)}${spell.saveAbility?` ${spell.saveAbility.toUpperCase()}`:''}${spell.halfOnSave?' · half on success':''}`):'';const stats=[actionCostLabel(spell.castingTime),slotLevel===0?'Cantrip':`Level ${slotLevel}`,spell.concentration?'Concentration':'',persistent?.acMinimum!==undefined?`AC minimum ${persistent.acMinimum}`:'',persistent?.duration?`Duration ${persistent.duration}`:'',spell.components?`Components ${spell.components}`:'',spell.attackBonus!==undefined?`Spell attack ${signed(spellAttackModifier(spell))}`:'',spell.healing?`Healing ${spell.healing}`:'',resolution].filter(Boolean).join(' · ');const timing=persistent?.id==='barkskin'?'2024 timing: Barkskin, Wild Shape, and Rage each use a Bonus Action, so they cannot be activated together on one turn. Barkskin lasts 1 hour; cast it before combat or on an earlier turn, then transform or Rage later.':'';const detail=[stats,spell.reason,persistent?.summary??spell.summary??'',timing].filter(Boolean).join('\n');const badge=spell.specialAccess==='circle-of-the-moon'?(spell.available?'Circle · Ready':'Circle · Blocked'):(spell.available?'Ready':'Unavailable');const c=card(spell.name,badge,detail);c.badge.className=`badge ${spell.available?'active':'inactive'}`;
+  const slotLevel=spell.slotLevel??spell.level;const chosen=chosenSpellLevel(spell);const persistent=spellActiveEffect(spell);const resolution=spell.damage?.length&&spell.attackBonus===undefined?(spell.resolution==='automatic'?'Automatic damage':spell.resolution==='manual'?'Conditional/manual effect':`Save DC ${spellSaveDc(spell)}${spell.saveAbility?` ${spell.saveAbility.toUpperCase()}`:''}${spell.halfOnSave?' · half on success':''}`):'';const stats=[actionCostLabel(spell.castingTime),slotLevel===0?'Cantrip':`Level ${slotLevel}`,spell.concentration?'Concentration':'',persistent?.acMinimum!==undefined?`AC minimum ${persistent.acMinimum}`:'',persistent?.duration?`Duration ${persistent.duration}`:'',spell.components?`Components ${spell.components}`:'',spell.attackBonus!==undefined?`Spell attack ${signed(spellAttackModifier(spell))}`:'',spell.healing?`Healing ${spell.healing}`:'',resolution].filter(Boolean).join(' · ');const timing=persistent?.id==='barkskin'?'2024 timing: Barkskin, Wild Shape, and Rage each use a Bonus Action, so they cannot be activated together on one turn. Barkskin lasts 1 hour; cast it before combat or on an earlier turn, then transform or Rage later.':'';const detail=[stats,spell.reason,persistent?.summary??spell.summary??'',timing].filter(Boolean).join('\n');const badge=spell.specialAccess==='circle-of-the-moon'?(spell.available?'Circle · Ready':'Circle · Blocked'):(spell.available?'Ready':'Unavailable');const c=card(spell.name,badge,detail,spell.available?'available':'unavailable');c.badge.className=`badge ${spell.available?'active':'inactive'}`;
   const levels=availableSpellSlotLevels(character,state,slotLevel);if(slotLevel>0&&levels.length){const picker=document.createElement('label');picker.className='slot-picker';picker.append(text('span','Cast using'));const select=document.createElement('select');select.setAttribute('aria-label',`${spell.name} spell slot level`);const scales=Boolean(spell.higherSlotHealing||spell.higherSlotDamage?.length);for(const level of levels){const option=document.createElement('option');option.value=String(level);option.textContent=`Level ${level} slot${level>slotLevel?scales?' · scaled effect':' · higher-level slot':''}`;option.selected=level===chosen;select.append(option);}select.disabled=!spell.available;select.addEventListener('change',()=>{selectedSpellSlots.set(spellKey(spell),Number(select.value));renderSpells();});picker.append(select);c.options.append(picker);}if(spell.attackBonus!==undefined)c.options.append(rollModePicker(`spell-${spell.name}`,spell.name));
   const immediate=spell.resolution!=='manual'&&(spell.attackBonus!==undefined||Boolean(spell.healing)||(!spell.concentration&&Boolean(spell.damage?.length)));const castLabel=persistent?.id==='barkskin'?'Cast Barkskin on Self':immediate?`Cast & Roll ${spell.name}`:`Cast ${spell.name}`;const cast=button(spell.available?castLabel:spell.reason,()=>castAndResolveSpell(spell),spell.available?'button primary action-roll':'button secondary');cast.disabled=!spell.available;c.actions.append(cast);const activeEffect=state.concentration?.name===spell.name&&spell.resolution!=='manual'&&Boolean(spell.damage?.length||spell.healing);if(activeEffect)c.actions.append(button(`Resolve ${spell.name} Effect`,()=>resolveSpellEffect(spell,state.concentration?.castLevel??slotLevel),'button secondary'));return c.node;
 }
@@ -652,13 +769,13 @@ function renderSpells(){
 }
 function renderFeatures(){
   const root=$('#tab-content');clear(root);let count=0;
-  if(sheet.form?.traits.length){root.append(text('h3',`${sheet.form.name} form traits`));for(const trait of sheet.form.traits){const c=card(trait.name,'Form trait',trait.summary);c.badge.className='badge active';root.append(c.node);count++;}}
-  if(sheet.features.length){root.append(text('h3','Character features and feats'));for(const feature of sheet.features){const c=card(feature.name,feature.status,`${feature.reason} ${feature.summary}`);c.badge.className=`badge ${feature.status}`;root.append(c.node);count++;}}
-  if(state.overlays.length){root.append(text('h3','Active transformation overlays'));for(const id of state.overlays){const grant=character.transformationGrants?.find(item=>item.id===id);const c=card(grant?.label??id,'Active overlay',grant?`${grant.source}${grant.duration?` · ${grant.duration}`:''}`:'Built-in transformation effect currently applied.');c.badge.className='badge active';root.append(c.node);count++;}}
+  if(sheet.form?.traits.length){root.append(text('h3',`${sheet.form.name} form traits`));for(const trait of sheet.form.traits){const c=card(trait.name,'Form trait',trait.summary,'active');c.badge.className='badge active';root.append(c.node);count++;}}
+  if(sheet.features.length){root.append(text('h3','Character features and feats'));for(const feature of sheet.features){const featureStatus:UiStatus=feature.status==='active'?'active':feature.status==='conditional'?'requirements':feature.status==='inactive'?'inactive':'warning';const c=card(feature.name,feature.status,`${feature.reason} ${feature.summary}`,featureStatus);c.badge.className=`badge ${feature.status}`;root.append(c.node);count++;}}
+  if(state.overlays.length){root.append(text('h3','Active transformation overlays'));for(const id of state.overlays){const grant=character.transformationGrants?.find(item=>item.id===id);const c=card(grant?.label??id,'Active overlay',grant?`${grant.source}${grant.duration?` · ${grant.duration}`:''}`:'Built-in transformation effect currently applied.','active');c.badge.className='badge active';root.append(c.node);count++;}}
   if(count===0)root.append(text('div','No evaluated features or active form traits.','empty'));
 }
 function renderRules(){
-  const root=$('#tab-content');clear(root);root.append(text('h3','Armor Class candidates'));const list=document.createElement('div');list.className='ac-list';for(const candidate of sheet.acCandidates){const row=document.createElement('div');row.className='ac-row'+(candidate.legal?'':' invalid');const info=document.createElement('div');info.append(text('strong',candidate.name),text('div',candidate.reason,'source-note'));row.append(info,text('strong',String(candidate.value)));list.append(row);}root.append(list,text('h3','Current transformation'));const source=document.createElement('div');source.className='item-card';source.append(text('strong',state.activeTransform?.option.label??'Base Form'),text('p',state.activeTransform?`${state.activeTransform.option.source} · ${state.activeTransform.duration}${state.activeTransform.permanentUntilDispelled?' · no Concentration required':''}`:'No replacement transformation is active.'));source.append(text('p',`Creature type: ${sheet.creatureType} · Size: ${sheet.size}`));if(sheet.form)source.append(text('p',`Verified stat block: ${sheet.form.source.page} · ${sheet.form.source.verified}`));root.append(source,text('h3','Current defenses'));const defenses=document.createElement('div');defenses.className='item-card';const moonReady=sheet.profile==='wildshape'?sheet.spells.filter(spell=>spell.specialAccess==='circle-of-the-moon'&&spell.available).length:0;const casting=sheet.canCast?'Yes':moonReady?`Circle spells only (${moonReady} ready)`:'No';defenses.append(text('p',`Resistances: ${sheet.resistances.join(', ')||'None'}`),text('p',`Immunities: ${sheet.immunities.join(', ')||'None'}`),text('p',`Senses: ${sheet.senses.join(', ')||'Base character senses'}`),text('p',`Speech: ${sheet.canSpeak?'Yes':'No'} · Spellcasting: ${casting} · Concentration: ${sheet.canConcentrate?'Allowed':'Blocked'} · Attack: ${sheet.canAttack?'Yes':'No'} · Manipulate objects: ${sheet.canManipulateObjects?'Yes':'No'}`),text('p',`Condition immunities: ${sheet.conditionImmunities.join(', ')||'None'}`));root.append(defenses,text('h3','Rules databank'));const registry=document.createElement('div');registry.className='item-card';registry.append(text('p',`${registrySnapshot.packs.length} built-in packs and ${installedPacks.length} private local packs are available. The engine, shared rules, private owned content, imported character, and mutable combat state are stored as separate layers.`));renderContentRegistry(registry,true);root.append(registry);
+  const root=$('#tab-content');clear(root);root.append(text('h3','Armor Class candidates'));const list=document.createElement('div');list.className='ac-list';for(const candidate of sheet.acCandidates){const row=document.createElement('div');row.className='ac-row'+(candidate.legal?'':' invalid');const info=document.createElement('div');info.append(text('strong',candidate.name),text('div',candidate.reason,'source-note'));row.append(info,text('strong',String(candidate.value)));list.append(row);}root.append(list,text('h3','Current transformation'));const source=document.createElement('div');source.className='item-card';source.append(text('strong',state.activeTransform?.option.label??'Base Form'),text('p',state.activeTransform?`${state.activeTransform.option.source} · ${state.activeTransform.duration}${state.activeTransform.permanentUntilDispelled?' · no Concentration required':''}`:'No replacement transformation is active.'));source.append(text('p',`Creature type: ${sheet.creatureType} · Size: ${sheet.size}`));if(sheet.form)source.append(text('p',`Verified stat block: ${sheet.form.source.page} · ${sheet.form.source.verified}`));root.append(source,text('h3','Current defenses'));const defenses=document.createElement('div');defenses.className='item-card';const moonReady=sheet.profile==='wildshape'?sheet.spells.filter(spell=>spell.specialAccess==='circle-of-the-moon'&&spell.available).length:0;const casting=sheet.canCast?'Yes':moonReady?`Circle spells only (${moonReady} ready)`:'No';defenses.append(text('p',`Resistances: ${sheet.resistances.join(', ')||'None'}`),text('p',`Immunities: ${sheet.immunities.join(', ')||'None'}`),text('p',`Senses: ${sheet.senses.join(', ')||'Base character senses'}`),text('p',`Speech: ${sheet.canSpeak?'Yes':'No'} · Spellcasting: ${casting} · Concentration: ${sheet.canConcentrate?'Allowed':'Blocked'} · Attack: ${sheet.canAttack?'Yes':'No'} · Manipulate objects: ${sheet.canManipulateObjects?'Yes':'No'}`),text('p',`Condition immunities: ${sheet.conditionImmunities.join(', ')||'None'}`));root.append(defenses,text('h3','Character source and items'));const provenance=document.createElement('div');provenance.className='item-card';provenance.append(text('strong',`${character.provenance.provider==='dndbeyond'?'D&D Beyond':'Local'} · ${character.provenance.ruleset.toUpperCase()} rules`),text('p',character.provenance.rulesetEvidence.join(' · ')||'No ruleset evidence was supplied.'),text('p',`${character.items.length} item record${character.items.length===1?'':'s'}; imported numeric totals are not applied a second time.`));for(const item of character.items){provenance.append(text('p',`${item.name} · ${item.type} · ${item.equipped?'equipped':'not equipped'}${item.requiresAttunement?item.attuned?' · attuned':' · attunement required':''} · ${item.ruleset.toUpperCase()} · ${item.mechanics.replaceAll('-',' ')}`,'source-note'));}root.append(provenance,text('h3','Rules databank'));const registry=document.createElement('div');registry.className='item-card';registry.append(text('p',`${registrySnapshot.packs.length} built-in packs and ${installedPacks.length} private local packs are available. The engine, shared rules, private owned content, imported character, and mutable combat state are stored as separate layers.`));renderContentRegistry(registry,true);root.append(registry);
 }
 function syncTabState(){
   let activeTab:HTMLButtonElement|undefined;
@@ -667,7 +784,7 @@ function syncTabState(){
 }
 function renderTab(){sheet=resolveSheet(character,state);syncTabState();if(currentTab==='actions')renderActions();else if(currentTab==='rolls')renderRolls();else if(currentTab==='spells')renderSpells();else if(currentTab==='features')renderFeatures();else renderRules();}
 function activateTab(tab:HTMLButtonElement,focus=false){currentTab=tab.dataset.tab??'actions';renderTab();if(focus)tab.focus();}
-function renderConditions(){const list=$('#condition-list');clear(list);for(const condition of state.conditions){const chip=button(`${condition} ×`,()=>applyResult(removeCondition(state,condition)),'condition-chip');chip.setAttribute('aria-label',`Remove ${condition} condition`);list.append(chip);}}
+function renderConditions(){const list=$('#condition-list');clear(list);for(const condition of state.conditions){const label=condition==='Exhaustion'?`Exhaustion ${state.exhaustionLevel} −1`:`${condition} ×`;const chip=button(label,()=>applyResult(removeCondition(state,condition)),'condition-chip');chip.setAttribute('aria-label',condition==='Exhaustion'?`Reduce Exhaustion from level ${state.exhaustionLevel}`:`Remove ${condition} condition`);list.append(chip);}}
 function renderLog(){const root=$('#activity-log');clear(root);$<HTMLButtonElement>('#clear-activity').disabled=state.log.length===0;if(state.log.length===0){root.append(text('div','No activity yet.','log-row'));return;}for(const item of state.log)root.append(text('div',item,'log-row'));}
 function render(){sheet=resolveSheet(character,state);syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderResources();renderQuickFeatures();renderActiveEffects();renderTab();renderConditions();renderLog();persist();}
 
@@ -677,6 +794,8 @@ function initializeControls(){
   const conditions=$<HTMLSelectElement>('#condition-select');for(const condition of commonConditions){const option=document.createElement('option');option.value=condition;option.textContent=condition;conditions.append(option);}
   $('#sample-character').addEventListener('change',event=>{const id=(event.target as HTMLSelectElement).value;const found=characters.find(c=>c.id===id);if(found)setCharacter(found);});
   $('#form-select').addEventListener('change',event=>{selectedOptionId=(event.target as HTMLSelectElement).value;renderTransformSelector();renderArt();});
+  $('#form-search').addEventListener('input',event=>{formSearch=(event.target as HTMLInputElement).value;renderTransformSelector();renderArt();});
+  $('#form-filter').addEventListener('change',event=>{formFilter=(event.target as HTMLSelectElement).value;renderTransformSelector();renderArt();});
   $('#transform-button').addEventListener('click',()=>{const option=currentOption();if(option)applyResult(startTransformation(character,state,option));});
   $('#end-form-button').addEventListener('click',endCurrentForm);
   const tabs=Array.from(document.querySelectorAll<HTMLButtonElement>('.tab'));
@@ -684,12 +803,20 @@ function initializeControls(){
   $('#apply-damage').addEventListener('click',()=>{const amount=Number($<HTMLInputElement>('#damage-amount').value);const type=$<HTMLSelectElement>('#damage-type').value as DamageType;applyResult(applyDamage(state,resolveSheet(character,state),amount,type,character));});
   $('#apply-healing').addEventListener('click',()=>applyResult(heal(state,character,Number($<HTMLInputElement>('#damage-amount').value))));
   $('#new-turn').addEventListener('click',()=>applyResult(startNewTurn(state)));$('#end-turn').addEventListener('click',()=>applyResult(endTurn(character,state)));$('#short-rest').addEventListener('click',()=>applyResult(shortRest(state)));$('#long-rest').addEventListener('click',()=>applyResult(longRest(character,state)));
-  $('#add-condition').addEventListener('click',()=>applyResult(applyCondition(character,state,$<HTMLSelectElement>('#condition-select').value)));$('#clear-conditions').addEventListener('click',()=>{for(const condition of [...state.conditions])removeCondition(state,condition);notify('Conditions cleared.');render();});
+  $('#add-condition').addEventListener('click',()=>applyResult(applyCondition(character,state,$<HTMLSelectElement>('#condition-select').value)));$('#clear-conditions').addEventListener('click',()=>applyResult(clearConditions(state)));
   $('#clear-activity').addEventListener('click',()=>{state.log=[];$('#status-message').textContent='Recent activity cleared.';renderLog();persist();});
+  $('#open-help').addEventListener('click',()=>{filterHelpTopics();const dialog=$<HTMLDialogElement>('#help-dialog');dialog.showModal();$<HTMLInputElement>('#help-search').focus();});
+  $('#close-help').addEventListener('click',()=>$<HTMLDialogElement>('#help-dialog').close());
+  $('#help-search').addEventListener('input',filterHelpTopics);
+  $('#start-walkthrough').addEventListener('click',startWalkthrough);
+  $('#skip-walkthrough').addEventListener('click',()=>finishWalkthrough('Walkthrough skipped. Restart it anytime from Help.'));
+  $('#walkthrough-back').addEventListener('click',()=>{walkthroughStepIndex--;renderWalkthroughStep();});
+  $('#walkthrough-next').addEventListener('click',()=>{const available=availableWalkthroughSteps();if(walkthroughStepIndex>=available.length-1)finishWalkthrough('Walkthrough complete. Help remains available from the top bar.');else{walkthroughStepIndex++;renderWalkthroughStep();}});
+  window.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('#walkthrough').hidden)finishWalkthrough('Walkthrough closed. Restart it anytime from Help.');});
   $('#import-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{applyImportedCharacter(parseCharacter(safeJsonParse(await file.text())));}catch(error){const message=`Import failed: ${error instanceof Error?error.message:'Unknown error'}`;notify(message);setImportStatus(message);}finally{input.value='';}});
   $('#fetch-dndbeyond').addEventListener('click',()=>void fetchDdbCharacter());
   $('#dndbeyond-source').addEventListener('keydown',event=>{if((event as KeyboardEvent).key==='Enter'){event.preventDefault();void fetchDdbCharacter();}});
-  $('#confirm-dndbeyond-import').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}const imported=applyImportedCharacter(pendingDdbImport.character);pendingDdbImport=null;$('#dndbeyond-review').hidden=true;setImportStatus(`${imported.name} imported after review. Export an Altered JSON backup once you finish checking any flagged areas.`);});
+  $('#confirm-dndbeyond-import').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}if(pendingDdbImport.blocked){setImportStatus(pendingDdbImport.blockReason??'This character is blocked by the 2024-only rules policy.');return;}const imported=applyImportedCharacter(pendingDdbImport.character);pendingDdbImport=null;$('#dndbeyond-review').hidden=true;setImportStatus(`${imported.name} imported after review. Export an Altered JSON backup once you finish checking any flagged areas.`);});
   $('#download-dndbeyond-json').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}downloadJson(pendingDdbImport.character,`${slug(pendingDdbImport.character.name)}-altered.json`);});
   $('#export-character').addEventListener('click',()=>downloadJson(character,`${character.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'altered-character'}.json`));
   $('#open-import-center').addEventListener('click',()=>{renderInstalledPacks();setImportStatus('Import from a public D&D Beyond character link, or use a validated Altered JSON backup.');$<HTMLDialogElement>('#import-dialog').showModal();});
@@ -720,9 +847,11 @@ async function boot(){
   if(pendingActiveSnapshot?.option?.id){const option=availableTransformations(character,state).find(candidate=>candidate.id===pendingActiveSnapshot?.option?.id);if(option)state.activeTransform={option,startedTurn:boundedWhole(pendingActiveSnapshot.startedTurn,state.turn.number,1,1_000_000),duration:safeSavedText(pendingActiveSnapshot.duration,'',200),tempHpSource:Boolean(pendingActiveSnapshot.tempHpSource),...(pendingActiveSnapshot.spellConcentration?{spellConcentration:true}:{}),...(pendingActiveSnapshot.permanentUntilDispelled?{permanentUntilDispelled:true}:{})};}
   magicEffectsEnabled=await loadBooleanSetting('magic-effects-enabled',true);
   reduceMotion=await loadBooleanSetting('reduce-motion',reduceMotion);
-  initializeControls();renderSettings();renderInstalledPacks();
+  const walkthroughCompleted=await loadBooleanSetting(WALKTHROUGH_SETTING,false);
+  initializeControls();filterHelpTopics();renderSettings();renderInstalledPacks();
   const repairNote=invalidPackCount?` ${invalidPackCount} damaged private pack${invalidPackCount===1?' was':'s were'} removed safely.`:'';
   notify(`Altered loaded for ${character.name}. ${installedPacks.length} private content pack${installedPacks.length===1?'':'s'} available.${repairNote}`);render();
+  if(!walkthroughCompleted)startWalkthrough();
   void refreshSrdCatalogStatus();
 }
 void boot().catch(error=>{console.error(error);const status=document.querySelector<HTMLElement>('#status-message');if(status)status.textContent=`Altered could not start: ${error instanceof Error?error.message:'Unknown error'}`;});

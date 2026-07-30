@@ -1,6 +1,6 @@
 {
   "name": "altered-rules-engine",
-  "version": "0.23.2",
+  "version": "0.24.0",
   "private": true,
   "type": "commonjs",
   "scripts": {
@@ -12,7 +12,8 @@
     "start": "npm run build && npm run serve",
     "start:lan": "npm run build && npm run serve:lan",
     "test": "npm run build && node --test dist/tests/*.test.js",
-    "verify": "npm run typecheck && npm test"
+    "verify": "npm run typecheck && npm test",
+    "audit": "npm run verify && node scripts/audit.mjs"
   },
   "devDependencies": {
     "typescript": "5.8.3"

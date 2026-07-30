@@ -8,9 +8,65 @@ test('static shell exposes accessible tabs, dialogs, and condition input',()=>{
   assert.equal((html.match(/role="tab"/g)??[]).length,5);
   assert.match(html,/id="tab-content"[^>]*role="tabpanel"[^>]*aria-labelledby="tab-actions"/);
   assert.match(html,/for="condition-select">Condition<\/label>/);
-  for(const id of ['import-dialog','transform-builder-dialog','settings-dialog','temp-hp-dialog']){
+  for(const id of ['help-dialog','import-dialog','transform-builder-dialog','settings-dialog','temp-hp-dialog']){
     assert.match(html,new RegExp(`<dialog id="${id}"[^>]*aria-labelledby="${id.replace(/-dialog$/,'')}(?:-dialog)?-title"`));
   }
+});
+
+test('help and first-launch walkthrough remain optional, searchable, and restartable',()=>{
+  const html=readFileSync('public/index.html','utf8');
+  const source=readFileSync('src/app.ts','utf8');
+  const styles=readFileSync('public/styles.css','utf8');
+  assert.match(html,/id="open-help"[^>]*>Help<\/button>/);
+  assert.match(html,/id="help-search"[^>]*type="search"/);
+  assert.ok((html.match(/class="help-topic"/g)??[]).length>=15);
+  for(const topic of ['What Altered is','What the app is for','Supported transformation types','Getting Started','Loading characters','Importing characters','Browsing forms, search, and filters','Activating forms','Ending forms and returning to normal','Tracking resources and turns','Images','Settings','Troubleshooting','FAQ','About'])assert.ok(html.includes(topic));
+  assert.match(html,/id="walkthrough"[^>]*role="dialog"[^>]*aria-modal="false"/);
+  assert.match(html,/id="start-walkthrough"/);
+  assert.match(html,/id="skip-walkthrough"/);
+  assert.match(source,/WALKTHROUGH_SETTING='walkthrough-completed-v1'/);
+  assert.match(source,/availableWalkthroughSteps\(\)/);
+  assert.match(source,/if\(!walkthroughCompleted\)startWalkthrough\(\)/);
+  assert.match(source,/saveBooleanSetting\(WALKTHROUGH_SETTING,true\)/);
+  assert.match(styles,/\.walkthrough-target\{/);
+  assert.match(styles,/@media\(prefers-reduced-motion:reduce\)/);
+});
+
+test('form browsing and visual statuses explain availability without changing form data',()=>{
+  const html=readFileSync('public/index.html','utf8');
+  const source=readFileSync('src/app.ts','utf8');
+  const styles=readFileSync('public/styles.css','utf8');
+  assert.match(html,/id="form-search"[^>]*type="search"/);
+  assert.match(html,/id="form-filter"/);
+  assert.match(html,/id="form-status-strip"[^>]*aria-label="Selected form status"/);
+  assert.match(source,/const options=availableTransformations\(character,state\)/);
+  assert.match(source,/selected form retained/);
+  assert.match(source,/o\.id===activeId\?' · Active'/);
+  assert.match(source,/statusChip\('selected'\)/);
+  assert.match(source,/image\.loading='lazy'/);
+  for(const state of ['available','active','inactive','locked','unavailable','requirements','selected','favorite','new','importing','loading','success','warning','error'])assert.match(source,new RegExp(`${state}:\\{icon:`));
+  assert.match(styles,/\.ui-status\.available/);
+  assert.match(styles,/\.ui-status\.locked/);
+  assert.match(styles,/\.main-form-art img,.preview-art img/);
+  assert.match(styles,/\.top-actions\{width:100%;margin-left:0;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(styles,/\.help-topic summary:focus-visible/);
+});
+
+test('the six current forms ship with app-ready artwork in both builds',()=>{
+  const source=readFileSync('src/app.ts','utf8');
+  const serviceWorker=readFileSync('public/sw.js','utf8');
+  const standalone=readFileSync('dist/altered-standalone.html','utf8');
+  for(const [form,file] of [['brown-bear','form-brown-bear.jpg'],['dire-wolf','form-dire-wolf.jpg'],['giant-octopus','form-giant-octopus.jpg'],['giant-spider','form-giant-spider.jpg'],['lion','form-lion.jpg'],['tiger','form-tiger.jpg']]){
+    assert.match(source,new RegExp(`'form:${form}':'${file}'`));
+    assert.ok(serviceWorker.includes(`'./${file}'`));
+    assert.ok(readFileSync(`dist/${file}`,'utf8').length>100_000);
+    assert.ok(!standalone.includes(`'${file}'`));
+  }
+  assert.match(source,/alt=`Built-in artwork for \$\{label\}`/);
+  assert.match(standalone,/data:image\/jpeg;base64,/);
+  const ferocitusStandalone=readFileSync('dist/altered-ferocitus.html','utf8');
+  assert.match(ferocitusStandalone,/name:\s*'Ferocitus'/);
+  assert.match(ferocitusStandalone,/data:image\/jpeg;base64,/);
 });
 
 test('recent activity exposes a clear control that preserves non-log state',()=>{
