@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.23.2
+
+- Extended the strong persistent pulsing glow to every non-base transformation, including replacement forms and additive spell, class, species, item, and private overlays.
+- Active overlays now identify themselves as active forms around the portrait instead of leaving the portrait labeled Base Form.
+- Increased pulse brightness, saturation, ring thickness, and outer glow while retaining the Reduce Motion and aura-disable accessibility controls.
+- Verified live with Goliath Large Form and Brown Bear; both pulse indefinitely and return to an unlit Base Form when ended.
+
+## v0.23.1
+
+- Added a dedicated Initiative roller that uses the current form's Dexterity, Alert proficiency, Feral Instinct, Remarkable Athlete, conditions, and Surprise Advantage/Disadvantage rules.
+- Clarified that changing form after Initiative is rolled does not change the established combat order.
+- Made the active-form pulse lifecycle explicit: it runs continuously through form actions and rerenders, honors the Reduce Motion setting, and ends only when the transformation ends.
+- Added deterministic Initiative and persistent-aura regression coverage; 129 automated tests pass.
+
+## v0.23.0
+
+- Re-audited every bundled creature action against Wizards’ official SRD 5.2.1 and added locked corrections for known upstream catalog errors.
+- Added deterministic attack-roll resolution for normal rolls, Advantage, Disadvantage, natural 1, natural 20, and Champion critical ranges.
+- Added a situational Advantage/Disadvantage selector that combines with automatic rules and cancels opposing sources correctly.
+- Made attack and Multiattack results surface all on-hit conditions, escape DCs, target-size limits, durations, and conditional notes.
+- Made Multiattack apply damage conversions and eligible optional damage correctly, and added legal variants such as Lion Rend + Roar.
+- Added executable conditional attack riders, including Giant Goat Charge’s extra damage and Prone effect.
+- Added all three 2024 Unarmed Strike choices: damage, Grapple, and Shove.
+- Fixed the live SRD normalizer for fixed-damage attacks, secondary damage packets, Multiattack replacement clauses, target-size limits, and half damage on a successful save.
+- Labeled ongoing damage at its actual timing and retained spell effect text in resolved spell-attack results.
+- Corrected form-selection cleanup whenever damage, conditions, rest, or another rule ends a transformation.
+- Expanded the deterministic regression suite to 128 passing tests and live-tested base attacks, condition cancellation, Brown Bear Multiattack, Lion Rend + Roar, and Moon-form spell attacks.
+
 ## v0.21.0
 
 - Restored the 2024 Circle of the Moon always-prepared spell list when D&D Beyond omits subclass-granted spells from its character payload.

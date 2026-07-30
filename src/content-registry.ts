@@ -24,7 +24,7 @@ export const CONDITIONS:Record<string,ConditionDefinition>=records({
   Charmed:{id:'charmed',name:'Charmed',summary:'Cannot attack the charmer and the charmer has social influence.',tags:['mental']},
   Deafened:{id:'deafened',name:'Deafened',summary:'Cannot hear and automatically fails checks that require hearing.',tags:['sense']},
   Frightened:{id:'frightened',name:'Frightened',summary:'Has Disadvantage on checks and attacks while the source of fear is visible and cannot willingly move closer.',tags:['mental','attack']},
-  Grappled:{id:'grappled',name:'Grappled',summary:'Speed becomes 0 while the grapple lasts.',tags:['movement'],speedBecomesZero:true},
+  Grappled:{id:'grappled',name:'Grappled',summary:'Speed becomes 0; attacks against a target other than the grappler have Disadvantage.',tags:['movement','attack'],speedBecomesZero:true},
   Incapacitated:{id:'incapacitated',name:'Incapacitated',summary:'Cannot take actions, Bonus Actions, or Reactions; Concentration ends.',tags:['action','concentration'],blocksActions:true,blocksBonusActions:true,blocksReactions:true,endsConcentration:true,endsWildShape:true},
   Invisible:{id:'invisible',name:'Invisible',summary:'Cannot be seen without special senses or magic.',tags:['sense','attack']},
   Paralyzed:{id:'paralyzed',name:'Paralyzed',summary:'Incapacitated, speed 0, and automatically fails Strength and Dexterity saves.',tags:['action','movement','save'],blocksActions:true,blocksBonusActions:true,blocksReactions:true,speedBecomesZero:true,endsConcentration:true,endsWildShape:true,automaticSaveFailure:['str','dex'],attackAdvantageAgainst:true},
@@ -69,7 +69,7 @@ const featEntries:Record<string,CatalogEntry>={
 
 const itemEntries:Record<string,CatalogEntry>={};
 
-const PACK_VERSION='0.22.2';
+const PACK_VERSION='0.23.2';
 const PACKS=[
   {metadata:metadata({id:'altered-srd-creatures',name:'SRD 5.2.1 Creature Forms',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'creatures',priority:100,license:'CC BY 4.0 source data; original Altered presentation',source:'Official SRD 5.2.1',verified:RULES_VERSION.reviewed,builtIn:true,description:'Verified creature stat blocks available to bundled transformations.'}),records:records(RAW_CREATURES)},
   {metadata:metadata({id:'altered-core-class-features',name:'Core Class Interaction Rules',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'class-features',priority:100,license:'CC BY 4.0 mechanical summaries authored for Altered',source:'Official SRD 5.2.1',verified:RULES_VERSION.reviewed,builtIn:true,description:'Structured transformation-relevant mechanics for SRD classes; additional subclasses can be supplied by private packs.'}),records:featureRecord(RAW_CLASS_FEATURES)},

@@ -1,8 +1,22 @@
-# Altered v0.21.0 release notes
+# Altered v0.23.2 release notes
 
 ## Status
 
 Altered is a cross-platform local alpha for Android, Windows, and macOS browsers. It is suitable for supervised gameplay testing, not yet a commercial release.
+
+## Combat-roll correctness and creature actions
+
+- Every bundled creature action was checked against Wizards’ official SRD 5.2.1 rather than trusting third-party parsed values.
+- Every attack that requires an attack roll now shows its own d20 total, including every component of Multiattack.
+- Natural 1, natural 20, Advantage/Disadvantage cancellation, Champion critical ranges, critical damage dice, fixed damage, and secondary damage packets are resolved explicitly.
+- On-hit and failed-save effects now show condition, target-size limit, escape DC, duration, and notes in the result.
+- The situational selector lets the user add target/battlefield Advantage or Disadvantage without overriding automatic condition rules.
+- Lion can execute either two Rends or Rend + Roar as one Multiattack Action.
+- Giant Goat Charge is an explicit prerequisite-controlled rider that adds 2d4 damage and Prone only when selected.
+- Base form includes the 2024 damage, Grapple, and Shove options for Unarmed Strike.
+- Spell attacks repeat their non-damage effect text in the resolved result, so effects such as Starry Wisp are not lost after the roll.
+- Initiative now uses the current form's Dexterity and supported 2024 modifiers, including Alert, Feral Instinct, Remarkable Athlete, conditions, and Surprise.
+- Every non-base transformation, including additive overlays, receives the stronger pulse and remains visibly active through rolls and other interface updates until all forms end.
 
 ## Actions, Rage, and Circle of the Moon spells
 
@@ -62,7 +76,7 @@ Altered is a cross-platform local alpha for Android, Windows, and macOS browsers
 ## Verification
 
 - Strict TypeScript compilation: pass.
-- Automated tests: 116/116 pass.
+- Automated tests: 129/129 pass.
 - Standalone and PWA generation: pass.
 - Live browser interaction coverage: transformations, rolls, damage/healing, conditions, turns/rests, spells/concentration, D&D Beyond success/privacy paths, imports/exports, private packs, settings persistence, artwork upload/reset, and Temporary HP choices.
 - Full live SRD creature normalization: 331/331 pass, including 91 Beast records and 989 executable actions.

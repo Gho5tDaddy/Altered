@@ -1,6 +1,6 @@
 import type {
   Ability,AcCandidate,ActionCost,Character,CreatureAction,DamagePacket,DamageType,
-  DerivedRoll,EvaluatedFeature,GameState,ImportedFeatureRule,ResolvedSheet,ResourcePool,RetentionPolicy,
+  DerivedRoll,EvaluatedFeature,GameState,ImportedFeatureRule,ProficiencyRank,ResolvedSheet,ResourcePool,RetentionPolicy,
   Spell,TransformProfile,TransformationEffects,TransformationOption,TransitionResult
 } from './types.js';
 import {
@@ -261,9 +261,28 @@ function resolveSkills(character:Character,state:GameState,option:Transformation
   }
   return out;
 }
-function baseActions(character:Character,abilities:Character['abilities']):CreatureAction[]{const mod=abilityMod(abilities.str);return [{id:'unarmed',name:'Unarmed Strike',type:'attack',cost:'action',attackBonus:proficiencyBonus(character.totalLevel)+mod,ability:'str',kind:'unarmed',reach:5,damage:[{expression:String(Math.max(1,1+mod)),type:'Bludgeoning'}]}]}
+function resolveInitiative(character:Character,state:GameState,option:TransformationOption,abilities:Character['abilities'],effects:TransformationEffects[]):DerivedRoll{
+  const form=creature(character,option.formId);const pb=proficiencyBonus(character.totalLevel);const conditionImmunities=effectConditionImmunities(form,effects);
+  let modifier=abilityMod(abilities.dex),proficiency:ProficiencyRank=0;const sources=[form&&option.profile!=='overlay'?`${form.name} Dexterity`:'Current Dexterity'];
+  if(character.feats.some(feat=>sameText(feat,'Alert'))){modifier+=pb;proficiency=1;sources.push('Alert proficiency');}
+  const advantageSources=effects.filter(effect=>effect.checkAdvantage?.includes('dex')).map(()=> 'Active transformation');
+  const disadvantageSources=effects.filter(effect=>effect.checkDisadvantage?.includes('dex')).map(()=> 'Active transformation');
+  if(retainedClassFeatures(option)&&classLevel(character,'Barbarian')>=7)advantageSources.push('Feral Instinct');
+  if(retainedClassFeatures(option)&&classLevel(character,'Fighter')>=3&&sameText(subclass(character,'Fighter'),'Champion'))advantageSources.push('Remarkable Athlete');
+  if(conditionApplies(state,'Poisoned',conditionImmunities))disadvantageSources.push('Poisoned');
+  const conditionalSources=conditionApplies(state,'Frightened',conditionImmunities)?['Frightened imposes Disadvantage only while the source is in line of sight.']:[];
+  return {name:'Initiative',modifier,source:sources.join(' + '),proficiency,...(advantageSources.length?{advantageSources}:{}),...(disadvantageSources.length?{disadvantageSources}:{}),...(conditionalSources.length?{conditionalSources}:{})};
+}
+function baseActions(character:Character,abilities:Character['abilities'],size:string):CreatureAction[]{
+  const mod=abilityMod(abilities.str),pb=proficiencyBonus(character.totalLevel),dc=8+pb+mod,targetSizeMax=shiftedSize(size,1);
+  return [
+    {id:'unarmed',name:'Unarmed Strike — Damage',type:'attack',cost:'action',attackBonus:pb+mod,ability:'str',kind:'unarmed',reach:5,damage:[{expression:String(Math.max(1,1+mod)),type:'Bludgeoning'}]},
+    {id:'unarmed-grapple',name:'Unarmed Strike — Grapple',type:'save',cost:'action',saveAbility:'str',saveAbilityOptions:['str','dex'],dc,range:'5 ft.',effectsOnFail:[{condition:'Grappled',escapeDc:dc,targetSizeMax,note:'Requires a free hand.'}],notes:'The target chooses a Strength or Dexterity save. It must be no more than one size larger than you.'},
+    {id:'unarmed-shove',name:'Unarmed Strike — Shove',type:'save',cost:'action',saveAbility:'str',saveAbilityOptions:['str','dex'],dc,range:'5 ft.',effectsOnFail:[{condition:'Prone',targetSizeMax,note:'Instead of Prone, you can push the target 5 feet away.'}],notes:'The target chooses a Strength or Dexterity save. It must be no more than one size larger than you.'}
+  ];
+}
 function resolvedActions(character:Character,option:TransformationOption,effects:TransformationEffects[],canAttack:boolean,abilities:Character['abilities']):CreatureAction[]{
-  const form=creature(character,option.formId);const actions:CreatureAction[]=form&&option.profile!=='overlay'?[...form.actions]:baseActions(character,abilities);for(const effect of effects)actions.push(...(effect.actions??[]));
+  const form=creature(character,option.formId);const size=effects.map(effect=>effect.size).filter((value):value is string=>Boolean(value)).at(-1)??form?.size??character.size;const actions:CreatureAction[]=form&&option.profile!=='overlay'?[...form.actions]:baseActions(character,abilities,size);for(const effect of effects)actions.push(...(effect.actions??[]));
   const monk=classLevel(character,'Monk');if(canAttack&&retainedClassFeatures(option)&&monk>=1){const stats=abilities;const strMod=abilityMod(stats.str),dexMod=abilityMod(stats.dex),mod=Math.max(strMod,dexMod),chosen:Ability=dexMod>=strMod?'dex':'str';actions.push({id:'monk-unarmed',name:'Monk Unarmed Strike',type:'attack',cost:'action',attackBonus:proficiencyBonus(character.totalLevel)+mod,ability:chosen,kind:'unarmed',reach:5,damage:[{expression:`${monkDie(monk)}${mod>=0?'+':''}${mod}`,type:'Bludgeoning'}],notes:'Separate Unarmed Strike; Beast attacks do not become Unarmed Strikes.'});}
   if(canAttack)return actions;
   return actions.filter(action=>action.type==='automatic'&&!action.damage?.length&&!action.effects?.length);
@@ -283,7 +302,7 @@ export function resolveSheet(character:Character,state:GameState):ResolvedSheet{
   if(sameText(state.concentration?.name,'Fount of Moonlight'))resistances.push('Radiant');
   const resolvedConditionImmunities=unique([...(form?.conditionImmunities??[]),...effects.flatMap(effect=>effect.conditionImmunities??[])]);const attackDamageModifiers=effects.map(effect=>effect.attackDamageModifier).filter((value):value is NonNullable<TransformationEffects['attackDamageModifier']>=>Boolean(value));
   const effectCreatureType=effects.map(effect=>effect.creatureType).filter((value):value is string=>Boolean(value)).at(-1);const creatureType=effectCreatureType??(form&&!policyFor(option).creatureType?form.type:character.creatureType);
-  return {profile,...(form?{form}:{}),creatureType,size:effects.map(e=>e.size).filter(Boolean).at(-1)??form?.size??character.size,abilities,ac:ac.value,acSource:ac.source,acCandidates:ac.candidates,speeds:resolveSpeeds(character,state,option,effects),saves:resolveSaves(character,state,option,abilities,effects),skills:resolveSkills(character,state,option,abilities,effects),actions:resolvedActions(character,option,effects,canAttack,abilities),resistances:unique(resistances),immunities:unique(immunities),vulnerabilities:unique(vulnerabilities),senses:unique([...(form?.senses??[]),...effects.flatMap(e=>e.senses??[])]),canSpeak,canCast,canConcentrate,canAttack,canManipulateObjects,conditionImmunities:resolvedConditionImmunities,attackDamageModifiers,features,spells:evaluateSpells(character,state,option,baseCanCast)};
+  return {profile,...(form?{form}:{}),creatureType,size:effects.map(e=>e.size).filter(Boolean).at(-1)??form?.size??character.size,abilities,ac:ac.value,acSource:ac.source,acCandidates:ac.candidates,speeds:resolveSpeeds(character,state,option,effects),initiative:resolveInitiative(character,state,option,abilities,effects),saves:resolveSaves(character,state,option,abilities,effects),skills:resolveSkills(character,state,option,abilities,effects),actions:resolvedActions(character,option,effects,canAttack,abilities),resistances:unique(resistances),immunities:unique(immunities),vulnerabilities:unique(vulnerabilities),senses:unique([...(form?.senses??[]),...effects.flatMap(e=>e.senses??[])]),canSpeak,canCast,canConcentrate,canAttack,canManipulateObjects,conditionImmunities:resolvedConditionImmunities,attackDamageModifiers,features,spells:evaluateSpells(character,state,option,baseCanCast)};
 }
 
 function actionError(state:GameState,cost:ActionCost,conditionImmunities:Iterable<string>=[]):string|null{
@@ -622,9 +641,24 @@ export function attackRollSources(character:Character,state:GameState,action:Cre
   if(active('Poisoned'))disadvantage.push('Poisoned');
   if(active('Blinded'))disadvantage.push('Blinded');
   if(active('Prone'))disadvantage.push('Prone');
+  if(active('Grappled'))conditional.push('Grappled imposes Disadvantage only when attacking a target other than the grappler.');
   if(active('Frightened'))conditional.push('Frightened imposes Disadvantage only while the source is in line of sight.');
+  if(sheet?.form?.traits.some(trait=>sameText(trait.name,'Pack Tactics')))conditional.push('Pack Tactics grants Advantage when an eligible ally is within 5 feet of the target.');
   return {...resolveAdvantage({advantage,disadvantage}),conditional};
 }
+export function criticalHitThreshold(character:Character,action:CreatureAction){
+  if(action.type!=='attack'||(action.kind!=='weapon'&&action.kind!=='unarmed'))return 20;
+  const fighter=character.classes.find(entry=>sameText(entry.name,'Fighter'));const isChampion=normalized(fighter?.subclass).includes('champion');
+  return isChampion&&fighter&&fighter.level>=15?18:isChampion&&fighter&&fighter.level>=3?19:20;
+}
+export type AttackRollMode='normal'|'advantage'|'disadvantage';
+export interface AttackD20Result {first:number;second?:number;kept:number;total:number;mode:AttackRollMode;critical:boolean;naturalOne:boolean;naturalTwenty:boolean}
+export function rollAttackD20(modifier:number,mode:AttackRollMode,criticalThreshold=20,random:()=>number=Math.random):AttackD20Result{
+  const first=rollDice('1d20',random).total,second=mode==='normal'?undefined:rollDice('1d20',random).total;
+  const kept=mode==='advantage'?Math.max(first,second??first):mode==='disadvantage'?Math.min(first,second??first):first;
+  return {first,...(second===undefined?{}:{second}),kept,total:kept+modifier,mode,critical:kept>=criticalThreshold,naturalOne:kept===1,naturalTwenty:kept===20};
+}
+export function criticalDiceExpression(expression:string){return expression.replace(/(\d+)d(\d+)/gi,(_,count,size)=>`${Number(count)*2}d${size}`)}
 export function attackBonuses(character:Character,state:GameState,sheet:ResolvedSheet,action:CreatureAction):DamagePacket[]{
   if(action.type!=='attack')return [];
   const packets:DamagePacket[]=[];

@@ -1,4 +1,4 @@
-import type {Ability,AttackAction,Character,CreatureAction,DamagePacket,DamageType,GameState,OwnedContentMatch,OwnedContentPack,ResolvedSheet,Spell,TransformationEffects,TransformationOption,TransitionResult} from './types.js';
+import type {Ability,AttackAction,Character,ConditionEffect,CreatureAction,DamagePacket,DamageType,GameState,OwnedContentMatch,OwnedContentPack,ResolvedSheet,Spell,TransformationEffects,TransformationOption,TransitionResult} from './types.js';
 import {CONDITIONS,CREATURES,classLevel,contentRegistrySnapshot} from './content-registry.js';
 import {parseCharacter,safeJsonParse} from './schema.js';
 import {applyDdbSrdCreatures,ddbCoverageLabel,extractDdbCharacterId,importDdbCharacter} from './dndbeyond.js';
@@ -9,10 +9,10 @@ import {installExtensionPack,listExtensionPackRecords,loadArtOverride,loadBoolea
 import {SAMPLE_CHARACTERS} from './sample-data.js';
 import {applyOwnedContentPack,applyOwnedContentPacks,ownedContentTemplate,parseOwnedContentPack,safeOwnedContentParse} from './owned-content.js';
 import {
-  actionCostError,applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,
+  actionCostError,applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,criticalDiceExpression,criticalHitThreshold,
   completeTruePolymorph,concentrationSaveMode,createInitialState,declareAttack,declareRecklessAttack,endConcentration,endRage,endSpellEffect,endTransformation,endTurn,
   extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,markOncePerTurn,pendingActionRecharge,remainingActionUses,removeCondition,resolveAdvantage,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollDice,
-  proficiencyBonus,rageStartError,rulesMetadata,shortRest,spellActiveEffect,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError
+  proficiencyBonus,rageStartError,rollAttackD20,rulesMetadata,shortRest,spellActiveEffect,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError
 } from './engine.js';
 
 const $=<T extends HTMLElement>(selector:string)=>{
@@ -47,6 +47,8 @@ let sheet=resolveSheet(character,state);
 let currentTab='actions';
 let selectedOptionId='base';
 const selectedOptionalBonuses=new Map<string,Set<string>>();
+const selectedRollModes=new Map<string,RollMode>();
+const selectedMultiattackVariants=new Map<string,string>();
 const selectedSpellSlots=new Map<string,number>();
 const radiantActions=new Set<string>();
 let pendingTempChoice:{incoming:number;source:string}|null=null;
@@ -54,6 +56,7 @@ let magicEffectsEnabled=true;
 let reduceMotion=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)').matches:false;
 let auraInitialized=false;
 let previousTransformId:string|undefined;
+let previousAuraId:string|undefined;
 let auraTimer:number|undefined;
 const artOverrideCache=new Map<string,string|undefined>();
 const artLoading=new Set<string>();
@@ -132,11 +135,12 @@ function restore(){
 
 function currentOption(){return availableTransformations(character,state).find(o=>o.id===selectedOptionId)}
 function applyResult(result:TransitionResult){
+  if(previousTransformId&&!state.activeTransform){selectedOptionId='base';radiantActions.clear();selectedOptionalBonuses.clear();selectedRollModes.clear();selectedMultiattackVariants.clear();}
   if(result.choice){pendingTempChoice={incoming:result.choice.incoming,source:result.choice.source};const dialog=$<HTMLDialogElement>('#temp-hp-dialog');$('#temp-hp-copy').textContent=`Keep the current ${result.choice.current} Temporary Hit Points or replace them with ${result.choice.incoming} from ${result.choice.source}?`;$('#keep-current-thp').textContent=`Keep ${result.choice.current}`;$('#keep-new-thp').textContent=`Use ${result.choice.incoming}`;dialog.showModal();}
   notify(result.message);render();
 }
 function resetLatestResult(){$('#latest-roll').classList.remove('flash');$('#roll-title').textContent='Ready';$('#roll-total').textContent='—';$('#roll-detail').textContent='Press an attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically.';}
-function setCharacter(next:Character){character=next;baseCharacter=baseCharacters.find(entry=>entry.id===next.id)??next;state=createInitialState(character);sheet=resolveSheet(character,state);selectedOptionId='base';currentTab='actions';radiantActions.clear();selectedOptionalBonuses.clear();selectedSpellSlots.clear();resetLatestResult();notify(`${character.name} loaded in Base Form.`);render();}
+function setCharacter(next:Character){character=next;baseCharacter=baseCharacters.find(entry=>entry.id===next.id)??next;state=createInitialState(character);sheet=resolveSheet(character,state);selectedOptionId='base';currentTab='actions';radiantActions.clear();selectedOptionalBonuses.clear();selectedRollModes.clear();selectedMultiattackVariants.clear();selectedSpellSlots.clear();resetLatestResult();notify(`${character.name} loaded in Base Form.`);render();}
 function reconcileState(next:Character,previous:GameState){
   const clean=createInitialState(next);clean.hp=Math.min(previous.hp,next.hp.max);clean.tempHp=previous.tempHp;if(previous.tempHpSource)clean.tempHpSource=previous.tempHpSource;
   for(const [id,pool] of Object.entries(clean.resources)){const old=previous.resources[id];if(old)pool.current=Math.min(old.current,pool.max);}
@@ -167,18 +171,30 @@ function appendPortrait(container:HTMLElement,targetId:string,fallbackKey:string
   else{wrapper.innerHTML=art[fallbackKey]??art['base']??'';queueArtLoad(targetId);}
   container.append(wrapper);return Boolean(override);
 }
+function activeOverlayVisuals(){
+  const options=availableTransformations(character,state);
+  return state.overlays.map(id=>{
+    const option=options.find(candidate=>candidate.id===id||candidate.grantId===id);
+    return {id,label:(option?.label??character.transformationGrants?.find(grant=>grant.id===id)?.label??id).replace(/^End /,'')};
+  });
+}
+function activeAuraVisual(){
+  const replacement=state.activeTransform?.option;const overlays=activeOverlayVisuals();const ids=[replacement?.id,...overlays.map(overlay=>overlay.id)].filter((value):value is string=>Boolean(value));
+  const labels=[replacement?.label,...overlays.map(overlay=>overlay.label)].filter((value):value is string=>Boolean(value));
+  return {active:ids.length>0,id:ids.join('|')||undefined,label:labels.join(' + ')||character.name,replacement,overlays};
+}
 function renderArt(){
   const container=$('#form-art');clear(container);
-  const active=state.activeTransform?.option;
-  const preview=!active?currentOption():undefined;
+  const aura=activeAuraVisual();const active=aura.replacement;
+  const preview=!aura.active?currentOption():undefined;
   const activeForm=creatureById(active?.formId);
   const mainTarget=activeForm?{targetId:`form:${activeForm.id}`,label:activeForm.name,fallbackKey:activeForm.artKey}:{targetId:'base',label:character.name,fallbackKey:'base'};
-  container.classList.toggle('is-active',Boolean(active));container.classList.toggle('is-base',!active);
+  container.classList.toggle('is-active',aura.active);container.classList.toggle('is-base',!aura.active);
   appendPortrait(container,mainTarget.targetId,mainTarget.fallbackKey,mainTarget.label);
-  if(active){const aura=document.createElement('div');aura.className='form-aura-pulse';aura.setAttribute('aria-hidden','true');container.append(aura);}
-  container.append(text('div',active?'ACTIVE FORM':'BASE FORM','form-state '+(active?'active':'base')));
-  container.append(text('div',active?.label??character.name,'art-label'));
-  if(!active&&preview&&preview.profile!=='base'&&preview.formId){
+  if(aura.active){const pulse=document.createElement('div');pulse.className='form-aura-pulse';pulse.setAttribute('aria-hidden','true');container.append(pulse);}
+  container.append(text('div',aura.active?'ACTIVE FORM':'BASE FORM','form-state '+(aura.active?'active':'base')));
+  container.append(text('div',aura.label,'art-label'));
+  if(!aura.active&&preview&&preview.profile!=='base'&&preview.formId){
     const form=creatureById(preview.formId);if(form){const chip=document.createElement('div');chip.className='form-preview';const icon=document.createElement('div');icon.className='form-preview-icon';appendPortrait(icon,`form:${form.id}`,form.artKey,form.name,'preview-art');const copy=document.createElement('div');copy.append(text('span','Selected form'),text('strong',preview.label));chip.append(icon,copy);container.append(chip);}
   }
   const target=artTargetInfo();$('#art-target-label').textContent=`Artwork target: ${target.label}`;
@@ -186,7 +202,7 @@ function renderArt(){
 }
 function auraPaletteClass(){
   const active=state.activeTransform?.option;
-  if(!active)return state.rage.active?'aura-rage':undefined;
+  if(!active)return state.overlays.length?'aura-overlay':undefined;
   const form=creatureById(active.formId);
   const normalizedType=(form?.type??'').toLowerCase();
   const normalizedId=(form?.id??active.id).toLowerCase();
@@ -216,13 +232,13 @@ function auraPaletteClass(){
 }
 function scheduleAuraClassRemoval(className:string,duration:number){if(auraTimer!==undefined)window.clearTimeout(auraTimer);auraTimer=window.setTimeout(()=>{$('#app').classList.remove(className);auraTimer=undefined;},duration);}
 function syncAuraState(){
-  const app=$('#app');const activeId=state.activeTransform?.option.id;const palette=auraPaletteClass();
-  app.classList.toggle('effects-disabled',!magicEffectsEnabled);app.classList.toggle('reduce-motion',reduceMotion);app.classList.toggle('form-active',Boolean(activeId));app.classList.toggle('rage-empowered',state.rage.active);
+  const app=$('#app');const activeTransformId=state.activeTransform?.option.id;const activeId=activeAuraVisual().id;const palette=auraPaletteClass();
+  app.classList.toggle('effects-disabled',!magicEffectsEnabled);app.classList.toggle('reduce-motion',reduceMotion);app.classList.toggle('motion-forced',!reduceMotion);app.classList.toggle('form-active',Boolean(activeId));app.classList.toggle('rage-empowered',state.rage.active);
   for(const value of ['aura-moon','aura-beast','aura-nature','aura-arcane','aura-prismatic','aura-overlay','aura-rage','aura-undead','aura-shadow','aura-fey','aura-fiend','aura-celestial','aura-draconic','aura-plant','aura-ooze','aura-construct','aura-aberrant','aura-elemental','aura-elemental-fire','aura-elemental-water','aura-elemental-air','aura-elemental-earth'])app.classList.toggle(value,value===palette);
-  if(!auraInitialized){previousTransformId=activeId;auraInitialized=true;return;}
-  if(activeId&&activeId!==previousTransformId){app.classList.remove('form-dissipating');app.classList.add('form-transforming');scheduleAuraClassRemoval('form-transforming',1150);}
-  else if(!activeId&&previousTransformId){app.classList.remove('form-transforming');app.classList.add('form-dissipating');scheduleAuraClassRemoval('form-dissipating',820);}
-  previousTransformId=activeId;
+  if(!auraInitialized){previousTransformId=activeTransformId;previousAuraId=activeId;auraInitialized=true;return;}
+  if(activeId&&activeId!==previousAuraId){app.classList.remove('form-dissipating');app.classList.add('form-transforming');scheduleAuraClassRemoval('form-transforming',1150);}
+  else if(!activeId&&previousAuraId){app.classList.remove('form-transforming');app.classList.add('form-dissipating');scheduleAuraClassRemoval('form-dissipating',820);}
+  previousTransformId=activeTransformId;previousAuraId=activeId;
 }
 function renderContentRegistry(target:HTMLElement,compact=false){
   clear(target);const summary=document.createElement('div');summary.className='registry-summary';
@@ -470,15 +486,49 @@ function renderQuickFeatures(){
 
 function card(title:string,badgeText:string,summary:string){const node=document.createElement('article');node.className='item-card';const head=document.createElement('div');head.className='item-head';head.append(text('strong',title),text('span',badgeText,'badge'));node.append(head,text('p',summary));const options=document.createElement('div');options.className='action-options';node.append(options);const actions=document.createElement('div');actions.className='item-actions';node.append(actions);return {node,options,actions,badge:head.lastElementChild as HTMLElement}}
 type RollMode='normal'|'advantage'|'disadvantage';
-interface D20Result {first:number;second?:number;kept:number;total:number;mode:RollMode;critical:boolean;naturalOne:boolean}
-function rollD20Result(mod:number,mode:RollMode):D20Result{const first=rollDice('1d20').total;const second=mode==='normal'?undefined:rollDice('1d20').total;const kept=mode==='advantage'?Math.max(first,second??first):mode==='disadvantage'?Math.min(first,second??first):first;return {first,...(second===undefined?{}:{second}),kept,total:kept+mod,mode,critical:kept===20,naturalOne:kept===1};}
+interface D20Result {first:number;second?:number;kept:number;total:number;mode:RollMode;critical:boolean;naturalOne:boolean;naturalTwenty:boolean}
+function rollD20Result(mod:number,mode:RollMode,criticalThreshold=20):D20Result{return rollAttackD20(mod,mode,criticalThreshold)}
 function modeText(result:D20Result){return result.mode==='normal'?`d20 ${result.first}`:`${result.mode==='advantage'?'Advantage':'Disadvantage'} ${result.first}, ${result.second}; kept ${result.kept}`;}
 function showRoll(total:number|string,detail:string,title='Roll result'){const panel=$('#latest-roll');$('#roll-title').textContent=title;$('#roll-total').textContent=String(total);$('#roll-detail').textContent=detail;panel.classList.remove('flash');void panel.offsetWidth;panel.classList.add('flash');addActivity(`${title}: ${detail}`);renderLog();}
 function d20(mod:number,mode:RollMode,label:string){const result=rollD20Result(mod,mode);showRoll(result.total,`${modeText(result)} ${signed(mod)} = ${result.total}`,label);return result.total;}
 function combinedMode(rulesMode:RollMode){return rulesMode;}
-function criticalExpression(expression:string){return expression.replace(/(\d+)d(\d+)/gi,(_,count,size)=>`${Number(count)*2}d${size}`);}
+function rollContext(actionId:string,rules:ReturnType<typeof attackRollSources>){
+  const selected=selectedRollModes.get(actionId)??'normal';const advantage=[...rules.sources.advantage],disadvantage=[...rules.sources.disadvantage];
+  if(selected==='advantage')advantage.push('Selected situational Advantage');if(selected==='disadvantage')disadvantage.push('Selected situational Disadvantage');
+  const resolved=resolveAdvantage({advantage,disadvantage});return {mode:resolved.mode as RollMode,sources:resolved.sources,conditional:rules.conditional};
+}
+function rollModePicker(actionId:string,labelText:string){
+  const label=document.createElement('label');label.className='slot-picker';label.append(text('span','Situational roll'));
+  const select=document.createElement('select');select.setAttribute('aria-label',`${labelText} situational roll mode`);
+  for(const [value,name] of [['normal','Use automatic rules'],['advantage','Add Advantage'],['disadvantage','Add Disadvantage']] as const){const option=document.createElement('option');option.value=value;option.textContent=name;option.selected=(selectedRollModes.get(actionId)??'normal')===value;select.append(option);}
+  select.addEventListener('change',()=>selectedRollModes.set(actionId,select.value as RollMode));label.append(select);return label;
+}
+function initiativeModePicker(){
+  const label=document.createElement('label');label.className='slot-picker';label.append(text('span','Combat start'));
+  const select=document.createElement('select');select.setAttribute('aria-label','Initiative roll mode');
+  for(const [value,name] of [['normal','Not surprised / automatic rules'],['advantage','Situational Advantage'],['disadvantage','Surprised (Disadvantage)']] as const){const option=document.createElement('option');option.value=value;option.textContent=name;option.selected=(selectedRollModes.get('initiative')??'normal')===value;select.append(option);}
+  select.addEventListener('change',()=>selectedRollModes.set('initiative',select.value as RollMode));label.append(select);return label;
+}
+function rollInitiative(){
+  const value=sheet.initiative;const selected=selectedRollModes.get('initiative')??'normal';const advantage=[...(value.advantageSources??[])],disadvantage=[...(value.disadvantageSources??[])];
+  if(selected==='advantage')advantage.push('Selected situational Advantage');if(selected==='disadvantage')disadvantage.push('Surprised');
+  const resolved=resolveAdvantage({advantage,disadvantage});const result=rollD20Result(value.modifier,resolved.mode as RollMode);
+  const sources=[...advantage.map(source=>`Advantage: ${source}`),...disadvantage.map(source=>`Disadvantage: ${source}`),...(value.conditionalSources??[]).map(source=>`Conditional: ${source}`)];
+  showRoll(result.total,[`${modeText(result)} ${signed(value.modifier)} = ${result.total}.`,value.source,`Initiative order stays fixed after this roll, even if you later change form.`,sources.join(' · ')].filter(Boolean).join('\n'),'Initiative');render();
+}
 function attackMinimum(action:CreatureAction){if(action.type!=='attack')return 0;return Math.max(0,...sheet.attackDamageModifiers.filter(modifier=>modifier.appliesTo.includes(action.kind as 'weapon'|'unarmed')).map(modifier=>modifier.minimumDamage??0));}
-function packetTotal(packets:DamagePacket[],critical=false,minimum=0){let total=0;const details:string[]=[];for(const packet of packets){const expression=critical&&packet.doubleOnCritical!==false?criticalExpression(packet.expression):packet.expression;const result=rollDice(expression);total+=result.total;details.push(`${packet.label??packet.type}: ${result.total} [${expression}]`);}const raw=total;total=Math.max(minimum,total);if(total!==raw)details.push(`Minimum ${minimum} damage`);return {total,detail:details.join(' + ')};}
+function packetTotal(packets:DamagePacket[],critical=false,minimum=0){let total=0;const details:string[]=[];for(const packet of packets){const expression=critical&&packet.doubleOnCritical!==false?criticalDiceExpression(packet.expression):packet.expression;const result=rollDice(expression);total+=result.total;details.push(`${packet.label??packet.type}: ${result.total} [${expression}]`);}const raw=total;total=Math.max(minimum,total);if(total!==raw)details.push(`Minimum ${minimum} damage`);return {total,detail:details.join(' + ')};}
+function effectText(effect:ConditionEffect){const details=[effect.targetSizeMax?`${effect.targetSizeMax} or smaller target`:'',effect.escapeDc?`escape DC ${effect.escapeDc}`:'',effect.duration??'',effect.note??''].filter(Boolean);return `${effect.condition}${details.length?` (${details.join('; ')})`:''}`;}
+function effectsText(effects:ConditionEffect[]|undefined){return effects?.map(effectText).join('; ')??'';}
+function saveAbilities(action:Extract<CreatureAction,{type:'save'}>){return (action.saveAbilityOptions?.length?action.saveAbilityOptions:[action.saveAbility]).map(ability=>ability.toUpperCase()).join(' or ');}
+function riderToken(id:string){return `Rider:${id}`;}
+function activeRiders(action:AttackAction){const selected=optionalSet(action.id);return (action.riders??[]).filter(rider=>selected.has(riderToken(rider.id)));}
+function attackRollDetail(attack:D20Result,bonus:number,threshold:number){
+  if(attack.naturalOne)return `${modeText(attack)} ${signed(bonus)} = ${attack.total} — natural 1, automatic miss.`;
+  if(attack.naturalTwenty)return `${modeText(attack)} ${signed(bonus)} = ${attack.total} — natural 20, automatic hit and CRITICAL HIT.`;
+  if(attack.critical)return `${modeText(attack)} ${signed(bonus)} = ${attack.total} — CRITICAL HIT if the total hits AC (critical range ${threshold}–20).`;
+  return `${modeText(attack)} ${signed(bonus)} = ${attack.total} to hit.`;
+}
 function spendForAction(action:CreatureAction){const error=spendActionCost(state,action.cost,sheet.conditionImmunities);if(error){notify(error);render();return false;}return true;}
 type LimitedAction=Extract<CreatureAction,{type:'attack'|'save'|'automatic'}>;
 function limitedActionStatus(action:LimitedAction){
@@ -498,27 +548,34 @@ function toggleRow(labelText:string,checked:boolean,onChange:(checked:boolean)=>
 function markOptionalBonus(label:string|undefined){if(label?.includes('Primal'))markOncePerTurn(state,'primal-strike');if(label?.includes('Lunar'))markOncePerTurn(state,'lunar-form');}
 function resolveAttackAction(action:AttackAction){
   if(!prepareLimitedAction(action))return;sheet=resolveSheet(character,state);
-  const rules=attackRollSources(character,state,action,sheet);const mode=combinedMode(rules.mode as RollMode);const attack=rollD20Result(action.attackBonus,mode);
+  const context=rollContext(action.id,attackRollSources(character,state,action,sheet));const threshold=criticalHitThreshold(character,action);const attack=rollD20Result(action.attackBonus,context.mode,threshold);
   const radiant=radiantActions.has(action.id);const automatic=attackBonuses(character,state,sheet,action).filter(p=>!p.label?.startsWith('Optional'));
   const selected=optionalSet(action.id);const optional=attackBonuses(character,state,sheet,action).filter(p=>p.label?.startsWith('Optional')&&selected.has(p.label??''));
-  const base=action.damage.map((packet,index)=>radiant&&index===0?{...packet,type:'Radiant' as DamageType}:packet);const allPackets=[...base,...automatic,...optional];const damage=attack.naturalOne?null:packetTotal(allPackets,attack.critical,attackMinimum(action));
+  const riders=activeRiders(action);const base=action.damage.map((packet,index)=>radiant&&index===0?{...packet,type:'Radiant' as DamageType}:packet);const allPackets=[...base,...automatic,...optional,...riders.flatMap(rider=>rider.damage??[])];const damage=attack.naturalOne?null:packetTotal(allPackets,attack.critical,attackMinimum(action));
   optional.forEach(packet=>markOptionalBonus(packet.label));declareAttack(state,action);
-  const sources=[...rules.sources.advantage.map(x=>`Advantage: ${x}`),...rules.sources.disadvantage.map(x=>`Disadvantage: ${x}`),...rules.conditional.map(x=>`Conditional: ${x}`)];
-  const attackLine=`${modeText(attack)} ${signed(action.attackBonus)} = ${attack.total}${attack.critical?' — CRITICAL HIT':''}${attack.naturalOne?' — automatic miss':''}`;
+  const sources=[...context.sources.advantage.map(x=>`Advantage: ${x}`),...context.sources.disadvantage.map(x=>`Disadvantage: ${x}`),...context.conditional.map(x=>`Conditional: ${x}`)];
+  const attackLine=attackRollDetail(attack,action.attackBonus,threshold);
   const damageLine=damage?`${damage.total} damage if the attack hits${attack.critical?' (damage dice doubled)':''}: ${damage.detail}`:'No damage roll on a natural 1.';
-  showRoll(attack.naturalOne?'Natural 1':`${attack.total} to hit · ${damage?.total??0} dmg`,`${attackLine}\n${damageLine}${sources.length?`\n${sources.join(' · ')}`:''}`,action.name);render();
+  const hitEffects=[...(action.effects??[]),...riders.flatMap(rider=>rider.effects??[])];const riderLines=riders.map(rider=>`${rider.label} selected: ${rider.prerequisite}`);
+  showRoll(attack.naturalOne?'Natural 1':`${attack.total} to hit · ${damage?.total??0} dmg`,[attackLine,damageLine,hitEffects.length?`On a hit, apply: ${effectsText(hitEffects)}.`:'',...riderLines,sources.length?sources.join(' · '):''].filter(Boolean).join('\n'),action.name);render();
 }
-function resolveSaveAction(action:Extract<CreatureAction,{type:'save'}>){if(!prepareLimitedAction(action))return;const fail=packetTotal(action.damageOnFail??[]);const success=packetTotal(action.damageOnSuccess??[]);declareAttack(state,action);const total=fail.total?`${fail.total} fail dmg`:'Effect';const detail=[`Target makes a DC ${action.dc} ${action.saveAbility.toUpperCase()} save.`,fail.detail?`Failed save: ${fail.detail}.`:'Apply the listed failed-save effect.',success.detail?`Successful save: ${success.detail}.`:'',action.effectsOnFail?.length?`Failed-save effects: ${action.effectsOnFail.map(e=>e.condition).join(', ')}.`:''].filter(Boolean).join('\n');showRoll(total,detail,action.name);render();}
-function resolveAutomaticAction(action:Extract<CreatureAction,{type:'automatic'}>){if(!prepareLimitedAction(action))return;const result=packetTotal(action.damage??[]);showRoll(result.total||'Activated',result.detail||action.notes||'Effect activated.',action.name);render();}
+function resolveSaveAction(action:Extract<CreatureAction,{type:'save'}>){if(!prepareLimitedAction(action))return;const fail=packetTotal(action.damageOnFail??[]);const success=action.halfOnSuccess?{total:Math.floor(fail.total/2),detail:`${Math.floor(fail.total/2)} (half of the failed-save roll, rounded down)`}:packetTotal(action.damageOnSuccess??[]);declareAttack(state,action);const total=fail.total?`${fail.total} fail dmg`:'Effect';const detail=[`Target makes a DC ${action.dc} ${saveAbilities(action)} save.`,fail.detail?`Failed save: ${fail.detail}.`:'',action.effectsOnFail?.length?`Failed-save effects: ${effectsText(action.effectsOnFail)}.`:!fail.detail?'Apply the listed failed-save effect.':'',success.detail?`Successful save: ${success.detail}.`:'Successful save: no listed failed-save damage or effects.',action.notes??''].filter(Boolean).join('\n');showRoll(total,detail,action.name);render();}
+function resolveAutomaticAction(action:Extract<CreatureAction,{type:'automatic'}>){if(!prepareLimitedAction(action))return;const result=packetTotal(action.damage??[]);const detail=[action.prerequisite?`Prerequisite: ${action.prerequisite}`:'',result.detail?`${action.damageTiming??'Listed damage'}: ${result.detail}.`:action.damage?.length?'Listed damage did not resolve.':'Effect activated.',action.effects?.length?`Effects: ${effectsText(action.effects)}.`:'',action.notes??''].filter(Boolean).join('\n');showRoll(result.total||'Activated',detail,action.name);render();}
+function multiattackSequence(action:Extract<CreatureAction,{type:'multiattack'}>){const selected=selectedMultiattackVariants.get(action.id);return action.variants?.find(variant=>variant.id===selected)?.sequence??action.sequence;}
 function resolveMultiattack(action:Extract<CreatureAction,{type:'multiattack'}>){
   if(!spendForAction(action))return;const lines:string[]=[];const headlines:string[]=[];let combinedDamage=0;
-  for(const id of action.sequence){
+  for(const id of multiattackSequence(action)){
     const child=sheet.actions.find(candidate=>candidate.id===id);if(!child||child.type==='multiattack')continue;
     const status=limitedActionStatus(child);if(status.unavailable){lines.push(`${child.name}: unavailable (${status.recharge?'recharging':'no uses remaining'})`);continue;}
     markActionRechargeUsed(state,child);markLimitedActionUsed(state,child);
-    if(child.type==='attack'){const rules=attackRollSources(character,state,child,sheet);const attack=rollD20Result(child.attackBonus,rules.mode as RollMode);const automatic=attackBonuses(character,state,sheet,child).filter(packet=>!packet.label?.startsWith('Optional'));const damage=attack.naturalOne?null:packetTotal([...child.damage,...automatic],attack.critical,attackMinimum(child));combinedDamage+=damage?.total??0;headlines.push(`${child.name}: ${attack.naturalOne?'Natural 1 miss':`${attack.total} to hit`}`);const sources=[...rules.sources.advantage.map(value=>`Advantage: ${value}`),...rules.sources.disadvantage.map(value=>`Disadvantage: ${value}`),...rules.conditional.map(value=>`Conditional: ${value}`)];lines.push(`${child.name} attack roll: ${modeText(attack)} ${signed(child.attackBonus)} = ${attack.total} to hit${attack.critical?' — CRITICAL HIT':''}${attack.naturalOne?' — automatic miss':''}.\n${damage?`${child.name} damage if it hits: ${damage.total} (${damage.detail}).`:'No damage roll on a natural 1.'}${sources.length?`\n${sources.join(' · ')}`:''}`);declareAttack(state,child);}
-    else if(child.type==='save'){const fail=packetTotal(child.damageOnFail??[]);combinedDamage+=fail.total;headlines.push(`${child.name}: DC ${child.dc} ${child.saveAbility.toUpperCase()}`);lines.push(`${child.name}: target makes a DC ${child.dc} ${child.saveAbility.toUpperCase()} save${fail.total?`. Damage on a failed save: ${fail.total} (${fail.detail})`:''}.`);declareAttack(state,child);}
-    else{const result=packetTotal(child.damage??[]);combinedDamage+=result.total;headlines.push(`${child.name}: activated`);lines.push(`${child.name}: ${result.detail||child.notes||'effect activated'}`);}
+    if(child.type==='attack'){
+      const context=rollContext(child.id,attackRollSources(character,state,child,sheet));const threshold=criticalHitThreshold(character,child);const attack=rollD20Result(child.attackBonus,context.mode,threshold);
+      const bonuses=attackBonuses(character,state,sheet,child),automatic=bonuses.filter(packet=>!packet.label?.startsWith('Optional')),selected=optionalSet(child.id),optional=bonuses.filter(packet=>packet.label?.startsWith('Optional')&&selected.has(packet.label??'')),riders=activeRiders(child),radiant=radiantActions.has(child.id);
+      const base=child.damage.map((packet,index)=>radiant&&index===0?{...packet,type:'Radiant' as DamageType}:packet),damage=attack.naturalOne?null:packetTotal([...base,...automatic,...optional,...riders.flatMap(rider=>rider.damage??[])],attack.critical,attackMinimum(child));optional.forEach(packet=>markOptionalBonus(packet.label));
+      combinedDamage+=damage?.total??0;headlines.push(`${child.name}: ${attack.naturalOne?'Natural 1 miss':`${attack.total} to hit`}`);const sources=[...context.sources.advantage.map(value=>`Advantage: ${value}`),...context.sources.disadvantage.map(value=>`Disadvantage: ${value}`),...context.conditional.map(value=>`Conditional: ${value}`)],hitEffects=[...(child.effects??[]),...riders.flatMap(rider=>rider.effects??[])];
+      lines.push(`${child.name} attack roll: ${attackRollDetail(attack,child.attackBonus,threshold)}\n${damage?`${child.name} damage if it hits: ${damage.total} (${damage.detail}).`:'No damage roll on a natural 1.'}${hitEffects.length?`\nOn a hit, apply: ${effectsText(hitEffects)}.`:''}${riders.length?`\n${riders.map(rider=>`${rider.label}: ${rider.prerequisite}`).join(' · ')}`:''}${sources.length?`\n${sources.join(' · ')}`:''}`);declareAttack(state,child);
+    }else if(child.type==='save'){const fail=packetTotal(child.damageOnFail??[]);const success=child.halfOnSuccess?{total:Math.floor(fail.total/2),detail:'half the failed-save roll, rounded down'}:packetTotal(child.damageOnSuccess??[]);combinedDamage+=fail.total;headlines.push(`${child.name}: DC ${child.dc} ${saveAbilities(child)}`);lines.push(`${child.name}: target makes a DC ${child.dc} ${saveAbilities(child)} save.${fail.total?`\nFailed-save damage: ${fail.total} (${fail.detail}).`:''}${child.effectsOnFail?.length?`\nFailed-save effects: ${effectsText(child.effectsOnFail)}.`:''}${success.total?`\nSuccessful-save damage: ${success.total} (${success.detail}).`:'\nSuccess: no listed failed-save damage or effects.'}`);declareAttack(state,child);}
+    else{const result=packetTotal(child.damage??[]);combinedDamage+=result.total;headlines.push(`${child.name}: activated`);lines.push(`${child.name}: ${[result.detail,child.effects?.length?`Effects: ${effectsText(child.effects)}.`:'',child.notes].filter(Boolean).join(' ')||'effect activated'}`);}
   }
   const potential=combinedDamage?`Potential damage if every attack hits and every save fails: ${combinedDamage}.`:'';showRoll(headlines.join(' · ')||'Resolved',[...lines,...(potential?[potential]:[]),...(action.notes?[action.notes]:[])].join('\n\n')||'Multiattack resolved.',action.name);render();
 }
@@ -535,21 +592,27 @@ function renderActions(){
   for(const action of sheet.actions){
     const economyError=actionCostError(state,action.cost,sheet.conditionImmunities);
     if(action.type==='attack'){
-      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const limitText=actionLimitText(action);const description=[`${signed(action.attackBonus)} to hit`,action.damage.map(packet=>`${packet.expression} ${packet.type}`).join(' + '),limitText,action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':actionCostLabel(action.cost),description);if(blocked)c.badge.className='badge inactive';
+      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const limitText=actionLimitText(action);const description=[`${signed(action.attackBonus)} to hit`,action.damage.map(packet=>`${packet.expression} ${packet.type}`).join(' + '),action.effects?.length?`On hit: ${effectsText(action.effects)}`:'',limitText,action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':actionCostLabel(action.cost),description);if(blocked)c.badge.className='badge inactive';
+      c.options.append(rollModePicker(action.id,action.name));
       const radiantEligible=sheet.profile==='wildshape'&&classLevel(character,'Druid')>=6&&action.kind==='beast';if(radiantEligible)c.options.append(toggleRow('Use Radiant damage for this attack',radiantActions.has(action.id),checked=>{checked?radiantActions.add(action.id):radiantActions.delete(action.id);}));
       for(const bonus of attackBonuses(character,state,sheet,action).filter(packet=>packet.label?.startsWith('Optional'))){const label=bonus.label??'Optional damage';c.options.append(toggleRow(`${label} (${bonus.expression} ${bonus.type})`,optionalSet(action.id).has(label),checked=>{const set=optionalSet(action.id);checked?set.add(label):set.delete(label);}));}
+      for(const rider of action.riders??[]){const token=riderToken(rider.id);c.options.append(toggleRow(`${rider.label}: ${rider.prerequisite}`,optionalSet(action.id).has(token),checked=>{const set=optionalSet(action.id);checked?set.add(token):set.delete(token);}));}
       const label=limit.recharge?`Awaiting ${limit.recharge.min}–${limit.recharge.max}`:limit.remaining===0?'No uses remaining':economyError??`Roll ${action.name}`;const use=button(label,()=>resolveAttackAction(action),blocked?'button secondary action-roll':'button primary action-roll');use.disabled=blocked;c.actions.append(use);root.append(c.node);
     }else if(action.type==='save'){
-      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const damage=action.damageOnFail?.map(packet=>`${packet.expression} ${packet.type}`).join(' + ')||'Effect on failed save';const detail=[damage,actionLimitText(action),action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':`${actionCostLabel(action.cost)} · DC ${action.dc} ${action.saveAbility.toUpperCase()}`,detail);if(blocked)c.badge.className='badge inactive';const label=limit.recharge?`Awaiting ${limit.recharge.min}–${limit.recharge.max}`:limit.remaining===0?'No uses remaining':economyError??`Use ${action.name}`;const use=button(label,()=>resolveSaveAction(action),blocked?'button secondary action-roll':'button primary action-roll');use.disabled=blocked;c.actions.append(use);root.append(c.node);
+      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const damage=action.damageOnFail?.map(packet=>`${packet.expression} ${packet.type}`).join(' + ')||'Effect on failed save';const detail=[damage,action.halfOnSuccess?'Half damage on a successful save (rounded down)':'',action.effectsOnFail?.length?`On failure: ${effectsText(action.effectsOnFail)}`:'',actionLimitText(action),action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':`${actionCostLabel(action.cost)} · DC ${action.dc} ${saveAbilities(action)}`,detail);if(blocked)c.badge.className='badge inactive';const label=limit.recharge?`Awaiting ${limit.recharge.min}–${limit.recharge.max}`:limit.remaining===0?'No uses remaining':economyError??`Use ${action.name}`;const use=button(label,()=>resolveSaveAction(action),blocked?'button secondary action-roll':'button primary action-roll');use.disabled=blocked;c.actions.append(use);root.append(c.node);
     }else if(action.type==='multiattack'){
-      const names=action.sequence.map(id=>sheet.actions.find(candidate=>candidate.id===id)?.name??id);const c=card(action.name,actionCostLabel(action.cost),`Rolls each component separately with its own attack roll or saving throw: ${names.join(' → ')}. Damage is shown for each component and as a potential total.${action.notes?` ${action.notes}`:''}${economyError?` · ${economyError}`:''}`);if(economyError)c.badge.className='badge inactive';const use=button(economyError??`Roll ${action.name}`,()=>resolveMultiattack(action),economyError?'button secondary action-roll':'button primary action-roll');use.disabled=Boolean(economyError);c.actions.append(use);root.append(c.node);
+      const names=multiattackSequence(action).map(id=>sheet.actions.find(candidate=>candidate.id===id)?.name??id);const c=card(action.name,actionCostLabel(action.cost),`Rolls each component separately with its own attack roll or saving throw: ${names.join(' → ')}. Damage, critical hits, and on-hit effects are shown per component. Optional choices configured on the individual attack cards are applied when eligible.${action.notes?` ${action.notes}`:''}${economyError?` · ${economyError}`:''}`);if(economyError)c.badge.className='badge inactive';
+      if(action.variants?.length){const label=document.createElement('label');label.className='slot-picker';label.append(text('span','Multiattack option'));const select=document.createElement('select');select.setAttribute('aria-label',`${action.name} option`);const standard=document.createElement('option');standard.value='';standard.textContent=action.sequence.map(id=>sheet.actions.find(candidate=>candidate.id===id)?.name??id).join(' + ');select.append(standard);for(const variant of action.variants){const option=document.createElement('option');option.value=variant.id;option.textContent=variant.label;option.selected=selectedMultiattackVariants.get(action.id)===variant.id;select.append(option);}select.addEventListener('change',()=>{selectedMultiattackVariants.set(action.id,select.value);renderActions();});label.append(select);c.options.append(label);}
+      const use=button(economyError??`Roll ${action.name}`,()=>resolveMultiattack(action),economyError?'button secondary action-roll':'button primary action-roll');use.disabled=Boolean(economyError);c.actions.append(use);root.append(c.node);
     }else{
-      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const detail=[action.prerequisite,actionLimitText(action),action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':actionCostLabel(action.cost),detail);if(blocked)c.badge.className='badge inactive';const label=limit.recharge?`Awaiting ${limit.recharge.min}–${limit.recharge.max}`:limit.remaining===0?'No uses remaining':economyError??`Use ${action.name}`;const use=button(label,()=>resolveAutomaticAction(action),blocked?'button secondary action-roll':'button primary action-roll');use.disabled=blocked;c.actions.append(use);root.append(c.node);
+      const limit=limitedActionStatus(action);const blocked=limit.unavailable||Boolean(economyError);const detail=[action.prerequisite,action.damage?.length?`${action.damageTiming??'Listed damage'}: ${action.damage.map(packet=>`${packet.expression} ${packet.type}`).join(' + ')}`:'',action.effects?.length?`Effects: ${effectsText(action.effects)}`:'',actionLimitText(action),action.notes,economyError].filter(Boolean).join(' · ');const c=card(action.name,limit.recharge?'Recharging':limit.remaining===0?'Expended':actionCostLabel(action.cost),detail);if(blocked)c.badge.className='badge inactive';const label=limit.recharge?`Awaiting ${limit.recharge.min}–${limit.recharge.max}`:limit.remaining===0?'No uses remaining':economyError??`Use ${action.name}`;const use=button(label,()=>resolveAutomaticAction(action),blocked?'button secondary action-roll':'button primary action-roll');use.disabled=blocked;c.actions.append(use);root.append(c.node);
     }
   }
 }
 function renderRolls(){
-  const root=$('#tab-content');clear(root);const saveTitle=text('h3','Saving Throws');root.append(saveTitle);const saves=document.createElement('div');saves.className='roll-grid';
+  const root=$('#tab-content');clear(root);const initiative=sheet.initiative;const initiativeSource=sheet.form?`Current form: ${sheet.form.name}. ${initiative.source}.`:`Base form. ${initiative.source}.`;const initiativeCard=card(`Initiative ${signed(initiative.modifier)}`,sheet.form?.name??'Base Form',`${initiativeSource} Initiative is a Dexterity check when combat starts. If you transform after rolling, keep the existing Initiative order.`);
+  initiativeCard.options.append(initiativeModePicker());initiativeCard.actions.append(button('Roll Initiative',rollInitiative,'button primary action-roll'));root.append(text('h3','Initiative'),initiativeCard.node);
+  const saveTitle=text('h3','Saving Throws');root.append(saveTitle);const saves=document.createElement('div');saves.className='roll-grid';
   for(const value of Object.values(sheet.saves)){const row=document.createElement('div');row.className='roll-row';const info=document.createElement('div');const ruleMode=resolveAdvantage({advantage:value.advantageSources??[],disadvantage:value.disadvantageSources??[]}).mode as 'normal'|'advantage'|'disadvantage';const notes=[value.source,...(value.advantageSources?.length?[`Advantage: ${value.advantageSources.join(', ')}`]:[]),...(value.disadvantageSources?.length?[`Disadvantage: ${value.disadvantageSources.join(', ')}`]:[]),...(value.automaticFailure?[value.automaticFailure]:[])];info.append(text('strong',`${value.name} ${signed(value.modifier)}`),text('small',notes.join(' · ')));const roll=button(value.automaticFailure?'Automatic Failure':'Roll',()=>d20(value.modifier,combinedMode(ruleMode),value.name),'button compact');roll.disabled=Boolean(value.automaticFailure);row.append(info,roll);saves.append(row);}root.append(saves,text('h3','Skills'));
   const skills=document.createElement('div');skills.className='roll-grid';for(const value of Object.values(sheet.skills).sort((a,b)=>a.name.localeCompare(b.name))){const row=document.createElement('div');row.className='roll-row';const info=document.createElement('div');const ruleMode=resolveAdvantage({advantage:value.advantageSources??[],disadvantage:value.disadvantageSources??[]}).mode as 'normal'|'advantage'|'disadvantage';const detail=[value.source,...(value.advantageSources?.length?[`Advantage: ${value.advantageSources.join(', ')}`]:[]),...(value.disadvantageSources?.length?[`Disadvantage: ${value.disadvantageSources.join(', ')}`]:[]),...(value.conditionalSources?.length?[`Conditional: ${value.conditionalSources.join(', ')}`]:[]),...(value.alternate?[`Alternate ${signed(value.alternate.modifier)}: ${value.alternate.source}`]:[])].join(' · ');info.append(text('strong',`${value.name} ${signed(value.modifier)}`),text('small',detail));const actions=document.createElement('div');actions.className='inline-actions';actions.append(button('Roll',()=>d20(value.modifier,combinedMode(ruleMode),value.name),'button compact'));if(value.alternate)actions.append(button('Use STR',()=>d20(value.alternate?.modifier??value.modifier,combinedMode(ruleMode),`${value.name} (Strength)`),'button compact'));row.append(info,actions);skills.append(row);}root.append(skills);
 }
@@ -567,17 +630,17 @@ function chosenSpellLevel(spell:Spell){
 }
 function resolveSpellEffect(baseSpell:Spell,castLevel=baseSpell.slotLevel??baseSpell.level){
   const spell=scaledSpell(baseSpell,castLevel);
-  if(spell.attackBonus!==undefined){const pseudo:AttackAction={id:`spell-${spell.name}`,name:spell.name,type:'attack',cost:'none',attackBonus:spellAttackModifier(spell),ability:spell.ability,kind:'spell',damage:spell.damage??[]};const rules=attackRollSources(character,state,pseudo,sheet);const attack=rollD20Result(pseudo.attackBonus,rules.mode as RollMode);const damage=attack.naturalOne?null:packetTotal(spell.damage??[],attack.critical);declareAttack(state,pseudo);showRoll(attack.naturalOne?'Natural 1':`${attack.total} to hit · ${damage?.total??0} dmg`,`${modeText(attack)} ${signed(pseudo.attackBonus)} = ${attack.total}${attack.critical?' — CRITICAL HIT':''}
-${damage?`${damage.total} damage if hit: ${damage.detail}`:'No damage roll on a natural 1.'}`,spell.name);return;}
-  if(spell.healing){const healing=rollDice(spell.healing);showRoll(`${healing.total} healing`,`${spell.healing} = ${healing.total}. Apply it to the chosen target.`,spell.name);return;}
+  if(spell.attackBonus!==undefined){const pseudo:AttackAction={id:`spell-${spell.name}`,name:spell.name,type:'attack',cost:'none',attackBonus:spellAttackModifier(spell),ability:spell.ability,kind:'spell',damage:spell.damage??[]};const context=rollContext(pseudo.id,attackRollSources(character,state,pseudo,sheet));const attack=rollD20Result(pseudo.attackBonus,context.mode);const damage=attack.naturalOne?null:packetTotal(spell.damage??[],attack.critical);declareAttack(state,pseudo);const sources=[...context.sources.advantage.map(value=>`Advantage: ${value}`),...context.sources.disadvantage.map(value=>`Disadvantage: ${value}`),...context.conditional.map(value=>`Conditional: ${value}`)];showRoll(attack.naturalOne?'Natural 1':`${attack.total} to hit · ${damage?.total??0} dmg`,`${attackRollDetail(attack,pseudo.attackBonus,20)}
+${damage?`${damage.total} damage if hit: ${damage.detail}`:'No damage roll on a natural 1.'}${spell.summary?`\nSpell effect: ${spell.summary}`:''}${sources.length?`\n${sources.join(' · ')}`:''}`,spell.name);return;}
+  if(spell.healing){const healing=rollDice(spell.healing);showRoll(`${healing.total} healing`,`${spell.healing} = ${healing.total}. Apply it to the chosen target.${spell.summary?`\n${spell.summary}`:''}`,spell.name);return;}
   if(spell.damage?.length&&spell.resolution==='manual'){showRoll('Manual',spell.summary??'Resolve this conditional effect from your source.',spell.name);return;}
-  if(spell.damage?.length){const damage=packetTotal(spell.damage);const save=spell.saveAbility?`DC ${spellSaveDc(spell)} ${spell.saveAbility.toUpperCase()} save`:`DC ${spellSaveDc(spell)} save`;const success=spell.halfOnSave?` Success: ${Math.floor(damage.total/2)} damage.`:'';showRoll(`${damage.total} effect dmg`,spell.resolution==='automatic'?`No attack roll or saving throw is required. ${damage.detail}`:`${save}. Failure: ${damage.total} damage.${success} ${damage.detail}`,spell.name);return;}
+  if(spell.damage?.length){const damage=packetTotal(spell.damage);const save=spell.saveAbility?`DC ${spellSaveDc(spell)} ${spell.saveAbility.toUpperCase()} save`:`DC ${spellSaveDc(spell)} save`;const success=spell.halfOnSave?` Success: ${Math.floor(damage.total/2)} damage.`:'';showRoll(`${damage.total} effect dmg`,`${spell.resolution==='automatic'?`No attack roll or saving throw is required. ${damage.detail}`:`${save}. Failure: ${damage.total} damage.${success} ${damage.detail}`}${spell.summary?`\n${spell.summary}`:''}`,spell.name);return;}
   showRoll('Cast',spell.summary??'Spell effect activated.',spell.name);
 }
 function castAndResolveSpell(spell:Spell&{available:boolean;reason:string}){const castLevel=chosenSpellLevel(spell);const result=castSpell(character,state,spell.name,castLevel||undefined);const success=result.message.startsWith('Cast ');applyResult(result);if(!success)return;const immediate=spell.resolution!=='manual'&&(spell.attackBonus!==undefined||Boolean(spell.healing)||(!spell.concentration&&Boolean(spell.damage?.length)));const persistent=spellActiveEffect(spell);const timing=persistent?.id==='barkskin'?' Barkskin used your Bonus Action; your Action remains available. Wild Shape and Rage also require a Bonus Action and must wait until a later turn.':'';if(immediate)resolveSpellEffect(spell,castLevel);else showRoll('Cast',`${persistent?`${persistent.summary} Active for ${persistent.duration}.`:spell.concentration?'Concentration started. Use Resolve Effect whenever the spell deals damage or healing.':spell.summary??'Spell activated.'}${timing}`,spell.name);}
 function spellCard(spell:Spell&{available:boolean;reason:string}){
   const slotLevel=spell.slotLevel??spell.level;const chosen=chosenSpellLevel(spell);const persistent=spellActiveEffect(spell);const resolution=spell.damage?.length&&spell.attackBonus===undefined?(spell.resolution==='automatic'?'Automatic damage':spell.resolution==='manual'?'Conditional/manual effect':`Save DC ${spellSaveDc(spell)}${spell.saveAbility?` ${spell.saveAbility.toUpperCase()}`:''}${spell.halfOnSave?' · half on success':''}`):'';const stats=[actionCostLabel(spell.castingTime),slotLevel===0?'Cantrip':`Level ${slotLevel}`,spell.concentration?'Concentration':'',persistent?.acMinimum!==undefined?`AC minimum ${persistent.acMinimum}`:'',persistent?.duration?`Duration ${persistent.duration}`:'',spell.components?`Components ${spell.components}`:'',spell.attackBonus!==undefined?`Spell attack ${signed(spellAttackModifier(spell))}`:'',spell.healing?`Healing ${spell.healing}`:'',resolution].filter(Boolean).join(' · ');const timing=persistent?.id==='barkskin'?'2024 timing: Barkskin, Wild Shape, and Rage each use a Bonus Action, so they cannot be activated together on one turn. Barkskin lasts 1 hour; cast it before combat or on an earlier turn, then transform or Rage later.':'';const detail=[stats,spell.reason,persistent?.summary??spell.summary??'',timing].filter(Boolean).join('\n');const badge=spell.specialAccess==='circle-of-the-moon'?(spell.available?'Circle · Ready':'Circle · Blocked'):(spell.available?'Ready':'Unavailable');const c=card(spell.name,badge,detail);c.badge.className=`badge ${spell.available?'active':'inactive'}`;
-  const levels=availableSpellSlotLevels(character,state,slotLevel);if(slotLevel>0&&levels.length){const picker=document.createElement('label');picker.className='slot-picker';picker.append(text('span','Cast using'));const select=document.createElement('select');select.setAttribute('aria-label',`${spell.name} spell slot level`);const scales=Boolean(spell.higherSlotHealing||spell.higherSlotDamage?.length);for(const level of levels){const option=document.createElement('option');option.value=String(level);option.textContent=`Level ${level} slot${level>slotLevel?scales?' · scaled effect':' · higher-level slot':''}`;option.selected=level===chosen;select.append(option);}select.disabled=!spell.available;select.addEventListener('change',()=>{selectedSpellSlots.set(spellKey(spell),Number(select.value));renderSpells();});picker.append(select);c.options.append(picker);}
+  const levels=availableSpellSlotLevels(character,state,slotLevel);if(slotLevel>0&&levels.length){const picker=document.createElement('label');picker.className='slot-picker';picker.append(text('span','Cast using'));const select=document.createElement('select');select.setAttribute('aria-label',`${spell.name} spell slot level`);const scales=Boolean(spell.higherSlotHealing||spell.higherSlotDamage?.length);for(const level of levels){const option=document.createElement('option');option.value=String(level);option.textContent=`Level ${level} slot${level>slotLevel?scales?' · scaled effect':' · higher-level slot':''}`;option.selected=level===chosen;select.append(option);}select.disabled=!spell.available;select.addEventListener('change',()=>{selectedSpellSlots.set(spellKey(spell),Number(select.value));renderSpells();});picker.append(select);c.options.append(picker);}if(spell.attackBonus!==undefined)c.options.append(rollModePicker(`spell-${spell.name}`,spell.name));
   const immediate=spell.resolution!=='manual'&&(spell.attackBonus!==undefined||Boolean(spell.healing)||(!spell.concentration&&Boolean(spell.damage?.length)));const castLabel=persistent?.id==='barkskin'?'Cast Barkskin on Self':immediate?`Cast & Roll ${spell.name}`:`Cast ${spell.name}`;const cast=button(spell.available?castLabel:spell.reason,()=>castAndResolveSpell(spell),spell.available?'button primary action-roll':'button secondary');cast.disabled=!spell.available;c.actions.append(cast);const activeEffect=state.concentration?.name===spell.name&&spell.resolution!=='manual'&&Boolean(spell.damage?.length||spell.healing);if(activeEffect)c.actions.append(button(`Resolve ${spell.name} Effect`,()=>resolveSpellEffect(spell,state.concentration?.castLevel??slotLevel),'button secondary'));return c.node;
 }
 function renderSpells(){
@@ -608,7 +671,7 @@ function renderConditions(){const list=$('#condition-list');clear(list);for(cons
 function renderLog(){const root=$('#activity-log');clear(root);$<HTMLButtonElement>('#clear-activity').disabled=state.log.length===0;if(state.log.length===0){root.append(text('div','No activity yet.','log-row'));return;}for(const item of state.log)root.append(text('div',item,'log-row'));}
 function render(){sheet=resolveSheet(character,state);syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderResources();renderQuickFeatures();renderActiveEffects();renderTab();renderConditions();renderLog();persist();}
 
-function endCurrentForm(){const wasActive=Boolean(state.activeTransform);const recordsExternalEnd=state.activeTransform?.option.profile==='true-polymorph'&&state.activeTransform.permanentUntilDispelled;const result=endTransformation(state,!recordsExternalEnd,character);if(wasActive&&!state.activeTransform){selectedOptionId='base';radiantActions.clear();selectedOptionalBonuses.clear();}applyResult(result);}
+function endCurrentForm(){const wasActive=Boolean(state.activeTransform);const recordsExternalEnd=state.activeTransform?.option.profile==='true-polymorph'&&state.activeTransform.permanentUntilDispelled;const result=endTransformation(state,!recordsExternalEnd,character);if(wasActive&&!state.activeTransform){selectedOptionId='base';radiantActions.clear();selectedOptionalBonuses.clear();selectedRollModes.clear();selectedMultiattackVariants.clear();}applyResult(result);}
 function initializeControls(){
   const damage=$<HTMLSelectElement>('#damage-type');for(const type of damageTypes){const option=document.createElement('option');option.value=type;option.textContent=type;damage.append(option);}damage.value='Slashing';
   const conditions=$<HTMLSelectElement>('#condition-select');for(const condition of commonConditions){const option=document.createElement('option');option.value=condition;option.textContent=condition;conditions.append(option);}

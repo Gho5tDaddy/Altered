@@ -1,4 +1,4 @@
-# Rules coverage — v0.21.0
+# Rules coverage — v0.23.2
 
 ## Fully calculated in the bundled rules pack
 
@@ -18,6 +18,12 @@
 - Damage resistances, immunities, vulnerabilities, Temporary HP conflicts, healing, and damage-triggered Concentration checks.
 - Core condition effects used by the sheet: action blocking, speech/Concentration consequences, zero Speed, attack/check/save disadvantage, and automatic Strength/Dexterity save failures.
 - Attack-roll, saving-throw, automatic, and mixed-action Multiattack creature actions, including start-of-turn recharge rolls and lockout.
+- Natural 1 automatic misses, natural 20 automatic hits and critical hits, Champion expanded critical ranges for weapons and Unarmed Strikes, and critical doubling of eligible damage dice only.
+- Rules-aware situational Advantage/Disadvantage that combines with automatic sources and cancels opposing sources.
+- Independent Multiattack attack rolls, legal replacement sequences, attack damage conversions, optional once-per-turn damage, and target effects.
+- Attack riders with declared prerequisites, extra damage, and on-hit conditions.
+- 2024 Unarmed Strike damage, Grapple, and Shove procedures, including target-selected Strength or Dexterity saves.
+- Failed-save effects, half damage from the same roll rounded down, and ongoing-damage timing labels.
 - Per-day creature-action use tracking with Long Rest recovery.
 - Live SRD 5.2.1 support-catalog validation across 1,808 reusable records. Relevant selected Beast forms can be normalized into executable local form data during character import.
 

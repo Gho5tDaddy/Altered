@@ -23,14 +23,16 @@ The same standalone file is used on all three platforms. The `dist` directory is
 1. Import a public D&D Beyond character link/ID, import an Altered JSON backup, or select a bundled character.
 2. Choose one of the forms generated from that character's legal abilities.
 3. Press Transform.
-4. Press the named attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically.
+4. Press the named attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically. Use the clearly labeled situational selector when the target or battlefield grants Advantage or Disadvantage; Altered combines it with automatic condition rules and cancels opposing sources correctly.
 5. Press End Form when a legal exit is available. Wild Shape voluntary exit requires a Bonus Action, so the button clearly explains when that Bonus Action is unavailable.
 
 The **Active now** panel explains the effects that currently change the sheet. Barkskin raises Armor Class to its 2024 minimum and remains visible through Wild Shape until ended. In Moon Wild Shape the panel lists the Circle spells that can still be cast; during Rage it shows the active resistances and Strength benefits and explains why spells are blocked.
 
 The turn strip tracks the Action, Bonus Action, Reaction, and the 2024 one-slot-spell-per-turn limit separately. Spending an Action never consumes the Bonus Action, and a cantrip does not consume the slot-spell limit. Barkskin, Wild Shape, and Rage each require a Bonus Action, so Altered keeps the Action available after Barkskin while clearly requiring Wild Shape or Rage to wait for another turn.
 
-Multiattack displays a separate d20-to-hit or saving-throw result for every component, followed by each component's damage and a clearly labeled potential damage total. Active forms use a visible animated portrait ring and interface aura; if Reduce motion is enabled, the Active now panel explains why the aura is static.
+Multiattack displays a separate d20-to-hit or saving-throw result for every component, followed by each component's damage, on-hit effects, and a clearly labeled potential damage total. Legal alternatives such as the Lion's Rend + Roar sequence are selectable without spending a second Action. Natural 1, natural 20, Champion critical ranges, doubled critical dice, fixed damage, secondary damage packets, failed-save effects, and half-damage-on-success outcomes use the 2024 rules. Conditional riders such as Giant Goat Charge must be explicitly selected after their prerequisite is met.
+
+Base form exposes all three 2024 Unarmed Strike options: a damage attack roll, Grapple with a Strength-or-Dexterity save, and Shove with the same save choice. The Saves & Skills tab includes Initiative, automatically using the current form's Dexterity plus supported retained features and condition rules; Surprise can be selected explicitly. Every non-base transformation—including replacement forms and additive overlays—uses a strong animated portrait ring and interface aura that continues until all forms end; if Reduce motion is enabled, the Active now panel explains why the aura is static.
 
 ## Development
 

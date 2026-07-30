@@ -86,3 +86,47 @@ test('SRD Multiattack can reference a save-based action',()=>{
   assert.ok(multi?.type==='multiattack');if(multi?.type!=='multiattack')return;
   assert.deepEqual(multi.sequence,['bite','constrict']);
 });
+
+test('SRD attack normalization retains every damage packet, including fixed damage',()=>{
+  const spider=normalizeSrdCreature({
+    ...brownBear,name:'Giant Spider',key:'srd-2024_giant-spider',
+    actions:[{name:'Bite',desc:'Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage plus 7 (2d6) Poison damage.',action_type:'ACTION',attacks:[{to_hit_mod:5,reach:5,damage_die_count:1,damage_die_type:'D8',damage_bonus:3,damage_type:{name:'Piercing'}}]}],
+  });
+  const bite=spider.actions[0];assert.equal(bite?.type,'attack');if(bite?.type!=='attack')return;
+  assert.deepEqual(bite.damage,[{expression:'1d8+3',type:'Piercing'},{expression:'2d6',type:'Poison'}]);
+
+  const cat=normalizeSrdCreature({
+    ...brownBear,name:'Cat',key:'srd-2024_cat',size:{name:'Small'},challenge_rating:0,armor_class:12,hit_points:2,hit_dice:'1d4',
+    actions:[{name:'Scratch',desc:'Melee Attack Roll: +4, reach 5 ft. Hit: 1 Slashing damage.',action_type:'ACTION',attacks:[{to_hit_mod:4,reach:5,damage_bonus:1,damage_type:{name:'Slashing'}}]}],
+  });
+  assert.equal(cat.size,'Tiny');const scratch=cat.actions[0];assert.equal(scratch?.type,'attack');if(scratch?.type==='attack')assert.deepEqual(scratch.damage,[{expression:'1',type:'Slashing'}]);
+});
+
+test('verified SRD corrections override known upstream Cat and Panther parse errors',()=>{
+  const panther=normalizeSrdCreature({...brownBear,name:'Panther',key:'srd-2024_panther',skill_bonuses:{perception:4,stealth:6}});
+  assert.equal(panther.skills.Stealth,7);
+  const cat=normalizeSrdCreature({...brownBear,name:'Cat',key:'srd-2024_cat',size:{name:'Small'}});
+  assert.equal(cat.size,'Tiny');
+});
+
+test('SRD replacement Multiattack produces a legal selectable variant instead of an extra attack',()=>{
+  const lion=normalizeSrdCreature({
+    ...brownBear,name:'Lion',key:'srd-2024_lion',
+    actions:[
+      {name:'Rend',desc:'Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Slashing damage.',action_type:'ACTION',attacks:[{to_hit_mod:5,reach:5,damage_die_count:1,damage_die_type:'D8',damage_bonus:3,damage_type:{name:'Slashing'}}]},
+      {name:'Roar',desc:'Wisdom Saving Throw: DC 11. Failure: The target has the Frightened condition.',action_type:'ACTION',attacks:[]},
+      {name:'Multiattack',desc:'The lion makes two Rend attacks. It can replace one attack with a use of Roar.',action_type:'ACTION',attacks:[]},
+    ],
+  });
+  const multi=lion.actions.find(action=>action.type==='multiattack');assert.equal(multi?.type,'multiattack');if(multi?.type!=='multiattack')return;
+  assert.deepEqual(multi.sequence,['rend','rend']);
+  assert.deepEqual(multi.variants,[{id:'replace-with-roar',label:'Rend + Roar',sequence:['rend','roar']}]);
+});
+
+test('SRD save normalization preserves half-damage-on-success timing',()=>{
+  const creature=normalizeSrdCreature({
+    ...brownBear,name:'Breath Beast',key:'srd-2024_breath-beast',
+    actions:[{name:'Cold Breath',desc:'Dexterity Saving Throw: DC 13. Failure: 14 (4d6) Cold damage. Success: Half as much damage.',action_type:'ACTION',attacks:[]}],
+  });
+  const breath=creature.actions[0];assert.equal(breath?.type,'save');if(breath?.type==='save'){assert.equal(breath.halfOnSuccess,true);assert.deepEqual(breath.damageOnFail,[{expression:'4d6',type:'Cold'}]);}
+});

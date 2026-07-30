@@ -53,6 +53,14 @@ const VERIFIED_ABILITY_CORRECTIONS:Readonly<Record<string,Creature['abilities']>
   // and Charisma modifiers in the score fields. These values are locked to SRD 5.2.1 p. 358.
   Octopus:{str:4,dex:15,con:11,int:3,wis:10,cha:4}
 });
+const VERIFIED_SIZE_CORRECTIONS:Readonly<Record<string,string>>=Object.freeze({
+  // The upstream parsed catalog currently reports Small; SRD 5.2.1 p. 346 says Tiny.
+  Cat:'Tiny'
+});
+const VERIFIED_SKILL_CORRECTIONS:Readonly<Record<string,Record<string,number>>>=Object.freeze({
+  // The upstream parsed catalog currently reports +6; SRD 5.2.1 p. 358 says +7.
+  Panther:{Stealth:7}
+});
 
 export function parseSrdCatalogStatus(input:unknown):SrdCatalogStatus{
   if(!isObject(input))throw new Error('SRD catalog status must be an object.');
@@ -111,11 +119,12 @@ function damageFromDescription(description:string):DamagePacket[]{
 }
 
 function conditionEffects(description:string){
-  const effects=[] as {condition:string;escapeDc?:number;note?:string}[];
+  const effects=[] as {condition:string;escapeDc?:number;targetSizeMax?:string;note?:string}[];
   for(const condition of CONDITIONS){
     const pattern=new RegExp(`(?:has|gains?|becomes?)\\s+(?:the\\s+)?${condition}\\s+condition|knocked\\s+${condition}`,'i');
     if(!pattern.test(description))continue;
-    const escape=description.match(/escape\s+DC\s*(\d{1,2})/i);effects.push({condition,...(escape?{escapeDc:whole(escape[1])}:{}),note:'Apply the condition as described in the SRD action.'});
+    const escape=description.match(/escape\s+DC\s*(\d{1,2})/i);const targetSize=description.match(/\b(Tiny|Small|Medium|Large|Huge|Gargantuan)\s+or\s+smaller\b/i);
+    effects.push({condition,...(escape?{escapeDc:whole(escape[1])}:{}),...(targetSize?{targetSizeMax:title(targetSize[1]??'')}:{}),note:'Apply the condition as described in the SRD action.'});
   }
   return effects;
 }
@@ -143,7 +152,7 @@ function attackAction(raw:Record<string,unknown>,abilities:Creature['abilities']
   if(primaryType&&expression)damage.push({expression,type:primaryType});
   const extraType=damageType(attack.extra_damage_type);const extraExpression=diceExpression(attack.extra_damage_die_count,attack.extra_damage_die_type,attack.extra_damage_bonus);
   if(extraType&&extraExpression&&!damage.some(packet=>packet.expression===extraExpression&&packet.type===extraType))damage.push({expression:extraExpression,type:extraType});
-  if(damage.length===0)damage.push(...damageFromDescription(description));
+  for(const packet of damageFromDescription(description))if(!damage.some(existing=>existing.expression===packet.expression&&existing.type===packet.type))damage.push(packet);
   const longRange=number(attack.long_range);const shortRange=number(attack.range);
   const effects=conditionEffects(description);
   return {
@@ -162,20 +171,24 @@ function saveAction(raw:Record<string,unknown>):CreatureAction|undefined{
   const saveAbility=LONG_ABILITIES[abilityName];if(!dc||!saveAbility)return undefined;
   const name=string(raw.name)||'Save';const damage=damageFromDescription(description);
   const effects=conditionEffects(description);
-  return {id:slug(name),name,type:'save',cost:actionCost(raw.action_type),saveAbility,dc,...(damage.length?{damageOnFail:damage}:{}),...(effects.length?{effectsOnFail:effects}:{}),...actionLimits(raw),notes:description.slice(0,500)};
+  const halfOnSuccess=/half\s+(?:as\s+much\s+)?damage|half\s+the\s+damage/i.test(description);
+  return {id:slug(name),name,type:'save',cost:actionCost(raw.action_type),saveAbility,dc,...(damage.length?{damageOnFail:damage}:{}),...(halfOnSuccess?{halfOnSuccess:true}:{}),...(effects.length?{effectsOnFail:effects}:{}),...actionLimits(raw),notes:description.slice(0,500)};
 }
 
 function multiattackAction(raw:Record<string,unknown>,actions:Exclude<CreatureAction,{type:'multiattack'}>[]):CreatureAction|undefined{
-  const description=string(raw.desc);const sequence:string[]=[];
+  const description=string(raw.desc);const replacementClause=description.match(/\b(?:it|the \w+)\s+can\s+replace\s+one\s+attack\s+with\s+(?:a\s+use\s+of\s+)?[^.]+/i)?.[0]??'';
+  const baseDescription=replacementClause?description.replace(replacementClause,''):description;const sequence:string[]=[];
   const counts:Record<string,number>={one:1,two:2,three:3,four:4,five:5,six:6};
   for(const action of actions){
     const escaped=action.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-    const match=description.match(new RegExp(`\\b(one|two|three|four|five|six|\\d+)\\s+(?:\\w+\\s+)?${escaped}\\b`,'i'));
-    const count=match?counts[(match[1]??'').toLowerCase()]??whole(match[1],1):description.toLowerCase().includes(action.name.toLowerCase())?1:0;
+    const match=baseDescription.match(new RegExp(`\\b(one|two|three|four|five|six|\\d+)\\s+(?:\\w+\\s+)?${escaped}\\b`,'i'));
+    const count=match?counts[(match[1]??'').toLowerCase()]??whole(match[1],1):baseDescription.toLowerCase().includes(action.name.toLowerCase())?1:0;
     for(let index=0;index<count&&sequence.length<20;index++)sequence.push(action.id);
   }
   if(sequence.length===0)return undefined;
-  return {id:slug(string(raw.name)||'Multiattack'),name:string(raw.name)||'Multiattack',type:'multiattack',cost:'action',sequence,notes:description.slice(0,500)};
+  const replacement=actions.find(action=>replacementClause.toLowerCase().includes(action.name.toLowerCase()));
+  const variants=replacement&&sequence.length>0&&!sequence.includes(replacement.id)?[{id:`replace-with-${replacement.id}`,label:`${actions.find(action=>action.id===sequence[0])?.name??sequence[0]} + ${replacement.name}`,sequence:[...sequence.slice(0,-1),replacement.id]}]:undefined;
+  return {id:slug(string(raw.name)||'Multiattack'),name:string(raw.name)||'Multiattack',type:'multiattack',cost:'action',sequence,...(variants?{variants}:{}),notes:description.slice(0,500)};
 }
 
 function creatureActions(value:unknown,abilities:Creature['abilities'],cr:number):CreatureAction[]{
@@ -203,11 +216,11 @@ export function normalizeSrdCreature(input:unknown):Creature{
   };
   const correction=VERIFIED_ABILITY_CORRECTIONS[name];if(correction)abilities={...correction};
   if(ABILITIES.some(ability=>abilities[ability]<1||abilities[ability]>30))throw new Error(`${name} has invalid ability scores.`);
-  const cr=number(input.challenge_rating);const size=string(object(input.size).name);const type=string(object(input.type).name);
+  const cr=number(input.challenge_rating);const size=VERIFIED_SIZE_CORRECTIONS[name]??string(object(input.size).name);const type=string(object(input.type).name);
   const ac=whole(input.armor_class),hp=whole(input.hit_points);if(cr===undefined||cr<0||cr>30||!size||!type||ac<1||ac>40||hp<1||hp>9999)throw new Error(`${name} has invalid core statistics.`);
   const savesRaw=object(input.saving_throws_all);const saves:Partial<Record<Ability,number>>={};
   for(const [longName,ability] of Object.entries(LONG_ABILITIES)){const value=number(savesRaw[longName]);saves[ability]=value!==undefined&&value>=-20&&value<=20?value:abilityMod(abilities[ability]);}
-  const skills:Record<string,number>={};for(const [key,value] of Object.entries(object(input.skill_bonuses))){const parsed=number(value);if(parsed!==undefined)skills[title(key)]=parsed;}
+  const skills:Record<string,number>={};for(const [key,value] of Object.entries(object(input.skill_bonuses))){const parsed=number(value);if(parsed!==undefined)skills[title(key)]=parsed;}Object.assign(skills,VERIFIED_SKILL_CORRECTIONS[name]??{});
   const speedRaw=object(input.speed);const speeds:Creature['speeds']={};for(const key of ['walk','climb','swim','fly','burrow'] as const){const value=number(speedRaw[key]);if(value!==undefined&&value>=0&&value<=500)speeds[key]=value;}
   const senses:string[]=[];for(const [label,key] of [['Darkvision','darkvision_range'],['Blindsight','blindsight_range'],['Tremorsense','tremorsense_range'],['Truesight','truesight_range']] as const){const value=number(input[key]);if(value)senses.push(`${label} ${whole(value)} ft.`);}const passive=whole(input.passive_perception);if(passive)senses.push(`Passive Perception ${passive}`);
   const defenses=object(input.resistances_and_immunities);

@@ -54,24 +54,46 @@ function parseConditionEffects(v:unknown,path:string){
     return out;
   });
 }
+function parseAttackRiders(v:unknown,path:string){
+  if(v==null)return undefined;
+  if(!Array.isArray(v))throw new Error(`${path} must be an array.`);
+  return v.slice(0,20).map((entry,i)=>{
+    if(!isObject(entry))throw new Error(`${path}[${i}] must be an object.`);
+    const rider:{id:string;label:string;prerequisite:string;damage?:DamagePacket[];effects?:NonNullable<ReturnType<typeof parseConditionEffects>>}={
+      id:str(entry.id,`${path}[${i}].id`,120),
+      label:str(entry.label,`${path}[${i}].label`,120),
+      prerequisite:str(entry.prerequisite,`${path}[${i}].prerequisite`,300)
+    };
+    if(entry.damage!=null)rider.damage=parseDamage(entry.damage,`${path}[${i}].damage`);
+    const effects=parseConditionEffects(entry.effects,`${path}[${i}].effects`);if(effects)rider.effects=effects;
+    return rider;
+  });
+}
 function parseAction(v:unknown,path:string):CreatureAction{
   if(!isObject(v))throw new Error(`${path} must be an object.`);
   const id=str(v.id,`${path}.id`);const name=str(v.name,`${path}.name`);const type=str(v.type,`${path}.type`,30);
   if(type==='attack'){
     const kind=['beast','weapon','unarmed','spell'].includes(String(v.kind))?v.kind as 'beast'|'weapon'|'unarmed'|'spell':'beast';
     const out:CreatureAction={id,name,type:'attack',cost:actionCost(v.cost,`${path}.cost`,'action'),attackBonus:num(v.attackBonus,`${path}.attackBonus`,-20,40),ability:ability(v.ability,`${path}.ability`),kind,damage:parseDamage(v.damage,`${path}.damage`)};
-    if(typeof v.reach==='number')out.reach=num(v.reach,`${path}.reach`,0,1000);if(typeof v.range==='string')out.range=v.range.slice(0,80);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);const effects=parseConditionEffects(v.effects,`${path}.effects`);if(effects)out.effects=effects;parseActionLimits(v,path,out);return out;
+    if(typeof v.reach==='number')out.reach=num(v.reach,`${path}.reach`,0,1000);if(typeof v.range==='string')out.range=v.range.slice(0,80);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);const effects=parseConditionEffects(v.effects,`${path}.effects`);if(effects)out.effects=effects;const riders=parseAttackRiders(v.riders,`${path}.riders`);if(riders)out.riders=riders;parseActionLimits(v,path,out);return out;
   }
   if(type==='save'){
     const out:CreatureAction={id,name,type:'save',cost:actionCost(v.cost,`${path}.cost`,'action'),saveAbility:ability(v.saveAbility,`${path}.saveAbility`),dc:num(v.dc,`${path}.dc`,1,40)};
-    if(typeof v.range==='string')out.range=v.range.slice(0,80);if(v.damageOnFail!=null)out.damageOnFail=parseDamage(v.damageOnFail,`${path}.damageOnFail`);if(v.damageOnSuccess!=null)out.damageOnSuccess=parseDamage(v.damageOnSuccess,`${path}.damageOnSuccess`);const effects=parseConditionEffects(v.effectsOnFail,`${path}.effectsOnFail`);if(effects)out.effectsOnFail=effects;parseActionLimits(v,path,out);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);return out;
+    if(Array.isArray(v.saveAbilityOptions)){const options=[...new Set(v.saveAbilityOptions.map((entry,i)=>ability(entry,`${path}.saveAbilityOptions[${i}]`)))];if(options.length)out.saveAbilityOptions=options;}
+    if(typeof v.range==='string')out.range=v.range.slice(0,80);if(v.damageOnFail!=null)out.damageOnFail=parseDamage(v.damageOnFail,`${path}.damageOnFail`);if(v.damageOnSuccess!=null)out.damageOnSuccess=parseDamage(v.damageOnSuccess,`${path}.damageOnSuccess`);if(typeof v.halfOnSuccess==='boolean')out.halfOnSuccess=v.halfOnSuccess;const effects=parseConditionEffects(v.effectsOnFail,`${path}.effectsOnFail`);if(effects)out.effectsOnFail=effects;parseActionLimits(v,path,out);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);return out;
   }
   if(type==='automatic'){
-    const out:CreatureAction={id,name,type:'automatic',cost:actionCost(v.cost,`${path}.cost`,'action')};if(v.damage!=null)out.damage=parseDamage(v.damage,`${path}.damage`);const effects=parseConditionEffects(v.effects,`${path}.effects`);if(effects)out.effects=effects;if(typeof v.prerequisite==='string')out.prerequisite=v.prerequisite.slice(0,300);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);parseActionLimits(v,path,out);return out;
+    const out:CreatureAction={id,name,type:'automatic',cost:actionCost(v.cost,`${path}.cost`,'action')};if(v.damage!=null)out.damage=parseDamage(v.damage,`${path}.damage`);if(typeof v.damageTiming==='string')out.damageTiming=v.damageTiming.slice(0,200);const effects=parseConditionEffects(v.effects,`${path}.effects`);if(effects)out.effects=effects;if(typeof v.prerequisite==='string')out.prerequisite=v.prerequisite.slice(0,300);if(typeof v.notes==='string')out.notes=v.notes.slice(0,500);parseActionLimits(v,path,out);return out;
   }
   if(type==='multiattack'){
     if(!Array.isArray(v.sequence)||v.sequence.length===0||v.sequence.length>20)throw new Error(`${path}.sequence must be a non-empty array under 20 entries.`);
-    return {id,name,type:'multiattack',cost:'action',sequence:v.sequence.map((entry,i)=>str(entry,`${path}.sequence[${i}]`,120)),...(typeof v.notes==='string'?{notes:v.notes.slice(0,500)}:{})};
+    const sequence=v.sequence.map((entry,i)=>str(entry,`${path}.sequence[${i}]`,120));
+    const variants=Array.isArray(v.variants)?v.variants.slice(0,20).map((entry,i)=>{
+      if(!isObject(entry))throw new Error(`${path}.variants[${i}] must be an object.`);
+      if(!Array.isArray(entry.sequence)||entry.sequence.length===0||entry.sequence.length>20)throw new Error(`${path}.variants[${i}].sequence must be a non-empty array under 20 entries.`);
+      return {id:str(entry.id,`${path}.variants[${i}].id`,120),label:str(entry.label,`${path}.variants[${i}].label`,120),sequence:entry.sequence.map((child,j)=>str(child,`${path}.variants[${i}].sequence[${j}]`,120))};
+    }):undefined;
+    return {id,name,type:'multiattack',cost:'action',sequence,...(variants?.length?{variants}:{}),...(typeof v.notes==='string'?{notes:v.notes.slice(0,500)}:{})};
   }
   throw new Error(`${path}.type must be attack, save, automatic, or multiattack.`);
 }

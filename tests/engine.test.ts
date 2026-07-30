@@ -4,8 +4,8 @@ import type {AttackAction,Character} from '../src/types.js';
 import {CREATURES} from '../src/content-registry.js';
 import {parseCharacter} from '../src/schema.js';
 import {
-  applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,declareRecklessAttack,
-  endConcentration,endSpellEffect,endTransformation,endTurn,extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
+  applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,criticalDiceExpression,criticalHitThreshold,declareRecklessAttack,
+  endConcentration,endSpellEffect,endTransformation,endTurn,extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,resolveConcentrationCheck,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
 } from '../src/engine.js';
 
 function must<T>(value:T|undefined):T{if(value===undefined)throw new Error('Expected value was missing.');return value}
@@ -31,6 +31,8 @@ function character(overrides:Record<string,unknown>={}):Character{
 }
 
 test('verified 2024 creature golden values are locked',()=>{
+  assert.equal(must(CREATURES.cat).size,'Tiny');
+  assert.equal(must(CREATURES.panther).skills.Stealth,7);
   assert.equal(must(CREATURES['dire-wolf']).hp,22);
   assert.equal(must(CREATURES['dire-wolf']).ac,14);
   assert.equal(must(CREATURES['brown-bear']).abilities.dex,12);
@@ -444,6 +446,44 @@ test('overlay forms preserve imported save and skill totals while adjusting for 
 test('condition immunity suppresses condition penalties and Frightened is surfaced without guessing line of sight',()=>{
   const c=character({classes:[{name:'Fighter',level:5}],totalLevel:5,knownForms:[],seenForms:[],spells:[],spellSlots:{},transformationGrants:[{id:'fearless',label:'Fearless Form',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',effects:{conditionImmunities:['Frightened']}}]});const state=createInitialState(c);state.conditions.push('Frightened');let sheet=resolveSheet(c,state);const attack=sheet.actions.find(action=>action.type==='attack');assert.ok(attack);const baseRules=attackRollSources(c,state,attack,sheet);assert.equal(baseRules.mode,'normal');assert.equal(baseRules.conditional.length,1);assert.equal(sheet.skills.Athletics?.conditionalSources?.length,1);
   const option=availableTransformations(c,state).find(entry=>entry.grantId==='fearless');assert.ok(option);startTransformation(c,state,option);sheet=resolveSheet(c,state);const transformedAttack=sheet.actions.find(action=>action.type==='attack');assert.ok(transformedAttack);assert.equal(attackRollSources(c,state,transformedAttack,sheet).conditional.length,0);assert.equal(sheet.skills.Athletics?.conditionalSources?.length??0,0);
+});
+
+test('2024 Unarmed Strike exposes damage, Grapple, and Shove with the correct save DC',()=>{
+  const c=character({classes:[{name:'Fighter',level:5}],totalLevel:5,knownForms:[],seenForms:[],abilities:{str:16,dex:12,con:14,int:10,wis:10,cha:10}});const state=createInitialState(c);const actions=resolveSheet(c,state).actions;
+  const damage=actions.find(action=>action.id==='unarmed');assert.equal(damage?.type,'attack');if(damage?.type==='attack'){assert.equal(damage.attackBonus,6);assert.equal(damage.damage[0]?.expression,'4');}
+  const grapple=actions.find(action=>action.id==='unarmed-grapple');assert.equal(grapple?.type,'save');if(grapple?.type==='save'){assert.equal(grapple.dc,14);assert.deepEqual(grapple.saveAbilityOptions,['str','dex']);assert.equal(grapple.effectsOnFail?.[0]?.condition,'Grappled');assert.equal(grapple.effectsOnFail?.[0]?.targetSizeMax,'Large');}
+  const shove=actions.find(action=>action.id==='unarmed-shove');assert.equal(shove?.type,'save');if(shove?.type==='save')assert.match(shove.effectsOnFail?.[0]?.note??'',/push the target 5 feet/);
+});
+
+test('Initiative uses the current form Dexterity and retains 2024 Initiative features',()=>{
+  const c=character();const state=createInitialState(c);
+  assert.equal(resolveSheet(c,state).initiative.modifier,2);
+  const bear=availableTransformations(c,state).find(option=>option.profile==='wildshape'&&option.formId==='brown-bear');assert.ok(bear);startTransformation(c,state,bear);
+  let initiative=resolveSheet(c,state).initiative;assert.equal(initiative.modifier,1);assert.match(initiative.source,/Brown Bear Dexterity/);
+  applyCondition(c,state,'Poisoned');initiative=resolveSheet(c,state).initiative;assert.ok(initiative.disadvantageSources?.includes('Poisoned'));
+
+  const champion=character({classes:[{name:'Fighter',level:3,subclass:'Champion'}],knownForms:[],seenForms:[],feats:['Alert']});const championInitiative=resolveSheet(champion,createInitialState(champion)).initiative;
+  assert.equal(championInitiative.modifier,4);assert.ok(championInitiative.advantageSources?.includes('Remarkable Athlete'));assert.match(championInitiative.source,/Alert proficiency/);
+});
+
+test('Champion critical range applies only to weapon and Unarmed Strike attacks',()=>{
+  const c=character({classes:[{name:'Fighter',level:15,subclass:'Champion'}],totalLevel:15,knownForms:[],seenForms:[]});const state=createInitialState(c);const unarmed=resolveSheet(c,state).actions.find(action=>action.id==='unarmed');assert.ok(unarmed);assert.equal(criticalHitThreshold(c,must(unarmed)),18);
+  const beast:AttackAction={id:'bite',name:'Bite',type:'attack',cost:'action',attackBonus:5,ability:'str',kind:'beast',damage:[{expression:'1d8+3',type:'Piercing'}]};assert.equal(criticalHitThreshold(c,beast),20);
+  const level3=character({classes:[{name:'Fighter',level:3,subclass:'Champion'}],totalLevel:3,knownForms:[],seenForms:[]});assert.equal(criticalHitThreshold(level3,must(resolveSheet(level3,createInitialState(level3)).actions.find(action=>action.id==='unarmed'))),19);
+});
+
+test('attack d20 resolution is deterministic for Advantage, Disadvantage, natural 1, and expanded criticals',()=>{
+  const sequence=(...values:number[])=>{let index=0;return ()=>values[index++]??values.at(-1)??0};
+  const advantage=rollAttackD20(5,'advantage',20,sequence(0,.95));assert.deepEqual({first:advantage.first,second:advantage.second,kept:advantage.kept,total:advantage.total,naturalTwenty:advantage.naturalTwenty},{first:1,second:20,kept:20,total:25,naturalTwenty:true});
+  const disadvantage=rollAttackD20(5,'disadvantage',20,sequence(0,.95));assert.equal(disadvantage.kept,1);assert.equal(disadvantage.naturalOne,true);assert.equal(disadvantage.critical,false);
+  const champion=rollAttackD20(7,'normal',19,sequence(.9));assert.equal(champion.kept,19);assert.equal(champion.critical,true);assert.equal(champion.naturalTwenty,false);
+  assert.equal(criticalDiceExpression('1d8+2d6+3'),'2d8+4d6+3');
+  assert.equal(criticalDiceExpression('4'),'4');
+});
+
+test('conditional attack modifiers for Grappled and Pack Tactics are surfaced without guessing the target',()=>{
+  const c=character();const state=createInitialState(c);state.conditions.push('Grappled');let sheet=resolveSheet(c,state);let attack=sheet.actions.find(action=>action.type==='attack');assert.ok(attack);assert.match(attackRollSources(c,state,must(attack),sheet).conditional.join(' '),/other than the grappler/);
+  state.conditions=[];const wolf=availableTransformations(c,state).find(option=>option.formId==='dire-wolf'&&option.profile==='wildshape');assert.ok(wolf);startTransformation(c,state,must(wolf));sheet=resolveSheet(c,state);attack=sheet.actions.find(action=>action.type==='attack');assert.ok(attack);assert.match(attackRollSources(c,state,must(attack),sheet).conditional.join(' '),/Pack Tactics/);
 });
 
 test('Invisible grants attack Advantage and transformed condition immunity can suppress an existing incapacitating condition',()=>{

@@ -9,23 +9,28 @@ export interface Abilities {str:number;dex:number;con:number;int:number;wis:numb
 export interface Speeds {walk?:number;climb?:number;swim?:number;fly?:number;burrow?:number}
 export interface DamagePacket {expression:string;type:DamageType;label?:string;doubleOnCritical?:boolean}
 export interface ConditionEffect {condition:string;duration?:string;escapeDc?:number;targetSizeMax?:string;note?:string}
+export interface AttackRider {
+  id:string;label:string;prerequisite:string;damage?:DamagePacket[];effects?:ConditionEffect[];
+}
 export interface ActionUseLimit {max:number;recovery:'long'}
 
 export interface AttackAction {
   id:string;name:string;type:'attack';cost:ActionCost;attackBonus:number;ability:Ability;
   kind:'beast'|'weapon'|'unarmed'|'spell';reach?:number;range?:string;
-  damage:DamagePacket[];effects?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;notes?:string;
+  damage:DamagePacket[];effects?:ConditionEffect[];riders?:AttackRider[];recharge?:{min:number;max:number};uses?:ActionUseLimit;notes?:string;
 }
 export interface SaveAction {
   id:string;name:string;type:'save';cost:ActionCost;saveAbility:Ability;dc:number;
+  saveAbilityOptions?:Ability[];
   range?:string;damageOnFail?:DamagePacket[];damageOnSuccess?:DamagePacket[];
-  effectsOnFail?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;notes?:string;
+  halfOnSuccess?:boolean;effectsOnFail?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;notes?:string;
 }
 export interface AutomaticAction {
   id:string;name:string;type:'automatic';cost:ActionCost;damage?:DamagePacket[];
-  effects?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;prerequisite?:string;notes?:string;
+  damageTiming?:string;effects?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;prerequisite?:string;notes?:string;
 }
-export interface MultiattackAction {id:string;name:string;type:'multiattack';cost:'action';sequence:string[];notes?:string}
+export interface MultiattackVariant {id:string;label:string;sequence:string[]}
+export interface MultiattackAction {id:string;name:string;type:'multiattack';cost:'action';sequence:string[];variants?:MultiattackVariant[];notes?:string}
 export type CreatureAction = AttackAction|SaveAction|AutomaticAction|MultiattackAction;
 
 export interface Creature {
@@ -112,7 +117,7 @@ export interface EvaluatedFeature {id:string;name:string;source:string;status:Fe
 export interface AcCandidate {name:string;value:number;legal:boolean;reason:string}
 export interface ResolvedSheet {
   profile:TransformProfile;form?:Creature;creatureType:string;size:string;abilities:Abilities;ac:number;acSource:string;acCandidates:AcCandidate[];speeds:Speeds;
-  saves:Record<Ability,DerivedRoll>;skills:Record<string,DerivedRoll>;actions:CreatureAction[];
+  initiative:DerivedRoll;saves:Record<Ability,DerivedRoll>;skills:Record<string,DerivedRoll>;actions:CreatureAction[];
   resistances:DamageType[];immunities:DamageType[];vulnerabilities:DamageType[];senses:string[];
   canSpeak:boolean;canCast:boolean;canConcentrate:boolean;canAttack:boolean;canManipulateObjects:boolean;conditionImmunities:string[];attackDamageModifiers:NonNullable<TransformationEffects['attackDamageModifier']>[];features:EvaluatedFeature[];spells:(Spell&{available:boolean;reason:string})[];
 }

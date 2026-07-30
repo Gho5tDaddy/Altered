@@ -1,10 +1,10 @@
-# Altered v0.21.0 QA report
+# Altered v0.23.2 QA report
 
 ## Automated verification
 
 - Strict TypeScript compilation: pass
 - Reproducible standalone and PWA build: pass
-- Node test suite: 116/116 pass
+- Node test suite: 129/129 pass
 - Schema, content-registry, storage, owned-content, data-integrity, and rules-engine suites: pass
 - Runtime dependencies: project-local Node.js v24.18.0 and TypeScript 5.8.3
 
@@ -20,6 +20,15 @@ Verified:
 - Accessible dialog names and an accessible condition selector.
 - Wild Shape selection, activation, direct form changes, legal exit costs, and form-resource spending.
 - Attack, save-based, automatic, and Multiattack action renderers.
+- Independent d20 rolls for every Multiattack attack, with clear to-hit totals and component damage.
+- Natural 1 automatic misses, natural 20 automatic hits/critical hits, Champion 19–20 and 18–20 critical ranges, and eligible damage-dice doubling.
+- Situational Advantage/Disadvantage combined with automatic condition sources, including correct cancellation.
+- On-hit Prone/Grappled/Restrained effects, failed-save effects, escape DCs, size limits, and durations.
+- Lion’s two-Rend and Rend + Roar Multiattack options.
+- Giant Goat Charge’s selectable prerequisite, extra 2d4 damage, and Prone rider.
+- Base-form Unarmed Strike damage, Grapple, and Shove options using the 2024 attack/save procedures.
+- Live SRD fixed-damage, secondary-damage, replacement-Multiattack, and half-on-success normalization.
+- Primary-source corrections for upstream Cat-size and Panther-Stealth parsing errors.
 - Recharge actions lock after use, persist across reloads, report failed turn-start rolls, and unlock on a qualifying roll.
 - Recharging attack, save, and automatic actions share the same enforcement path.
 - Per-day form actions show remaining uses, lock when spent, remain scoped to the form, and recover on a Long Rest.
@@ -61,6 +70,7 @@ Verified:
 - Action and spell buttons disable immediately when their action-economy cost is unavailable and show the blocker before a click.
 - Rage activation produces a persistent effect summary and applies resistance/Strength benefits without incorrectly adding Rage Damage to beast stat-block attacks.
 - Live Ferocitus Brown Bear workflow: four Circle spells initially ready; level 3 Cure Wounds rolled 6d8 + 3; level 3 Moonbeam rolled 3d10 with Constitution-save/half-damage guidance; Starry Wisp rolled its level-scaled attack; Conjure Animals became unavailable only after its level 3 slots were spent.
+- Final v0.23.2 live pass: Brown Bear replacement form and Goliath Large Form overlay each displayed the stronger two-second pulse with an infinite running animation; ending each transformation removed the pulse and restored the unlit Base Form. Brown Bear Initiative changed from base Dexterity +2 to form Dexterity +1. No browser errors were recorded.
 
 Runtime page errors during the final interaction pass: 0.
 
