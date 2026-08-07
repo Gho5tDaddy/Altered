@@ -328,6 +328,22 @@ function renderSettings(){
 }
 function slug(value:string){return value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,70)||'private-content';}
 function downloadJson(data:unknown,filename:string){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=filename;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
+async function loadHostedAccount(){
+  try{
+    const response=await fetch('/api/auth/me',{headers:{Accept:'application/json','X-Altered-Request':'app'},credentials:'same-origin',cache:'no-store'});
+    if(!response.ok)return;
+    const payload=await response.json() as {displayName?:unknown;email?:unknown};
+    const displayName=typeof payload.displayName==='string'?payload.displayName.trim().slice(0,100):'';
+    const email=typeof payload.email==='string'?payload.email.trim().slice(0,254):'';
+    if(!displayName&&!email)return;
+    const status=$('#account-status');
+    $('#account-name').textContent=displayName||email;
+    status.title=email?`Signed in as ${email}`:'Signed in to Altered';
+    status.hidden=false;
+  }catch{
+    // Standalone and local builds intentionally have no hosted account route.
+  }
+}
 function setImportStatus(message:string){$('#import-status').textContent=message;}
 function setBuilderStatus(message:string){$('#builder-status').textContent=message;}
 function applyImportedCharacter(parsed:Character){
@@ -852,6 +868,7 @@ async function boot(){
   initializeControls();filterHelpTopics();renderSettings();renderInstalledPacks();
   notify(`Altered loaded for ${character.name}. Built-in rules and forms are ready.`);render();
   document.documentElement.dataset.alteredReady='true';
+  void loadHostedAccount();
   installedPacks=await loadValidatedInstalledPacks();
   rebuildEffectiveCharacterLibrary(true);
   if(pendingActiveSnapshot?.option?.id){const option=availableTransformations(character,state).find(candidate=>candidate.id===pendingActiveSnapshot?.option?.id);if(option)state.activeTransform={option,startedTurn:boundedWhole(pendingActiveSnapshot.startedTurn,state.turn.number,1,1_000_000),duration:safeSavedText(pendingActiveSnapshot.duration,'',200),tempHpSource:Boolean(pendingActiveSnapshot.tempHpSource),...(pendingActiveSnapshot.spellConcentration?{spellConcentration:true}:{}),...(pendingActiveSnapshot.permanentUntilDispelled?{permanentUntilDispelled:true}:{})};}

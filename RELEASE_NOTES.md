@@ -1,8 +1,14 @@
-# Altered v0.24.2 release notes
+# Altered v0.24.3 release notes
 
-Altered can now be opened by anyone who has its link. Each visitor receives an independent local sheet: character saves, combat state, settings, artwork overrides, and private owned-content packs remain in that visitor's browser and are not uploaded to an Altered database.
+Anyone with the public link can now sign in to Altered or create a free ChatGPT account. Account credentials are handled by ChatGPT, so Altered never receives or stores a password. The app shows the signed-in identity and provides a direct sign-out control. Each account still receives an independent local sheet: character saves, combat state, settings, artwork overrides, and private owned-content packs remain in that browser and are not uploaded to an Altered database.
 
-The public support routes remain narrow and non-caching. Public D&D Beyond imports accept numeric character IDs only and contact one fixed upstream host; SRD lookups accept only the verified catalog domains and document. Both now require same-origin application requests and apply bounded best-effort per-address rate limits in addition to their existing response-size and timeout controls.
+The dashboard now stays within the browser viewport. The current form, core state, action economy, and active sheet tab remain the focus; damage, turn/rest, conditions, activity, form search, filters, and artwork tools use compact native disclosure panels. Scrolling is confined to the active content or the panel the user opened.
+
+The hosted service worker no longer caches authenticated HTML or navigation responses. Public D&D Beyond and SRD support routes now require both a signed-in identity and the existing same-origin application marker, while retaining fixed upstream hosts, response limits, timeouts, rate limits, and `no-store` responses.
+
+## Previous v0.24.2 notes
+
+Altered can be reached by anyone who has its link. Each visitor receives an independent local sheet: character saves, combat state, settings, artwork overrides, and private owned-content packs remain in that visitor's browser and are not uploaded to an Altered database.
 
 ## Previous v0.24.1 notes
 

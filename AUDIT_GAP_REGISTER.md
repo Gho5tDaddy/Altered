@@ -1,6 +1,13 @@
-# Altered v0.24.2 audit gap register
+# Altered v0.24.3 audit gap register
 
 This register distinguishes an incorrect result from a deliberately conditional or reference-only result. Altered must never present a reference-only mechanic as calculated.
+
+## Resolved in v0.24.3
+
+| Finding | Severity | Resolution | Regression evidence |
+|---|---:|---|---|
+| The public release did not require the requested per-user sign-in | High | Added platform-managed account authentication, server-side route enforcement, identity-safe status, and non-caching authenticated navigation | hosted worker runtime audit and `account identity and compact dashboard...` |
+| Full-page scrolling obscured core table controls on smaller screens | Medium | Bound the shell to the viewport and converted secondary controls into native disclosures with localized overflow | desktop/phone browser audit and UI contract tests |
 
 ## Resolved in v0.24.2
 

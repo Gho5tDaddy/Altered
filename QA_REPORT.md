@@ -1,4 +1,14 @@
-# Altered v0.24.2 QA report
+# Altered v0.24.3 QA report
+
+## v0.24.3 account and compact-dashboard verification
+
+- Anonymous page requests receive only the sign-in screen; authenticated requests receive the application with private, non-caching HTML.
+- Account status exposes only the display name and email to the client. The platform identity ID stays server-side, and Altered stores no passwords.
+- Every hosted data route requires authenticated identity plus the same-origin application marker. Direct anonymous requests return 401; authenticated non-app requests return 403.
+- The hosted service worker keeps authenticated HTML and navigation responses out of Cache Storage.
+- Four existing side controls use keyboard-accessible native disclosures, and optional form lookup/artwork controls use one additional disclosure without changing control IDs or handlers.
+- The document is viewport-bound at desktop and phone sizes; the active tab and opened disclosure panels own overflow.
+- Strict TypeScript checking, clean build, **150/150 automated tests**, exact-worker desktop/phone startup, and live rendered interaction checks pass.
 
 ## v0.24.2 public-link security verification
 

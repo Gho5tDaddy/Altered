@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.24.3
+
+- Added a secure public account gate using Sign in with ChatGPT. Anyone with the link can sign in or create a free account; Altered never receives or stores passwords.
+- Added an authenticated account indicator and sign-out control without changing browser-local character saves or private-content storage.
+- Reworked the existing table controls into compact native disclosure panels and constrained the app to the viewport, leaving scrolling inside the active sheet tab or opened control only.
+- Moved optional form search, filters, and artwork management into one compact disclosure while keeping transform status and primary actions visible.
+- Prevented the hosted service worker from caching authenticated HTML or navigation responses and added runtime coverage for anonymous, authenticated, and direct-API access.
+
 ## v0.24.2
 
 - Enabled public link access while keeping every visitor's saves, combat state, settings, artwork, and private packs isolated in that browser.

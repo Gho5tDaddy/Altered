@@ -87,7 +87,7 @@ test('the exact hosted build executes before optional mobile storage hydration',
   const build=readFileSync('scripts/build.mjs','utf8');
   const worker=readFileSync('scripts/hosted-worker.template.js','utf8');
   const pkg=JSON.parse(readFileSync('package.json','utf8')) as {scripts?:Record<string,string>};
-  assert.match(source,/Built-in rules and forms are ready\.`\);render\(\);\s*document\.documentElement\.dataset\.alteredReady='true';\s*installedPacks=await/);
+  assert.match(source,/Built-in rules and forms are ready\.`\);render\(\);\s*document\.documentElement\.dataset\.alteredReady='true';\s*void loadHostedAccount\(\);\s*installedPacks=await/);
   assert.match(build,/replace\('<script src="app\.bundle\.js"><\/script>',\(\)=>/);
   assert.equal(pkg.scripts?.['browser:audit'],'node scripts/browser-audit.mjs');
   assert.ok(worker.includes(String.raw`\/api\/dndbeyond\/character`));
@@ -96,14 +96,39 @@ test('the exact hosted build executes before optional mobile storage hydration',
   assert.match(worker,/character-service\.dndbeyond\.com/);
   assert.match(worker,/api\.open5e\.com/);
   assert.match(source,/credentials:'same-origin'/);
-  assert.equal((source.match(/'X-Altered-Request':'app'/g)??[]).length,3);
+  assert.equal((source.match(/'X-Altered-Request':'app'/g)??[]).length,4);
   assert.match(worker,/fetch\(String\(url\)/);
   assert.match(worker,/redirect:'manual'/);
   assert.match(worker,/guardApiRequest\(request,'ddb',12\)/);
   assert.match(worker,/guardApiRequest\(request,'srd-status',30\)/);
   assert.match(worker,/guardApiRequest\(request,'srd-catalog',90\)/);
+  assert.match(worker,/guardApiRequest\(request,'auth-me',120\)/);
+  assert.match(worker,/oai-authenticated-user-id/);
+  assert.match(worker,/\/signin-with-chatgpt\?return_to=%2F/);
+  assert.match(worker,/private, no-store/);
   assert.match(worker,/Cross-Origin-Resource-Policy/);
   assert.ok(!worker.includes('Live imports are unavailable'));
+});
+
+test('account identity and compact dashboard stay incremental and accessible',()=>{
+  const html=readFileSync('public/index.html','utf8');
+  const source=readFileSync('src/app.ts','utf8');
+  const styles=readFileSync('public/styles.css','utf8');
+  const hostedServiceWorker=readFileSync('public/sw-hosted.js','utf8');
+  assert.match(html,/id="account-status"[^>]*hidden/);
+  assert.match(html,/id="account-name"/);
+  assert.match(html,/href="\/signout-with-chatgpt\?return_to=%2F"/);
+  assert.equal((html.match(/<details class="panel dashboard-drawer" name="table-controls"/g)??[]).length,4);
+  assert.equal((html.match(/<details class="panel dashboard-drawer" name="table-controls" open>/g)??[]).length,1);
+  assert.match(html,/class="form-tools-drawer"/);
+  assert.match(source,/async function loadHostedAccount\(\)/);
+  assert.match(source,/#account-name/);
+  assert.match(styles,/html,body\{width:100%;height:100%;overflow:hidden\}/);
+  assert.match(styles,/\.tab-content\{min-height:0;flex:1 1 auto;overflow:auto/);
+  assert.match(styles,/\.drawer-content\{[^}]*overflow:auto/);
+  assert.match(styles,/\.dashboard-drawer>summary:focus-visible/);
+  assert.match(hostedServiceWorker,/event\.request\.mode==='navigate'/);
+  assert.ok(!hostedServiceWorker.includes("'./index.html'"));
 });
 
 test('recent activity exposes a clear control that preserves non-log state',()=>{

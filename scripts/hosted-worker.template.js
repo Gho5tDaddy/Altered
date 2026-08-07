@@ -2,6 +2,32 @@ const PAGE=__ALTERED_PAGE_BASE64__;
 const MANIFEST=__ALTERED_MANIFEST__;
 const SERVICE_WORKER=__ALTERED_SERVICE_WORKER__;
 const ICONS=__ALTERED_ICONS__;
+const LOGIN_PAGE=`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b0e11">
+  <title>Sign in to Altered</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#050607;color:#f1ede5}
+    *{box-sizing:border-box}body{min-height:100dvh;margin:0;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at 50% 0,#242a2e 0,#0b0e11 46%,#020303 100%)}
+    main{width:min(430px,100%);border:1px solid #5f5039;padding:clamp(22px,6vw,34px);background:linear-gradient(145deg,rgba(25,29,31,.98),rgba(8,10,11,.99));box-shadow:0 24px 70px rgba(0,0,0,.62),0 0 0 1px rgba(226,197,142,.08);clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)}
+    .mark{width:58px;height:58px;display:grid;place-items:center;border:1px solid #c9872b;border-radius:16px;color:#efb456;background:#111518;box-shadow:inset 0 0 0 3px #090b0d;font-size:29px;font-weight:900}
+    h1{margin:18px 0 4px;font-size:1.55rem;letter-spacing:.07em}p{margin:0;color:#aeb5ba;line-height:1.55}.purpose{margin-top:12px;font-size:.9rem}
+    a{display:flex;align-items:center;justify-content:center;min-height:50px;margin-top:22px;border:1px solid #c9872b;border-radius:10px;background:linear-gradient(180deg,#efb456,#c9872b);color:#171108;text-decoration:none;font-weight:850}
+    a:focus-visible{outline:3px solid rgba(239,180,86,.55);outline-offset:3px}.note{margin-top:14px;font-size:.76rem;color:#8f999f}.seal{display:flex;align-items:center;gap:7px;margin-top:18px;padding-top:14px;border-top:1px solid #313b43;color:#aeb5ba;font-size:.76rem}.seal b{color:#b4d9bf}
+  </style>
+</head>
+<body><main>
+  <div class="mark" aria-hidden="true">A</div>
+  <h1>ALTERED</h1>
+  <p>Rules-aware transformation character sheet</p>
+  <p class="purpose">Sign in to open your table dashboard. New users can create a free ChatGPT account on the next screen.</p>
+  <a href="/signin-with-chatgpt?return_to=%2F">Sign in or create account</a>
+  <p class="note">Altered never receives or stores your password. Character saves and private content remain on the device where you use them.</p>
+  <div class="seal"><b>Secure account access</b><span>managed by ChatGPT</span></div>
+</main></body></html>`;
 
 let pageBytes;
 let srdStatusCache;
@@ -45,13 +71,32 @@ function json(status,body,extraHeaders={}){
   return new Response(JSON.stringify(body),{status,headers:{...headers('application/json; charset=utf-8','no-store'),...extraHeaders}});
 }
 
+function identityText(value,maximum=160){
+  return typeof value==='string'?value.trim().replace(/[\u0000-\u001f\u007f]/g,'').slice(0,maximum):'';
+}
+
+function authenticatedUser(request){
+  const id=identityText(request.headers.get('oai-authenticated-user-id'),200);
+  const email=identityText(request.headers.get('oai-authenticated-user-email'),254);
+  if(!id||!email)return null;
+  let fullName='';
+  const encodedName=request.headers.get('oai-authenticated-user-full-name');
+  if(encodedName&&request.headers.get('oai-authenticated-user-full-name-encoding')==='percent-encoded-utf-8'){
+    try{fullName=identityText(decodeURIComponent(encodedName),100);}catch{}
+  }
+  const emailName=identityText(email.split('@')[0]?.replace(/[._-]+/g,' '),60);
+  return {id,email,displayName:fullName||emailName||'Adventurer'};
+}
+
 function guardApiRequest(request,kind,limit){
+  const user=authenticatedUser(request);
+  if(!user)return json(401,{error:'Sign in to Altered to use this feature.'});
   const fetchSite=request.headers.get('Sec-Fetch-Site');
   if(request.headers.get('X-Altered-Request')!=='app'||(fetchSite&&fetchSite!=='same-origin')){
     return json(403,{error:'This endpoint is available only to the Altered application.'});
   }
   const address=(request.headers.get('CF-Connecting-IP')??'local').slice(0,64);
-  const key=`${kind}:${address}`;
+  const key=`${kind}:${user.id}:${address}`;
   const now=Date.now();
   let window=apiRateWindows.get(key);
   if(!window||now>=window.resetAt){
@@ -191,14 +236,27 @@ export default {
       const blocked=guardApiRequest(request,'srd-catalog',90);
       return blocked??(request.method==='HEAD'?new Response(null,{status:204,headers:headers('application/json; charset=utf-8','no-store')}):proxySrdCatalog(url));
     }
+    if(url.pathname==='/api/auth/me'){
+      const blocked=guardApiRequest(request,'auth-me',120);
+      if(blocked)return blocked;
+      const user=authenticatedUser(request);
+      return request.method==='HEAD'
+        ?new Response(null,{status:204,headers:headers('application/json; charset=utf-8','no-store')})
+        :json(200,{displayName:user.displayName,email:user.email});
+    }
     if(url.pathname==='/manifest.json')return new Response(request.method==='HEAD'?null:MANIFEST,{headers:headers('application/manifest+json; charset=utf-8','no-cache')});
     if(url.pathname==='/sw.js')return new Response(request.method==='HEAD'?null:SERVICE_WORKER,{headers:headers('application/javascript; charset=utf-8','no-cache')});
+    if(url.pathname==='/favicon.ico'){
+      const icon=ICONS['/icon-192.png'];
+      return new Response(request.method==='HEAD'?null:decodeBase64(icon.data),{headers:headers(icon.type,'public, max-age=86400')});
+    }
     if(url.pathname in ICONS){
       const icon=ICONS[url.pathname];
       return new Response(request.method==='HEAD'?null:decodeBase64(icon.data),{headers:headers(icon.type,'public, max-age=86400')});
     }
     if(url.pathname!=='/'&&url.pathname!=='/index.html')return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
+    if(!authenticatedUser(request))return new Response(request.method==='HEAD'?null:LOGIN_PAGE,{headers:headers('text/html; charset=utf-8','private, no-store')});
     if(!pageBytes)pageBytes=decodeBase64(PAGE);
-    return new Response(request.method==='HEAD'?null:pageBytes,{headers:headers('text/html; charset=utf-8','no-cache')});
+    return new Response(request.method==='HEAD'?null:pageBytes,{headers:headers('text/html; charset=utf-8','private, no-store')});
   },
 };

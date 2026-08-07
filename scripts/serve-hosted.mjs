@@ -12,6 +12,10 @@ const server=createServer(async(request,response)=>{
     const origin=`http://${host}:${port}`;
     const headers=new Headers();
     for(const [key,value] of Object.entries(request.headers))if(typeof value==='string')headers.set(key,value);
+    headers.set('oai-authenticated-user-id','altered-local-preview');
+    headers.set('oai-authenticated-user-email','local@altered.preview');
+    headers.set('oai-authenticated-user-full-name','Local%20Adventurer');
+    headers.set('oai-authenticated-user-full-name-encoding','percent-encoded-utf-8');
     const result=await worker.fetch(new Request(new URL(request.url??'/',origin),{method:request.method,headers}));
     response.writeHead(result.status,Object.fromEntries(result.headers.entries()));
     response.end(Buffer.from(await result.arrayBuffer()));

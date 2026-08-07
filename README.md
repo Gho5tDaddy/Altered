@@ -6,7 +6,7 @@ Altered is a rules-aware adaptive character sheet for 2024 fifth-edition transfo
 
 ### Hosted app
 
-Open [Altered](https://altered-ferocitus.ghostdaddy.chatgpt.site) from a phone, tablet, or computer. The hosted build is the recommended test route because it does not depend on the PC being awake, Windows localhost, or a particular Wi-Fi network. Anyone with the link can open the app; character saves, combat state, settings, artwork overrides, and private packs remain in that person's browser and are not shared with other visitors.
+Open [Altered](https://altered-ferocitus.ghostdaddy.chatgpt.site) from a phone, tablet, or computer. The hosted build is the recommended test route because it does not depend on the PC being awake, Windows localhost, or a particular Wi-Fi network. Anyone with the link can sign in or create a free ChatGPT account; Altered never receives the password. Character saves, combat state, settings, artwork overrides, and private packs remain in that browser and are not shared with other visitors.
 
 ### Android
 
