@@ -85,6 +85,9 @@ try{
     }
     if(!dom.includes('data-altered-character="Ferocitus"'))throw new Error(`${label} build did not load Ferocitus.`);
     if(dom.includes('data-altered-ready="error"'))throw new Error(`${label} build reported a startup error.`);
+    if(!dom.includes('data-altered-workspace="play"'))throw new Error(`${label} build did not initialize the Play workspace.`);
+    if(!dom.includes('class="persistent-form-visual"'))throw new Error(`${label} build did not keep the form artwork mounted.`);
+    for(const id of ['nav-play','nav-forms','nav-sheet','nav-more'])if(!dom.includes(`id="${id}"`))throw new Error(`${label} build is missing ${id}.`);
   }
   console.log('Hosted browser audit passed at desktop and phone dimensions.');
 }finally{

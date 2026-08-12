@@ -82,6 +82,9 @@ let srdCatalogStatus:SrdCatalogStatus|null=null;
 let srdCatalogMessage='Checking the live legal SRD support catalog...';
 let formSearch='';
 let formFilter='all';
+type WorkspaceView='play'|'forms'|'task'|'more';
+let currentWorkspace:WorkspaceView='play';
+let taskOrigin:'play'|'sheet'='play';
 let walkthroughStepIndex=0;
 let walkthroughTarget:HTMLElement|undefined;
 let walkthroughReturnFocus:HTMLElement|undefined;
@@ -97,10 +100,10 @@ const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
 };
 const WALKTHROUGH_STEPS=[
   {selector:'.character-strip',title:'Choose your character',copy:'Switch between sample and imported characters here. Each character keeps its own validated sheet and combat state.'},
-  {selector:'.transform-panel',title:'Find and choose a form',copy:'Search or filter forms, then read the Selected and Available or Locked chips before transforming.'},
+  {selector:'.play-form-status',title:'See your current form',copy:'Your active form and the way back to normal stay at the top of Play.'},
   {selector:'#action-economy',title:'Check what remains this turn',copy:'These chips show Action, Bonus Action, Reaction, and spell-slot availability before you press anything.'},
-  {selector:'.tabs',title:'Use the focused sheet sections',copy:'Actions, rolls, spells, features, and rule explanations stay grouped in five keyboard-friendly tabs.'},
-  {selector:'.side-column',title:'Run the turn',copy:'Track damage, healing, turns, rests, conditions, and recent activity here. Help remains available from the top bar.'},
+  {selector:'.task-launchers',title:'Choose one focused tool',copy:'Open Actions, Spells, Checks, or Abilities. Each gets its own uncluttered workspace.'},
+  {selector:'.workspace-nav',title:'Move without losing your place',copy:'Play, Forms, Sheet, and More keep every capability close while your combat state stays active.'},
 ] as const;
 
 function statusChip(status:UiStatus,label=UI_STATUS[status].label,titleText?:string){
@@ -116,10 +119,11 @@ function clearWalkthroughHighlight(){
 }
 function finishWalkthrough(message:string){
   clearWalkthroughHighlight();$('#walkthrough').hidden=true;void saveBooleanSetting(WALKTHROUGH_SETTING,true);
-  if(window.matchMedia('(max-width:700px)').matches)$<HTMLDetailsElement>('#character-form-drawer').open=false;
   $('#status-message').textContent=message;
+  $('#play-status').textContent=message;
   const returnFocus=walkthroughReturnFocus;walkthroughReturnFocus=undefined;
-  if(returnFocus?.isConnected)window.setTimeout(()=>returnFocus.focus({preventScroll:true}),0);
+  const focusTarget=returnFocus?.isConnected&&returnFocus.offsetParent?returnFocus:$<HTMLButtonElement>('#nav-play');
+  window.setTimeout(()=>focusTarget.focus({preventScroll:true}),0);
 }
 function renderWalkthroughStep(){
   const available=availableWalkthroughSteps();if(available.length===0){finishWalkthrough('Walkthrough skipped because its interface targets are unavailable.');return;}
@@ -137,7 +141,7 @@ function startWalkthrough(){
   const openHelp=$<HTMLButtonElement>('#open-help');const fallback=openHelp.offsetParent?openHelp:$<HTMLButtonElement>('#toggle-app-menu');
   walkthroughReturnFocus=active instanceof HTMLElement&&active!==document.body&&!help.contains(active)?active:fallback;
   if(help.open)help.close();
-  walkthroughStepIndex=0;$('#walkthrough').hidden=false;renderWalkthroughStep();$<HTMLButtonElement>('#walkthrough-next').focus();
+  setWorkspace('play');walkthroughStepIndex=0;$('#walkthrough').hidden=false;renderWalkthroughStep();$<HTMLButtonElement>('#walkthrough-next').focus();
 }
 
 function setAppMenuOpen(open:boolean,restoreFocus=false){
@@ -145,9 +149,34 @@ function setAppMenuOpen(open:boolean,restoreFocus=false){
   topbar?.classList.toggle('menu-open',open);toggle.setAttribute('aria-expanded',String(open));
   if(!open&&restoreFocus)toggle.focus({preventScroll:true});
 }
+const TASK_TITLES:Record<string,string>={actions:'Actions',rolls:'Saves & Skills',spells:'Spells',features:'Abilities & Features',rules:'Rules & Defenses'};
+function syncWorkspaceChrome(){
+  document.documentElement.dataset.alteredWorkspace=currentWorkspace;
+  document.documentElement.dataset.alteredTab=currentTab;
+  document.querySelectorAll<HTMLElement>('[data-workspace-view]').forEach(view=>{
+    const active=view.dataset.workspaceView===currentWorkspace;view.hidden=!active;view.toggleAttribute('inert',!active);
+  });
+  const sheetSelected=currentWorkspace==='task'&&taskOrigin==='sheet';
+  const activeNav=currentWorkspace==='forms'?'nav-forms':currentWorkspace==='more'?'nav-more':sheetSelected?'nav-sheet':'nav-play';
+  for(const id of ['nav-play','nav-forms','nav-sheet','nav-more']){const node=$<HTMLButtonElement>(`#${id}`);const active=id===activeNav;node.classList.toggle('active',active);if(active)node.setAttribute('aria-current','page');else node.removeAttribute('aria-current');}
+  $('#task-view-title').textContent=TASK_TITLES[currentTab]??'Character Sheet';
+  $('#task-abilities').hidden=currentTab!=='features';
+}
+function setWorkspace(view:WorkspaceView,tab?:string,origin:'play'|'sheet'=taskOrigin,focusTarget?:HTMLElement){
+  currentWorkspace=view;if(tab){currentTab=tab;taskOrigin=origin;renderTab();}
+  syncWorkspaceChrome();renderArt();
+  const active=document.querySelector<HTMLElement>(`[data-workspace-view="${currentWorkspace}"]`);active?.scrollTo({top:0,behavior:'auto'});
+  if(focusTarget)window.setTimeout(()=>focusTarget.focus({preventScroll:true}),0);
+}
+function openTask(tab:string,origin:'play'|'sheet'='play'){setWorkspace('task',tab,origin,$<HTMLElement>('#task-view-title'));}
+function openMoreDrawer(label:string){
+  setWorkspace('more');
+  const drawers=Array.from(document.querySelectorAll<HTMLDetailsElement>('#workspace-more .dashboard-drawer'));const target=drawers.find(drawer=>drawer.querySelector('summary span')?.textContent?.startsWith(label));
+  if(target){target.open=true;window.setTimeout(()=>target.querySelector<HTMLElement>('summary')?.focus({preventScroll:true}),0);}
+}
 function syncCharacterFormDrawer(){
-  const compact=window.matchMedia('(max-width:700px)').matches;const drawer=$<HTMLDetailsElement>('#character-form-drawer');
-  if(compactFormLayout===undefined||compact!==compactFormLayout)drawer.open=!compact;
+  const compact=window.matchMedia('(max-width:700px)').matches;
+  $<HTMLDetailsElement>('#character-form-drawer').open=true;
   compactFormLayout=compact;
 }
 function filterHelpTopics(){
@@ -159,7 +188,7 @@ function filterHelpTopics(){
 }
 
 function addActivity(message:string){state.log.unshift(message);state.log=state.log.slice(0,25);persist();}
-function notify(message:string){$('#status-message').textContent=message;addActivity(message);}
+function notify(message:string){$('#status-message').textContent=message;$('#play-status').textContent=message;addActivity(message);}
 function persist(){try{localStorage.setItem('altered-v0.18',JSON.stringify({baseCharacters,currentCharacterId:baseCharacter.id,state}));}catch{/* storage is optional */}}
 function safeSavedText(value:unknown,fallback:string,max=200){return typeof value==='string'?value.slice(0,max):fallback;}
 function savedOncePerTurn(value:unknown){
@@ -233,7 +262,7 @@ function applyResult(result:TransitionResult){
   if(result.choice){pendingTempChoice={incoming:result.choice.incoming,source:result.choice.source};const dialog=$<HTMLDialogElement>('#temp-hp-dialog');$('#temp-hp-copy').textContent=`Keep the current ${result.choice.current} Temporary Hit Points or replace them with ${result.choice.incoming} from ${result.choice.source}?`;$('#keep-current-thp').textContent=`Keep ${result.choice.current}`;$('#keep-new-thp').textContent=`Use ${result.choice.incoming}`;dialog.showModal();}
   notify(result.message);render();
 }
-function resetLatestResult(){$('#latest-roll').classList.remove('flash');$('#roll-title').textContent='Ready';$('#roll-total').textContent='—';$('#roll-detail').textContent='Press an attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically.';}
+function resetLatestResult(){const title='Ready',total='—',detail='Press an attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically.';$('#latest-roll').classList.remove('flash');$('#roll-title').textContent=title;$('#roll-total').textContent=total;$('#roll-detail').textContent=detail;$('#play-roll-title').textContent=title;$('#play-roll-total').textContent=total;$('#play-roll-detail').textContent=detail;}
 function setCharacter(next:Character){character=next;baseCharacter=baseCharacters.find(entry=>entry.id===next.id)??next;state=createInitialState(character);sheet=resolveSheet(character,state);selectedOptionId='base';currentTab='actions';formSearch='';formFilter='all';$<HTMLInputElement>('#form-search').value='';$<HTMLSelectElement>('#form-filter').value='all';radiantActions.clear();selectedOptionalBonuses.clear();selectedRollModes.clear();selectedMultiattackVariants.clear();selectedSpellSlots.clear();resetLatestResult();notify(`${character.name} loaded in Base Form.`);render();}
 function reconcileState(next:Character,previous:GameState){
   const clean=createInitialState(next);clean.hp=Math.min(previous.hp,next.hp.max);clean.tempHp=previous.tempHp;clean.life={...previous.life};clean.exhaustionLevel=previous.exhaustionLevel;clean.relentlessRageDc=previous.relentlessRageDc;if(previous.pendingRelentlessRage)clean.pendingRelentlessRage={...previous.pendingRelentlessRage};if(previous.tempHpSource)clean.tempHpSource=previous.tempHpSource;
@@ -280,7 +309,7 @@ function activeAuraVisual(){
 function renderArt(){
   const container=$('#form-art');clear(container);
   const aura=activeAuraVisual();const active=aura.replacement;
-  const preview=!aura.active?currentOption():undefined;
+  const preview=!aura.active&&currentWorkspace==='forms'?currentOption():undefined;
   const activeForm=creatureById(active?.formId);
   const previewForm=preview&&preview.profile!=='base'&&preview.formId?creatureById(preview.formId):undefined;
   const displayedForm=activeForm??previewForm;
@@ -568,6 +597,8 @@ function renderTransformSelector(){
   for(const o of visible){const name=groupName(o);let group=groups.get(name);if(!group){group=document.createElement('optgroup');group.label=name;groups.set(name,group);select.append(group);}const item=document.createElement('option');item.value=o.id;item.textContent=`${o.label}${o.id===activeId?' · Active':o.usable?'':' · Locked'}`;item.title=o.id===activeId?'Currently active':o.reason??o.source;group.append(item);}
   select.value=selectedOptionId;
   const selected=options.find(o=>o.id===selectedOptionId);const active=state.activeTransform?.option;
+  const currentLabel=active?.label??'Base Form';const currentDetail=active?`${active.source} · ${actionCostLabel(active.actionCost)}`:`${character.name} · Character sheet`;
+  $('#play-view-title').textContent=currentLabel;$('#play-form-detail').textContent=currentDetail;$('#persistent-form-name').textContent=currentLabel;
   $('#character-form-summary').textContent=active&&selected?.id!==active.id?`${selected?.label??'Form'} selected · ${active.label} active`:active?`${active.label} active`:`${selected?.label??'Base Form'} selected`;
   const economyError=selected&&selected.profile!=='base'&&selected.id!==active?.id?actionCostError(state,selected.actionCost,sheet.conditionImmunities):null;
   const results=$('#form-results-status');const hiddenSelection=Boolean(selected&&!matched.some(option=>option.id===selected.id)&&selected.profile!=='base');results.textContent=!search&&formFilter==='all'?'':`${matched.length} of ${options.length} forms shown${hiddenSelection?' · selected form retained':''}.`;
@@ -576,6 +607,7 @@ function renderTransformSelector(){
   $('#form-reason').textContent=active&&selected?.id===active.id?`${active.label} is active. Choose another legal form to change directly, or press End Form to return to ${character.name}.`:economyError??selected?.reason??selected?.source??'';
   const transform=$<HTMLButtonElement>('#transform-button');const transformLabel=selected?.deactivate?selected.label:selected?.profile==='overlay'?'Activate':active&&selected?.id!==active.id?'Change Form':selected?.profile==='base'?'Choose a Form':'Transform';transform.textContent=economyError?`${transformLabel} — ${economyError.replace(/[.!]$/,'')}`:transformLabel;transform.disabled=!selected||!selected.usable||Boolean(economyError)||selected.profile==='base'||selected.id===active?.id;transform.hidden=Boolean(!selected||selected.profile==='base'||selected.id===active?.id);if(economyError)transform.title=economyError;else transform.removeAttribute('title');
   const end=$<HTMLButtonElement>('#end-form-button');const permanentTruePolymorph=active?.profile==='true-polymorph'&&state.activeTransform?.permanentUntilDispelled;const needsBonus=active?.profile==='wildshape'||active?.profile==='animal-shapes';const canEnd=permanentTruePolymorph||!needsBonus||state.turn.bonusRemaining>0;end.textContent=permanentTruePolymorph?'Remove Dispelled Effect':needsBonus&&!canEnd?'End Form — Bonus Action Used':'End Form';end.disabled=!active||!canEnd;end.hidden=!active;if(permanentTruePolymorph)end.title='True Polymorph cannot be ended voluntarily after the full hour. Use this only after the effect is dispelled or otherwise ended externally.';else if(active&&needsBonus&&!canEnd)end.title='Voluntarily ending this form requires a Bonus Action. Start a new turn or regain a Bonus Action first.';else end.removeAttribute('title');
+  const playEnd=$<HTMLButtonElement>('#play-end-form');playEnd.textContent=end.textContent;playEnd.disabled=end.disabled;playEnd.hidden=end.hidden;playEnd.title=end.title;
 }
 function metric(label:string,value:string,note:string){const node=document.createElement('div');node.className='metric';node.append(text('span',label),text('strong',value),text('small',note));return node}
 function healthMetric(){
@@ -603,6 +635,7 @@ function renderResources(){
   for(const [level,slot] of Object.entries(state.spellSlots)){if(slot.max>0){const node=document.createElement('span');node.className='resource-chip';node.append(document.createTextNode(`L${level} slots `),text('b',`${slot.current}/${slot.max}`));strip.append(node);}}
   if(state.concentration)strip.append(text('span',`Concentrating: ${state.concentration.name}`,'state-chip'));
   if(state.concentrationChecks.length){const next=state.concentrationChecks[0];if(next)strip.append(text('span',`Concentration check: DC ${next.dc}${state.concentrationChecks.length>1?` (+${state.concentrationChecks.length-1})`:''}`,'state-chip warning'));}
+  const keyResources=Object.values(state.resources).slice(0,2).map(pool=>`${pool.name} ${pool.current}/${pool.max}`);const firstSlot=Object.entries(state.spellSlots).find(([,slot])=>slot.max>0);if(firstSlot)keyResources.push(`L${firstSlot[0]} slots ${firstSlot[1].current}/${firstSlot[1].max}`);$('#play-resource-summary').textContent=keyResources.join(' · ')||'Features and resources';
 }
 function isMoonDruid(){return character.classes.some(entry=>entry.name.toLowerCase()==='druid'&&(entry.subclass??'').toLowerCase()==='circle of the moon');}
 function renderActiveEffects(){
@@ -641,6 +674,7 @@ function renderActiveEffects(){
     panel.append(button(`End ${effect.name}`,()=>applyResult(endSpellEffect(state,effect.id)),'button compact secondary'));cards.push(panel);
   }
   root.hidden=cards.length===0;if(cards.length){root.append(text('h3','Active now'),...cards);}
+  const summaryButton=$<HTMLButtonElement>('#open-active-effects');const names=cards.map(card=>card.querySelector('strong')?.textContent).filter((name):name is string=>Boolean(name));summaryButton.hidden=names.length===0;$('#play-active-summary').textContent=names.join(' · ')||'No active effects';
 }
 function renderQuickFeatures(){
   const box=$('#quick-features');clear(box);
@@ -685,7 +719,7 @@ type RollMode='normal'|'advantage'|'disadvantage';
 interface D20Result {first:number;second?:number;kept:number;total:number;mode:RollMode;critical:boolean;naturalOne:boolean;naturalTwenty:boolean}
 function rollD20Result(mod:number,mode:RollMode,criticalThreshold=20):D20Result{return rollAttackD20(mod,mode,criticalThreshold)}
 function modeText(result:D20Result){return result.mode==='normal'?`d20 ${result.first}`:`${result.mode==='advantage'?'Advantage':'Disadvantage'} ${result.first}, ${result.second}; kept ${result.kept}`;}
-function showRoll(total:number|string,detail:string,title='Roll result'){const panel=$('#latest-roll');$('#roll-title').textContent=title;$('#roll-total').textContent=String(total);$('#roll-detail').textContent=detail;panel.classList.remove('flash');void panel.offsetWidth;panel.classList.add('flash');addActivity(`${title}: ${detail}`);renderLog();}
+function showRoll(total:number|string,detail:string,title='Roll result'){const panel=$('#latest-roll');const totalText=String(total);$('#roll-title').textContent=title;$('#roll-total').textContent=totalText;$('#roll-detail').textContent=detail;$('#play-roll-title').textContent=title;$('#play-roll-total').textContent=totalText;$('#play-roll-detail').textContent=detail;panel.classList.remove('flash');void panel.offsetWidth;panel.classList.add('flash');addActivity(`${title}: ${detail}`);renderLog();}
 function d20(mod:number,mode:RollMode,label:string,minimumD20?:number,minimumTotal?:number,minimumSource?:string){const result=rollD20Result(mod,mode);const treated=minimumD20!==undefined?Math.max(minimumD20,result.kept):result.kept;const raw=treated+mod;const total=minimumTotal!==undefined?Math.max(minimumTotal,raw):raw;const adjustments=[treated!==result.kept?`${minimumSource??'Feature'} treated ${result.kept} as ${treated}`:'',total!==raw?`${minimumSource??'Feature'} raised total ${raw} to ${total}`:''].filter(Boolean).join(' · ');showRoll(total,`${modeText(result)}${treated!==result.kept?` → ${treated}`:''} ${signed(mod)} = ${raw}${total!==raw?` → ${total}`:''}${adjustments?` · ${adjustments}`:''}`,label);return total;}
 function combinedMode(rulesMode:RollMode){return rulesMode;}
 function rollContext(actionId:string,rules:ReturnType<typeof attackRollSources>){
@@ -860,9 +894,10 @@ function syncTabState(){
   let activeTab:HTMLButtonElement|undefined;
   document.querySelectorAll<HTMLButtonElement>('.tab').forEach(tab=>{const active=tab.dataset.tab===currentTab;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;if(active)activeTab=tab;});
   if(activeTab)$('#tab-content').setAttribute('aria-labelledby',activeTab.id);
+  syncWorkspaceChrome();
 }
 function renderTab(){sheet=resolveSheet(character,state);syncTabState();if(currentTab==='actions')renderActions();else if(currentTab==='rolls')renderRolls();else if(currentTab==='spells')renderSpells();else if(currentTab==='features')renderFeatures();else renderRules();}
-function activateTab(tab:HTMLButtonElement,focus=false){currentTab=tab.dataset.tab??'actions';renderTab();if(focus)tab.focus();}
+function activateTab(tab:HTMLButtonElement,focus=false){currentTab=tab.dataset.tab??'actions';renderTab();syncWorkspaceChrome();if(focus)tab.focus();}
 function renderConditions(){const list=$('#condition-list');clear(list);for(const condition of state.conditions){const label=condition==='Exhaustion'?`Exhaustion ${state.exhaustionLevel} −1`:`${condition} ×`;const chip=button(label,()=>applyResult(removeCondition(state,condition)),'condition-chip');chip.setAttribute('aria-label',condition==='Exhaustion'?`Reduce Exhaustion from level ${state.exhaustionLevel}`:`Remove ${condition} condition`);list.append(chip);}}
 function renderLog(){const root=$('#activity-log');clear(root);$<HTMLButtonElement>('#clear-activity').disabled=state.log.length===0;if(state.log.length===0){root.append(text('div','No activity yet.','log-row'));return;}for(const item of state.log)root.append(text('div',item,'log-row'));}
 function render(){sheet=resolveSheet(character,state);document.documentElement.dataset.alteredCharacter=character.name;syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderResources();renderQuickFeatures();renderActiveEffects();renderTab();renderConditions();renderLog();persist();}
@@ -874,6 +909,23 @@ function initializeControls(){
   $('#toggle-app-menu').addEventListener('click',()=>setAppMenuOpen($<HTMLButtonElement>('#toggle-app-menu').getAttribute('aria-expanded')!=='true'));
   $('#top-actions').addEventListener('click',event=>{if((event.target as Element).closest('button,a'))setAppMenuOpen(false);});
   document.addEventListener('pointerdown',event=>{const topbar=document.querySelector<HTMLElement>('.topbar');if(topbar?.classList.contains('menu-open')&&!topbar.contains(event.target as Node))setAppMenuOpen(false);});
+  $('#nav-play').addEventListener('click',()=>setWorkspace('play'));
+  $('#nav-forms').addEventListener('click',()=>setWorkspace('forms'));
+  $('#nav-sheet').addEventListener('click',()=>openTask('features','sheet'));
+  $('#nav-more').addEventListener('click',()=>setWorkspace('more'));
+  $('#open-persistent-form').addEventListener('click',()=>setWorkspace('forms'));
+  document.querySelectorAll<HTMLElement>('.workspace-home').forEach(control=>control.addEventListener('click',()=>setWorkspace('play')));
+  $('#close-task-view').addEventListener('click',()=>setWorkspace('play'));
+  document.querySelectorAll<HTMLButtonElement>('[data-open-tab]').forEach(control=>control.addEventListener('click',()=>openTask(control.dataset.openTab??'actions','play')));
+  $('#open-active-effects').addEventListener('click',()=>openTask('features','play'));
+  $('#open-latest-result').addEventListener('click',()=>openTask(currentTab,'play'));
+  $('#open-damage-view').addEventListener('click',()=>openMoreDrawer('Damage'));
+  $('#open-conditions-view').addEventListener('click',()=>openMoreDrawer('Conditions'));
+  $('#play-end-form').addEventListener('click',endCurrentForm);
+  $('#more-help').addEventListener('click',()=>$<HTMLButtonElement>('#open-help').click());
+  $('#more-import').addEventListener('click',()=>$<HTMLButtonElement>('#open-import-center').click());
+  $('#more-export').addEventListener('click',()=>$<HTMLButtonElement>('#export-character').click());
+  $('#more-settings').addEventListener('click',()=>$<HTMLButtonElement>('#open-settings').click());
   const compactFormQuery=window.matchMedia('(max-width:700px)');syncCharacterFormDrawer();compactFormQuery.addEventListener('change',syncCharacterFormDrawer);window.addEventListener('resize',()=>{if(innerWidth>700)setAppMenuOpen(false);syncCharacterFormDrawer();});
   $('#sample-character').addEventListener('change',event=>{const id=(event.target as HTMLSelectElement).value;const found=characters.find(c=>c.id===id);if(found)setCharacter(found);});
   $('#form-select').addEventListener('change',event=>{selectedOptionId=(event.target as HTMLSelectElement).value;renderTransformSelector();renderArt();});
@@ -887,7 +939,7 @@ function initializeControls(){
   $('#apply-healing').addEventListener('click',()=>applyResult(heal(state,character,Number($<HTMLInputElement>('#damage-amount').value))));
   $('#new-turn').addEventListener('click',()=>applyResult(startNewTurn(state)));$('#end-turn').addEventListener('click',()=>applyResult(endTurn(character,state)));$('#short-rest').addEventListener('click',()=>applyResult(shortRest(state)));$('#long-rest').addEventListener('click',()=>applyResult(longRest(character,state)));
   $('#add-condition').addEventListener('click',()=>applyResult(applyCondition(character,state,$<HTMLSelectElement>('#condition-select').value)));$('#clear-conditions').addEventListener('click',()=>applyResult(clearConditions(state)));
-  $('#clear-activity').addEventListener('click',()=>{state.log=[];$('#status-message').textContent='Recent activity cleared.';renderLog();persist();});
+  $('#clear-activity').addEventListener('click',()=>{state.log=[];$('#status-message').textContent='Recent activity cleared.';$('#play-status').textContent='Recent activity cleared.';renderLog();persist();});
   $('#open-help').addEventListener('click',()=>{filterHelpTopics();const dialog=$<HTMLDialogElement>('#help-dialog');dialog.showModal();$<HTMLInputElement>('#help-search').focus();});
   $('#close-help').addEventListener('click',()=>$<HTMLDialogElement>('#help-dialog').close());
   $('#help-search').addEventListener('input',filterHelpTopics);
@@ -895,7 +947,7 @@ function initializeControls(){
   $('#skip-walkthrough').addEventListener('click',()=>finishWalkthrough('Walkthrough skipped. Restart it anytime from Help.'));
   $('#walkthrough-back').addEventListener('click',()=>{walkthroughStepIndex--;renderWalkthroughStep();});
   $('#walkthrough-next').addEventListener('click',()=>{const available=availableWalkthroughSteps();if(walkthroughStepIndex>=available.length-1)finishWalkthrough('Walkthrough complete. Help remains available from the top bar.');else{walkthroughStepIndex++;renderWalkthroughStep();}});
-  window.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(!$('#walkthrough').hidden)finishWalkthrough('Walkthrough closed. Restart it anytime from Help.');else if($<HTMLButtonElement>('#toggle-app-menu').getAttribute('aria-expanded')==='true')setAppMenuOpen(false,true);});
+  window.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(!$('#walkthrough').hidden)finishWalkthrough('Walkthrough closed. Restart it anytime from Help.');else if($<HTMLButtonElement>('#toggle-app-menu').getAttribute('aria-expanded')==='true')setAppMenuOpen(false,true);else if(currentWorkspace!=='play')setWorkspace('play');});
   $('#import-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{applyImportedCharacter(parseCharacter(safeJsonParse(await file.text())));}catch(error){const message=`Import failed: ${error instanceof Error?error.message:'Unknown error'}`;notify(message);setImportStatus(message);}finally{input.value='';}});
   $('#fetch-dndbeyond').addEventListener('click',()=>void fetchDdbCharacter());
   $('#dndbeyond-source').addEventListener('keydown',event=>{if((event as KeyboardEvent).key==='Enter'){event.preventDefault();void fetchDdbCharacter();}});

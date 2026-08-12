@@ -36,12 +36,55 @@
       <div id="rules-badge" class="rules-badge"></div>
     </section>
 
-    <main class="main-grid">
-      <section class="sheet panel">
+    <main id="workspace" class="main-grid workspace" aria-label="Altered workspace">
+      <aside class="persistent-form-visual" aria-label="Current form artwork">
+        <div id="form-art" class="form-art" aria-live="polite"></div>
+        <button id="open-persistent-form" class="persistent-form-copy" type="button">
+          <span>Current form</span><strong id="persistent-form-name">Base Form</strong><small>Open Forms</small>
+        </button>
+      </aside>
+      <div class="workspace-stage">
+      <section id="workspace-play" class="workspace-view play-view panel" data-workspace-view="play" aria-labelledby="play-view-title">
+        <div class="play-form-status">
+          <div><span>Current form</span><strong id="play-view-title">Base Form</strong><small id="play-form-detail">Character sheet</small></div>
+          <button id="play-end-form" class="button secondary compact" type="button" hidden>End Form</button>
+        </div>
+        <div id="metric-grid" class="metric-grid"></div>
+        <div id="action-economy" class="action-economy" aria-label="Action economy"></div>
+        <button id="open-active-effects" class="play-summary-button" type="button" hidden>
+          <span>Active now</span><strong id="play-active-summary">No active effects</strong><span aria-hidden="true">&#8250;</span>
+        </button>
+
+        <section class="task-launchers" aria-labelledby="play-actions-title">
+          <div class="section-title"><h2 id="play-actions-title">Choose what to do</h2><span>Focused tools</span></div>
+          <div class="task-launcher-grid">
+            <button id="open-actions-view" class="task-launcher" type="button" data-open-tab="actions"><strong>Actions</strong><span>Attacks and form actions</span></button>
+            <button id="open-spells-view" class="task-launcher" type="button" data-open-tab="spells"><strong>Spells</strong><span>Cast and resolve effects</span></button>
+            <button id="open-rolls-view" class="task-launcher" type="button" data-open-tab="rolls"><strong>Checks</strong><span>Saves, skills, initiative</span></button>
+            <button id="open-features-view" class="task-launcher" type="button" data-open-tab="features"><strong>Abilities</strong><span id="play-resource-summary">Features and resources</span></button>
+          </div>
+        </section>
+
+        <button id="open-latest-result" class="play-latest-result" type="button">
+          <span>Latest result</span><strong id="play-roll-title">Ready</strong><b id="play-roll-total">&mdash;</b><small id="play-roll-detail">Choose an action, spell, save, or skill.</small>
+        </button>
+        <div id="play-status" class="play-status" role="status" aria-live="polite">Altered is ready.</div>
+        <div class="play-utility-row">
+          <button id="open-damage-view" class="button secondary" type="button">Damage / Heal</button>
+          <button id="open-conditions-view" class="button secondary" type="button">Conditions</button>
+        </div>
+        <div class="turn-bar" aria-label="Turn controls">
+          <button id="new-turn" class="button primary" type="button">New Turn</button>
+          <button id="end-turn" class="button secondary" type="button">End Turn</button>
+          <span id="turn-number">Turn 1</span>
+        </div>
+      </section>
+
+      <section id="workspace-forms" class="workspace-view forms-view panel" data-workspace-view="forms" aria-labelledby="forms-view-title" hidden>
+        <div class="workspace-heading"><div><span>Transformation</span><h2 id="forms-view-title">Choose a form</h2></div><button class="text-button workspace-home" type="button">Back to Play</button></div>
         <details id="character-form-drawer" class="character-form-drawer" open>
           <summary><span><strong>Character &amp; Form</strong><small id="character-form-summary">Base Form selected</small></span><span class="drawer-hint" aria-hidden="true"></span></summary>
           <div class="hero-grid">
-            <div id="form-art" class="form-art" aria-live="polite"></div>
             <div class="transform-panel">
             <label for="form-select">Choose form</label>
             <select id="form-select"></select>
@@ -83,13 +126,16 @@
             </div>
           </div>
         </details>
+      </section>
 
-        <div id="metric-grid" class="metric-grid"></div>
-        <div id="action-economy" class="action-economy"></div>
-        <div id="quick-features" class="quick-features"></div>
-        <div id="resource-strip" class="resource-strip"></div>
+      <section id="workspace-task" class="workspace-view task-view panel" data-workspace-view="task" aria-labelledby="task-view-title" hidden>
+        <div class="workspace-heading"><div><span>Focused tool</span><h2 id="task-view-title" tabindex="-1">Actions</h2></div><button id="close-task-view" class="text-button" type="button">Back to Play</button></div>
+        <section id="task-abilities" class="task-abilities" hidden>
+          <div class="section-title"><h2>Abilities &amp; resources</h2><span>Use and track</span></div>
+          <div id="quick-features" class="quick-features"></div>
+          <div id="resource-strip" class="resource-strip"></div>
+        </section>
         <section id="active-effects" class="active-effects" aria-live="polite" hidden></section>
-
         <nav class="tabs" role="tablist" aria-label="Character sheet sections">
           <button id="tab-actions" class="tab active" data-tab="actions" type="button" role="tab" aria-selected="true" aria-controls="tab-content" tabindex="0">Actions</button>
           <button id="tab-rolls" class="tab" data-tab="rolls" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Saves & Skills</button>
@@ -104,8 +150,16 @@
         <section id="tab-content" class="tab-content" role="tabpanel" aria-labelledby="tab-actions" tabindex="0"></section>
       </section>
 
-      <aside class="side-column">
-        <details class="panel dashboard-drawer" name="table-controls">
+      <section id="workspace-more" class="workspace-view more-view" data-workspace-view="more" aria-labelledby="more-view-title" hidden>
+        <div class="workspace-heading panel"><div><span>Utilities</span><h2 id="more-view-title">More tools</h2></div><button class="text-button workspace-home" type="button">Back to Play</button></div>
+        <div class="more-links panel" aria-label="Application tools">
+          <button id="more-help" class="button secondary" type="button">Help</button>
+          <button id="more-import" class="button secondary" type="button">Import</button>
+          <button id="more-export" class="button secondary" type="button">Export</button>
+          <button id="more-settings" class="button secondary" type="button">Settings</button>
+        </div>
+        <aside class="side-column">
+        <details class="panel dashboard-drawer" name="more-controls">
           <summary><span>Damage & Healing</span><small>Adjust vitality</small></summary>
           <div class="drawer-content">
             <p class="panel-help">Use this when your character takes damage. Damage dealt by your attacks and spells is rolled from their action buttons.</p>
@@ -117,15 +171,14 @@
           </div>
         </details>
 
-        <details class="panel dashboard-drawer" name="table-controls" open>
-          <summary><span>Turn & Rest</span><small id="turn-number"></small></summary>
+        <details class="panel dashboard-drawer" name="more-controls">
+          <summary><span>Rest</span><small>Recover resources</small></summary>
           <div class="drawer-content">
-            <div class="two-col button-row"><button id="new-turn" class="button primary" type="button">New Turn</button><button id="end-turn" class="button secondary" type="button">End Turn</button></div>
             <div class="two-col button-row"><button id="short-rest" class="button secondary" type="button">Short Rest</button><button id="long-rest" class="button secondary" type="button">Long Rest</button></div>
           </div>
         </details>
 
-        <details class="panel dashboard-drawer" name="table-controls">
+        <details class="panel dashboard-drawer" name="more-controls">
           <summary><span>Conditions</span><small>Add or remove</small></summary>
           <div class="drawer-content">
             <div class="section-title drawer-tools"><span>Current conditions</span><button id="clear-conditions" class="text-button" type="button">Clear</button></div>
@@ -134,15 +187,24 @@
           </div>
         </details>
 
-        <details class="panel dashboard-drawer" name="table-controls">
+        <details class="panel dashboard-drawer" name="more-controls">
           <summary><span>Recent Activity</span><small>Latest events</small></summary>
           <div class="drawer-content">
             <div class="section-title drawer-tools"><span>Session log</span><button id="clear-activity" class="text-button" type="button">Clear Activity</button></div>
             <div id="activity-log" class="activity-log"></div>
           </div>
         </details>
-      </aside>
+        </aside>
+      </section>
+      </div>
     </main>
+
+    <nav class="workspace-nav" aria-label="Primary navigation">
+      <button id="nav-play" class="workspace-nav-button active" type="button" aria-current="page"><span aria-hidden="true">&#9670;</span>Play</button>
+      <button id="nav-forms" class="workspace-nav-button" type="button"><span aria-hidden="true">&#9789;</span>Forms</button>
+      <button id="nav-sheet" class="workspace-nav-button" type="button"><span aria-hidden="true">&#9776;</span>Sheet</button>
+      <button id="nav-more" class="workspace-nav-button" type="button"><span aria-hidden="true">&#8943;</span>More</button>
+    </nav>
   </div>
 
   <section id="walkthrough" class="walkthrough" role="dialog" aria-modal="false" aria-labelledby="walkthrough-title" hidden>
@@ -182,7 +244,7 @@
         </details>
         <details class="help-topic" data-help-keywords="getting started next beginner first turn">
           <summary><span aria-hidden="true">➜</span> Getting Started</summary>
-          <ol><li>Choose or import a character.</li><li>Choose a form and check its status chips.</li><li>Transform, then use the Actions, Spells, and Features tabs.</li><li>Press New Turn when Action or Bonus Action counters are spent.</li></ol>
+          <ol><li>Choose or import a character.</li><li>Open <strong>Forms</strong>, choose a form, and check its status.</li><li>Return to <strong>Play</strong> and open Actions, Spells, Checks, or Abilities only when needed.</li><li>Press New Turn when Action or Bonus Action counters are spent.</li></ol>
         </details>
         <details class="help-topic" data-help-keywords="loading characters choose sample switch">
           <summary><span aria-hidden="true">♙</span> Loading characters</summary>
@@ -198,19 +260,19 @@
         </details>
         <details class="help-topic" data-help-keywords="activating forms transform selected available resource">
           <summary><span aria-hidden="true">✧</span> Activating forms</summary>
-          <p>On a phone, tap <strong>Character &amp; Form</strong> to open the portrait and form chooser. Select a form, read its status, then press Transform or Activate. Close the drawer afterward to give Actions and Spells more room.</p>
+          <p>Open <strong>Forms</strong> from the bottom navigation or tap the persistent portrait. Select a form, read its availability and required action, then press Transform or Activate. The artwork remains visible when you return to Play.</p>
         </details>
         <details class="help-topic" data-help-keywords="ending forms return normal base release revert">
           <summary><span aria-hidden="true">↶</span> Ending forms and returning to normal</summary>
-          <p>Press <strong>End Form</strong> beside the form selector. If it is disabled, its tooltip and status explain the missing Bonus Action or external ending condition. Base Form returns automatically when a rule ends the form.</p>
+          <p>Press <strong>End Form</strong> on Play or Forms. If it is disabled, the label explains the missing Bonus Action or external ending condition. Base Form returns automatically when a rule ends the form.</p>
         </details>
         <details class="help-topic" data-help-keywords="tracking resources action bonus reaction slots turns rest active changed">
           <summary><span aria-hidden="true">◇</span> Tracking resources and turns</summary>
-          <p>Green availability chips show what remains this turn. Resource chips show current/maximum uses. Active effects summarize ongoing changes. New Turn refreshes turn actions; rests recover only what the 2024 rule allows.</p>
+          <p>Play shows what remains this turn and summarizes active effects. Open <strong>Abilities</strong> for full resource counters. New Turn refreshes turn actions; rests under More recover only what the 2024 rules allow.</p>
         </details>
         <details class="help-topic" data-help-keywords="images artwork upload crop reset portrait lazy">
           <summary><span aria-hidden="true">▣</span> Images</summary>
-          <p>Upload artwork for the current character or form. Altered crops without distortion, optimizes the image locally, and stores it only on this device. Reset Art restores the built-in portrait.</p>
+          <p>The current form artwork remains visible on every workspace and grows while browsing Forms. Uploads are cropped without distortion, optimized locally, and stored only on this device. Reset Art restores the built-in portrait.</p>
         </details>
         <details class="help-topic" data-help-keywords="settings aura motion catalog">
           <summary><span aria-hidden="true">⚙</span> Settings</summary>

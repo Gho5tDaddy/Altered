@@ -26,7 +26,8 @@ test('every static button is connected to an application control path',()=>{
   const ids=Array.from(html.matchAll(/<button\b[^>]*\bid="([^"]+)"/g),match=>match[1]).filter((id):id is string=>Boolean(id));
   assert.ok(ids.length>30);
   for(const id of ids){
-    const connected=id.startsWith('tab-')?source.includes("document.querySelectorAll<HTMLButtonElement>('.tab')"):source.includes(`#${id}`);
+    const taskLauncher=html.match(new RegExp(`id="${id}"[^>]*data-open-tab=`));
+    const connected=id.startsWith('tab-')?source.includes("document.querySelectorAll<HTMLButtonElement>('.tab')"):taskLauncher?source.includes("document.querySelectorAll<HTMLButtonElement>('[data-open-tab]')"):source.includes(`#${id}`);
     assert.ok(connected,`${id} has no application control path`);
   }
 });
@@ -46,7 +47,7 @@ test('help and first-launch walkthrough remain optional, searchable, and restart
   assert.match(source,/availableWalkthroughSteps\(\)/);
   assert.match(source,/if\(!walkthroughCompleted\)startWalkthrough\(\)/);
   assert.match(source,/saveBooleanSetting\(WALKTHROUGH_SETTING,true\)/);
-  assert.match(source,/setTimeout\(\(\)=>returnFocus\.focus\(\{preventScroll:true\}\),0\)/);
+  assert.match(source,/setTimeout\(\(\)=>focusTarget\.focus\(\{preventScroll:true\}\),0\)/);
   assert.match(styles,/\.walkthrough-target\{/);
   assert.match(styles,/@media\(prefers-reduced-motion:reduce\)/);
 });
@@ -75,11 +76,14 @@ test('form browsing and visual statuses explain availability without changing fo
   assert.match(styles,/\.help-topic summary:focus-visible/);
 });
 
-test('phone gameplay keeps the existing character and form controls in one accessible disclosure',()=>{
+test('phone gameplay uses focused views while keeping the form artwork persistent',()=>{
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
-  assert.match(html,/<details id="character-form-drawer"[^>]*open>/);assert.match(html,/<summary><span><strong>Character &amp; Form/);assert.match(html,/id="character-form-summary"/);
-  assert.match(source,/function syncCharacterFormDrawer\(\)/);assert.match(source,/matchMedia\('\(max-width:700px\)'\)/);assert.match(source,/#character-form-summary/);
-  assert.match(styles,/@media\(max-width:700px\)[\s\S]*\.character-form-drawer>summary/);assert.match(styles,/\.character-form-drawer\[open\] \.drawer-hint::before\{content:"Close"\}/);
+  for(const view of ['play','forms','task','more'])assert.match(html,new RegExp(`data-workspace-view="${view}"`));
+  for(const id of ['nav-play','nav-forms','nav-sheet','nav-more'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(html,/class="persistent-form-visual"[\s\S]*id="form-art"[\s\S]*id="persistent-form-name"/);
+  assert.equal((html.match(/id="form-art"/g)??[]).length,1,'persistent artwork must render once and stay mounted');
+  assert.match(source,/type WorkspaceView='play'\|'forms'\|'task'\|'more'/);assert.match(source,/function setWorkspace\(/);assert.match(source,/renderArt\(\)/);
+  assert.match(styles,/one task, one scroll region, persistent form art/);assert.match(styles,/\.workspace-view\{[^}]*overflow:auto/);assert.match(styles,/\.persistent-form-visual \.form-art/);
 });
 
 test('the six current forms ship with app-ready artwork in both builds',()=>{
@@ -132,7 +136,7 @@ test('the exact hosted build executes before optional mobile storage hydration',
   assert.ok(!worker.includes('Live imports are unavailable'));
 });
 
-test('account identity and compact dashboard stay incremental and accessible',()=>{
+test('account identity and focused workspace stay incremental and accessible',()=>{
   const html=readFileSync('public/index.html','utf8');
   const source=readFileSync('src/app.ts','utf8');
   const styles=readFileSync('public/styles.css','utf8');
@@ -141,15 +145,17 @@ test('account identity and compact dashboard stay incremental and accessible',()
   assert.match(html,/id="toggle-app-menu"[^>]*aria-expanded="false"[^>]*aria-controls="top-actions"/);
   assert.match(html,/id="account-name"/);
   assert.match(html,/href="\/signout-with-chatgpt\?return_to=%2F"/);
-  assert.equal((html.match(/<details class="panel dashboard-drawer" name="table-controls"/g)??[]).length,4);
-  assert.equal((html.match(/<details class="panel dashboard-drawer" name="table-controls" open>/g)??[]).length,1);
+  assert.equal((html.match(/<details class="panel dashboard-drawer" name="more-controls"/g)??[]).length,4);
+  assert.equal((html.match(/<details class="panel dashboard-drawer" name="more-controls" open>/g)??[]).length,0);
   assert.match(html,/class="form-tools-drawer"/);
   assert.match(source,/async function loadHostedAccount\(\)/);
   assert.match(source,/#account-name/);
   assert.match(source,/function setAppMenuOpen\(open:boolean,restoreFocus=false\)/);
   assert.match(styles,/html,body\{width:100%;height:100%;overflow:hidden\}/);
-  assert.match(styles,/\.tab-content\{min-height:0;flex:1 1 auto;overflow:auto/);
-  assert.match(styles,/\.drawer-content\{[^}]*overflow:auto/);
+  assert.match(styles,/\.workspace-stage\{[^}]*overflow:hidden/);
+  assert.match(styles,/\.workspace-view\{[^}]*overflow:auto/);
+  assert.match(styles,/\.task-view \.tab-content\{[^}]*overflow:visible/);
+  assert.match(styles,/\.more-view \.drawer-content\{overflow:visible/);
   assert.match(styles,/\.dashboard-drawer>summary:focus-visible/);
   assert.match(hostedServiceWorker,/event\.request\.mode==='navigate'/);
   assert.ok(!hostedServiceWorker.includes("'./index.html'"));

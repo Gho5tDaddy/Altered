@@ -20,7 +20,7 @@
     "path": "../../.android-signing/altered-release.keystore",
     "alias": "altered"
   },
-  "appVersion": "0.25.2",
+  "appVersion": "0.26.0",
   "appVersionCode": 25,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
