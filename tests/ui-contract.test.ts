@@ -84,6 +84,10 @@ test('phone gameplay uses focused views while keeping the form artwork persisten
   assert.equal((html.match(/id="form-art"/g)??[]).length,1,'persistent artwork must render once and stay mounted');
   assert.match(source,/type WorkspaceView='play'\|'forms'\|'task'\|'more'/);assert.match(source,/function setWorkspace\(/);assert.match(source,/renderArt\(\)/);
   assert.match(styles,/one task, one scroll region, persistent form art/);assert.match(styles,/\.workspace-view\{[^}]*overflow:auto/);assert.match(styles,/\.persistent-form-visual \.form-art/);
+  assert.match(html,/id="persistent-form-state"/);assert.match(source,/container\.setAttribute\('aria-label',`\$\{stateLabel\}: \$\{displayLabel\}`\)/);
+  assert.equal(/container\.append\(text\('div',stateLabel,`form-state/.test(source),false);assert.equal(/container\.append\(text\('div',[\s\S]*'art-label'\)\)/.test(source),false);
+  assert.match(styles,/\.persistent-form-visual \.form-state,\.persistent-form-visual \.art-label\{display:none!important\}/);
+  assert.match(styles,/@media\(max-width:700px\)\{[\s\S]*grid-template-rows:160px minmax\(0,1fr\)/);
 });
 
 test('arcane glow palette keeps secondary and disabled states luminous and legible',()=>{

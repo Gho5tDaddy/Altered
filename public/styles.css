@@ -1527,6 +1527,12 @@ body{min-height:100dvh}
 .persistent-form-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem}
 .persistent-form-copy small{color:var(--accent-2);font-size:.62rem}
 .persistent-form-copy:hover,.persistent-form-copy:focus-visible{background:#1a2024}
+.persistent-form-copy span{display:flex;align-items:center;gap:6px}
+.persistent-form-copy span::before{content:"";width:7px;height:7px;flex:0 0 7px;border:1px solid currentColor;border-radius:50%;background:transparent}
+.persistent-form-copy.is-active span{color:var(--accent-2);text-shadow:0 0 6px rgba(121,247,255,.54)}
+.persistent-form-copy.is-active span::before{background:var(--accent-2);box-shadow:0 0 7px rgba(121,247,255,.78)}
+.persistent-form-copy.is-preview span::before{background:var(--blue);box-shadow:0 0 7px rgba(117,216,255,.58)}
+.persistent-form-visual .form-state,.persistent-form-visual .art-label{display:none!important}
 .workspace-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid var(--line)}
 .workspace-heading>div{display:grid}.workspace-heading span{color:var(--accent-2);font-size:.6rem;text-transform:uppercase;letter-spacing:.09em}
 .workspace-heading h2{margin:0;font-size:1rem}.workspace-heading .text-button{min-height:40px}
@@ -1578,12 +1584,11 @@ html[data-altered-workspace="forms"] .persistent-form-copy strong{font-size:1rem
 @media(max-width:700px){
   .app-shell{grid-template-rows:auto auto minmax(0,1fr) auto;padding:5px 6px calc(5px + env(safe-area-inset-bottom))}
   .topbar{min-height:42px}.brand-mark{width:42px;height:42px}.character-strip{min-height:42px}
-  .workspace,html[data-altered-workspace="forms"] .workspace{grid-template-columns:1fr;grid-template-rows:88px minmax(0,1fr);gap:5px}
-  html[data-altered-workspace="forms"] .workspace{grid-template-rows:118px minmax(0,1fr)}
-  .persistent-form-visual{grid-template-columns:112px minmax(0,1fr);grid-template-rows:1fr;border-radius:11px}
-  html[data-altered-workspace="forms"] .persistent-form-visual{grid-template-columns:150px minmax(0,1fr)}
+  .workspace,html[data-altered-workspace="forms"] .workspace{grid-template-columns:1fr;grid-template-rows:160px minmax(0,1fr);gap:5px}
+  html[data-altered-workspace="forms"] .workspace{grid-template-rows:178px minmax(0,1fr)}
+  .persistent-form-visual{grid-template-columns:minmax(150px,43%) minmax(0,1fr);grid-template-rows:1fr;border-radius:11px}
+  html[data-altered-workspace="forms"] .persistent-form-visual{grid-template-columns:minmax(170px,46%) minmax(0,1fr)}
   .persistent-form-visual .form-art{height:100%;min-height:0!important;border-right:1px solid var(--line)}
-  .persistent-form-visual .form-state{top:4px;left:4px}.persistent-form-visual .art-label{left:4px;right:4px;bottom:4px;padding:3px;font-size:.6rem}
   .persistent-form-copy{min-height:0;border-top:0;padding:8px 10px;align-content:center}.persistent-form-copy strong{font-size:.9rem}
   .workspace-view{scrollbar-gutter:auto}.play-view{padding:7px}
   .play-form-status{padding-bottom:5px}.play-form-status strong{font-size:.9rem}.play-form-status small{font-size:.58rem}
@@ -1606,9 +1611,9 @@ html[data-altered-workspace="forms"] .persistent-form-copy strong{font-size:1rem
 }
 @media(max-width:390px){
   .brand-copy h1{font-size:1rem}.character-title strong{font-size:.88rem}
-  .workspace,html[data-altered-workspace="forms"] .workspace{grid-template-rows:80px minmax(0,1fr)}
-  html[data-altered-workspace="forms"] .workspace{grid-template-rows:108px minmax(0,1fr)}
-  .persistent-form-visual{grid-template-columns:102px minmax(0,1fr)}
+  .workspace,html[data-altered-workspace="forms"] .workspace{grid-template-rows:152px minmax(0,1fr)}
+  html[data-altered-workspace="forms"] .workspace{grid-template-rows:170px minmax(0,1fr)}
+  .persistent-form-visual{grid-template-columns:minmax(138px,43%) minmax(0,1fr)}
   .play-form-status small,.play-status{display:none}.task-launcher{min-height:47px}
 }
 @media(prefers-reduced-motion:reduce){

@@ -319,9 +319,10 @@ function renderArt(){
   appendPortrait(container,mainTarget.targetId,mainTarget.fallbackKey,mainTarget.label);
   if(aura.active){const pulse=document.createElement('div');pulse.className='form-aura-pulse';pulse.setAttribute('aria-hidden','true');container.append(pulse);}
   const stateLabel=aura.active?'ACTIVE FORM':previewing?'FORM PREVIEW':'BASE FORM';
-  const stateClass=aura.active?'active':previewing?'preview':'base';
-  container.append(text('div',stateLabel,`form-state ${stateClass}`));
-  container.append(text('div',aura.active?aura.label:previewing?preview?.label??mainTarget.label:character.name,'art-label'));
+  const displayLabel=aura.active?aura.label:previewing?preview?.label??mainTarget.label:'Base Form';
+  container.setAttribute('aria-label',`${stateLabel}: ${displayLabel}`);
+  const persistentCopy=$('#open-persistent-form');persistentCopy.classList.toggle('is-active',aura.active);persistentCopy.classList.toggle('is-preview',previewing);
+  $('#persistent-form-state').textContent=stateLabel;$('#persistent-form-name').textContent=displayLabel;
   const target=artTargetInfo();$('#art-target-label').textContent=`Artwork target: ${target.label}`;
   const reset=$<HTMLButtonElement>('#reset-art');const cached=artOverrideCache.get(artCacheKey(target.targetId));reset.disabled=!cached;
 }
