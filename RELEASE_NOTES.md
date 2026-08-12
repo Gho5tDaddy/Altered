@@ -1,3 +1,15 @@
+# Altered v0.26.6 release notes
+
+## Always-visible turns and resumable character setup
+
+New Turn and End Turn now live in the persistent form panel on phones, so they remain visible on Play, Forms, Sheet, and More instead of falling below the scroll area. The existing desktop turn controls remain unchanged, and both control paths use the same combat-state functions.
+
+Unfinished D&D Beyond private-content setup now saves locally on the current device. Returning after closing the questionnaire, switching screens, refreshing, or reopening Altered exposes a clear Resume Content Setup button in More and a resume card in Import. Starting a different import is explicit, completed private mechanics remain installed, and no D&D Beyond credentials or proprietary book text are stored.
+
+More now includes clear Add / Import Character and Delete Current Character actions. Deletion requires confirmation, cannot remove the only remaining character, and preserves separately installed private mechanics for a later re-import.
+
+Saved character, combat-state, import/export, standalone, and private-pack formats remain backward compatible.
+
 # Altered v0.26.5 release notes
 
 ## Visible outcomes and transformation cockpit polish

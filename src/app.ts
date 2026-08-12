@@ -5,7 +5,7 @@ import {applyDdbSrdCreatures,ddbCoverageLabel,ddbSetupPackId,extractDdbCharacter
 import type {DdbImportReport} from './dndbeyond.js';
 import {normalizeSrdCreature,parseSrdCatalogPage,parseSrdCatalogStatus} from './srd-catalog.js';
 import type {SrdCatalogStatus} from './srd-catalog.js';
-import {installExtensionPack,listExtensionPackRecords,loadArtOverride,loadBooleanSetting,optimizePortrait,removeArtOverride,removeExtensionPack,saveArtOverride,saveBooleanSetting} from './storage.js';
+import {installExtensionPack,listExtensionPackRecords,loadArtOverride,loadBooleanSetting,loadJsonSetting,optimizePortrait,removeArtOverride,removeExtensionPack,removeSetting,saveArtOverride,saveBooleanSetting,saveJsonSetting} from './storage.js';
 import {SAMPLE_CHARACTERS} from './sample-data.js';
 import {FEROCITUS_CHARACTER} from './ferocitus-data.js';
 import {applyOwnedContentPack,applyOwnedContentPacks,ownedContentTemplate,parseOwnedContentPack,privateMechanicPack,safeOwnedContentParse} from './owned-content.js';
@@ -79,6 +79,7 @@ let pendingActiveSnapshot:Partial<GameState>['activeTransform']|undefined;
 let invalidPackCount=0;
 let pendingDdbImport:DdbImportReport|null=null;
 let confirmedDdbSourceId:string|null=null;
+let deletedCharacterIds=new Set<string>();
 let srdCatalogStatus:SrdCatalogStatus|null=null;
 let srdCatalogMessage='Checking the live legal SRD support catalog...';
 let formSearch='';
@@ -91,6 +92,7 @@ let walkthroughTarget:HTMLElement|undefined;
 let walkthroughReturnFocus:HTMLElement|undefined;
 let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
+const PENDING_DDB_SETTING='pending-ddb-import-v1';
 type UiStatus='available'|'active'|'inactive'|'locked'|'unavailable'|'requirements'|'selected'|'favorite'|'new'|'importing'|'loading'|'success'|'warning'|'error';
 const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
   available:{icon:'✓',label:'Available'},active:{icon:'✦',label:'Active'},inactive:{icon:'○',label:'Inactive'},
@@ -190,7 +192,7 @@ function filterHelpTopics(){
 
 function addActivity(message:string){state.log.unshift(message);state.log=state.log.slice(0,25);persist();}
 function notify(message:string){$('#status-message').textContent=message;$('#play-status').textContent=message;addActivity(message);}
-function persist(){try{localStorage.setItem('altered-v0.18',JSON.stringify({baseCharacters,currentCharacterId:baseCharacter.id,state}));}catch{/* storage is optional */}}
+function persist(){try{localStorage.setItem('altered-v0.18',JSON.stringify({baseCharacters,currentCharacterId:baseCharacter.id,state,deletedCharacterIds:[...deletedCharacterIds]}));}catch{/* storage is optional */}}
 function safeSavedText(value:unknown,fallback:string,max=200){return typeof value==='string'?value.slice(0,max):fallback;}
 function savedOncePerTurn(value:unknown){
   if(typeof value!=='object'||value===null||Array.isArray(value))return {};
@@ -219,11 +221,12 @@ function savedActionUses(value:unknown){
 function restore(){
   try{
     const raw=localStorage.getItem('altered-v0.18')??localStorage.getItem('altered-v0.17')??localStorage.getItem('altered-v0.15')??localStorage.getItem('altered-v0.9')??localStorage.getItem('altered-v0.8')??localStorage.getItem('altered-v0.4');if(!raw)return false;
-    const parsed=JSON.parse(raw) as {baseCharacters?:unknown[];currentCharacterId?:string;baseCharacter?:unknown;character?:unknown;state?:Partial<GameState>};
+    const parsed=JSON.parse(raw) as {baseCharacters?:unknown[];currentCharacterId?:string;baseCharacter?:unknown;character?:unknown;state?:Partial<GameState>;deletedCharacterIds?:unknown[]};
+    deletedCharacterIds=new Set(Array.isArray(parsed.deletedCharacterIds)?parsed.deletedCharacterIds.filter((id):id is string=>typeof id==='string'&&id.length<=160).slice(0,50):[]);
     const library:Character[]=[];
     if(Array.isArray(parsed.baseCharacters)){for(const rawCharacter of parsed.baseCharacters.slice(0,50)){try{const entry=parseCharacter(rawCharacter);if(!library.some(existing=>existing.id===entry.id))library.push(entry);}catch{/* one damaged library entry should not block the rest */}}}
     if(library.length===0){const restored=parseCharacter(parsed.baseCharacter??parsed.character);library.push(restored);}
-    for(const sample of BUNDLED_CHARACTERS.map(parseCharacter))if(!library.some(entry=>entry.id===sample.id))library.push(sample);
+    for(const sample of BUNDLED_CHARACTERS.map(parseCharacter))if(!deletedCharacterIds.has(sample.id)&&!library.some(entry=>entry.id===sample.id))library.push(sample);
     baseCharacters=library;
     const requestedId=typeof parsed.currentCharacterId==='string'?parsed.currentCharacterId:typeof (parsed.baseCharacter as {id?:unknown}|undefined)?.id==='string'?String((parsed.baseCharacter as {id:string}).id):typeof (parsed.character as {id?:unknown}|undefined)?.id==='string'?String((parsed.character as {id:string}).id):library[0]?.id;
     const restored=library.find(entry=>entry.id===requestedId)??library[0];if(!restored)return false;
@@ -401,10 +404,35 @@ async function loadHostedAccount(){
 function setImportStatus(message:string){$('#import-status').textContent=message;}
 function setBuilderStatus(message:string){$('#builder-status').textContent=message;}
 function applyImportedCharacter(parsed:Character){
+  deletedCharacterIds.delete(parsed.id);
   const baseIndex=baseCharacters.findIndex(entry=>entry.id===parsed.id);if(baseIndex>=0)baseCharacters[baseIndex]=parsed;else baseCharacters=[parsed,...baseCharacters];
   baseCharacter=parsed;const result=applyInstalledPacks(parsed);const imported=result.character;rebuildEffectiveCharacterLibrary(false);setCharacter(characters.find(entry=>entry.id===imported.id)??imported);
   const detail=result.applied?` Matching private packs added ${result.added.transformations} transformations, ${result.added.forms} forms, and ${result.added.features} features.`:'';
   setImportStatus(`${imported.name} imported successfully.${detail}`);return imported;
+}
+function remainingDdbSetup(report:DdbImportReport){return report.setupNeeds.filter(need=>!installedPacks.some(pack=>pack.metadata.id===ddbSetupPackId(report.sourceId,need.id)));}
+function renderPendingSetupAccess(){
+  const report=pendingDdbImport;const remaining=report?remainingDdbSetup(report):[];const available=Boolean(report&&remaining.length);
+  const panel=$('#import-resume-panel');panel.hidden=!available;$<HTMLButtonElement>('#more-resume-setup').hidden=!available;
+  if(report&&available){$('#import-resume-title').textContent=`Resume ${report.character.name}'s content setup`;$('#import-resume-detail').textContent=`${remaining.length} mechanic${remaining.length===1?'':'s'} still need${remaining.length===1?'s':''} your confirmation. Progress is saved on this device.`;}
+}
+function savedDdbReport(value:unknown):DdbImportReport|null{
+  if(typeof value!=='object'||value===null||Array.isArray(value))return null;const report=value as Partial<DdbImportReport>;
+  if(typeof report.sourceId!=='string'||!Array.isArray(report.coverage)||!Array.isArray(report.warnings)||!Array.isArray(report.setupNeeds)||typeof report.blocked!=='boolean'||!report.supportRequests)return null;
+  try{return {...report,character:parseCharacter(report.character)} as DdbImportReport;}catch{return null;}
+}
+async function clearPendingDdbImport(){pendingDdbImport=null;confirmedDdbSourceId=null;$('#dndbeyond-review').hidden=true;renderPendingSetupAccess();await removeSetting(PENDING_DDB_SETTING);}
+function resumePrivateSetup(){
+  if(!pendingDdbImport){setImportStatus('There is no unfinished private-content setup on this device.');return;}
+  const remaining=remainingDdbSetup(pendingDdbImport);if(!remaining.length){setImportStatus('All detected private mechanics are complete.');renderPendingSetupAccess();return;}
+  openPrivateMechanics(remaining[0]?.id);
+}
+function deleteCurrentCharacter(){
+  if(baseCharacters.length<=1){$('#delete-character-status').textContent='Import or keep at least one other character before deleting this one.';return;}
+  const removed=baseCharacter;deletedCharacterIds.add(removed.id);baseCharacters=baseCharacters.filter(entry=>entry.id!==removed.id);characters=characters.filter(entry=>entry.id!==removed.id);
+  if(pendingDdbImport?.character.id===removed.id)void clearPendingDdbImport();
+  const next=characters[0]??baseCharacters[0];if(!next){$('#delete-character-status').textContent='Altered must keep at least one character.';return;}
+  $<HTMLDialogElement>('#delete-character-dialog').close();setCharacter(next);notify(`${removed.name} deleted from this device. Use Add / Import Character to start another character.`);
 }
 function renderDdbReview(report:DdbImportReport){
   const root=$('#dndbeyond-review');root.hidden=false;$('#dndbeyond-review-id').textContent=`DDB ${report.sourceId}`;
@@ -425,6 +453,7 @@ function renderDdbReview(report:DdbImportReport){
   const remaining=report.setupNeeds.length-completed;$('#dndbeyond-setup-summary').textContent=remaining?`${remaining} of ${report.setupNeeds.length} need setup`:`${completed} completed`;
   const setupBadge=$('#dndbeyond-setup-badge');setupBadge.className=`ui-status ${remaining?'requirements':'success'}`;setupBadge.textContent=remaining?'Needs Setup':'Completed';
   const confirm=$<HTMLButtonElement>('#confirm-dndbeyond-import');const confirmed=confirmedDdbSourceId===report.sourceId;confirm.disabled=report.blocked||confirmed;confirm.textContent=report.blocked?'2024 Rules Required':confirmed?'Character Imported':'Confirm Import';if(report.blockReason)confirm.title=report.blockReason;else confirm.removeAttribute('title');
+  renderPendingSetupAccess();
 }
 function privateMechanicMode(feature:OwnedContentPack['content']['features'][number]|undefined){
   if(feature?.grants?.speedBonus!==undefined)return 'speed';if(feature?.grants?.resistances?.length)return 'resistance';if(feature?.grants?.immunities?.length)return 'immunity';if(feature?.grants?.acFormula)return 'ac-formula';return feature?.automation==='conditional'?'conditional':'reference';
@@ -472,7 +501,7 @@ async function fetchDdbCharacter(explicitSource?:string){
   const source=explicitSource??$<HTMLInputElement>('#dndbeyond-source').value;const id=extractDdbCharacterId(source);
   if(!id){setImportStatus('Enter a public D&D Beyond character link or numeric character ID.');return;}
   $<HTMLInputElement>('#dndbeyond-source').value=id;const trigger=$<HTMLButtonElement>('#fetch-dndbeyond');trigger.disabled=true;trigger.textContent='Fetching…';
-  pendingDdbImport=null;confirmedDdbSourceId=null;$('#dndbeyond-review').hidden=true;setImportStatus(`Retrieving D&D Beyond character ${id} without account credentials…`);
+  const previousReport=pendingDdbImport;$('#dndbeyond-review').hidden=true;setImportStatus(`Retrieving D&D Beyond character ${id} without account credentials…`);
   try{
     // The private hosted app authenticates same-origin API requests at its
     // edge. The worker never forwards the incoming request or its cookies to
@@ -491,9 +520,10 @@ async function fetchDdbCharacter(explicitSource?:string){
         report.warnings.push({code:'srd-catalog-unavailable',severity:'warning',message:'The live SRD support catalog was unavailable. The character can still be imported, but selected forms missing from the offline library need review.'});
       }
     }
-    pendingDdbImport=report;renderDdbReview(report);
+    pendingDdbImport=report;confirmedDdbSourceId=null;await saveJsonSetting(PENDING_DDB_SETTING,report);renderDdbReview(report);
     const reviewCount=report.coverage.filter(item=>item.status==='review').length;setImportStatus(report.blocked?report.blockReason??'This character cannot be imported into the 2024-only rules engine.':`${report.character.name} is ready for review. ${reviewCount?`${reviewCount} area${reviewCount===1?' needs':'s need'} attention before you confirm.`:'All provided core fields passed validation.'}`);
   }catch(error){
+    if(previousReport){pendingDdbImport=previousReport;renderDdbReview(previousReport);}
     setImportStatus(`D&D Beyond import failed: ${error instanceof Error?error.message:'Unknown error'}`);
   }finally{trigger.disabled=false;trigger.textContent='Fetch & Review';}
 }
@@ -578,6 +608,7 @@ function renderCharacterStrip(){
   $('#character-name').textContent=character.name;
   $('#character-build').textContent=`${character.species} · ${character.classes.map(c=>`${c.subclass?`${c.subclass} `:''}${c.name} ${c.level}`).join(' / ')}`;
   const meta=rulesMetadata();$('#rules-badge').textContent=`${meta.srd} · ${auditSnapshot.rules} audited rules · verified ${meta.reviewed}`;
+  $<HTMLButtonElement>('#more-delete-character').disabled=baseCharacters.length<=1;
 }
 function renderTransformSelector(){
   const select=$<HTMLSelectElement>('#form-select');const options=availableTransformations(character,state);
@@ -630,7 +661,7 @@ function renderMetrics(){
   $('#persistent-hp').textContent=`${state.hp} / ${character.hp.max}`;$('#persistent-temp').textContent=String(state.tempHp);$('#persistent-ac').textContent=String(sheet.ac);$('#persistent-speed').textContent=`${sheet.speeds.walk??0} ft.`;
   const economy=$('#action-economy');clear(economy);const chips:[string,number][]=[['Action',state.turn.actionsRemaining],['Surge Action',state.turn.surgeActionsRemaining],['Bonus Action',state.turn.bonusRemaining],['Reaction',state.turn.reactionRemaining]];for(const [name,count] of chips){const node=text('span',`${name}: ${count}`,'economy-chip '+(count>0?'available':'used'));economy.append(node);}const slotSpell=text('span',state.turn.slotSpellCast?'Slot spell: Used':'Slot spell: Available','economy-chip '+(state.turn.slotSpellCast?'used':'available'));slotSpell.title='2024 rule: you can expend only one spell slot to cast a spell on a turn. Cantrips do not use this limit.';economy.append(slotSpell);
   if(state.turn.actionsRemaining>0&&state.turn.bonusRemaining===0)economy.append(text('p',`Action still available: use it for an attack, another non-spell action, or a cantrip. Rage and Wild Shape each require the Bonus Action already used this turn; press New Turn before using either.${state.turn.slotSpellCast?' Another leveled spell is also blocked by the 2024 one-slot-spell-per-turn rule.':''}`,'turn-guidance'));
-  $('#turn-number').textContent=`Turn ${state.turn.number}`;
+  $('#turn-number').textContent=`Turn ${state.turn.number}`;$('#persistent-turn-number').textContent=`Turn ${state.turn.number}`;
 }
 function renderResources(){
   const strip=$('#resource-strip');clear(strip);
@@ -948,6 +979,8 @@ function initializeControls(){
   $('#play-end-form').addEventListener('click',endCurrentForm);
   $('#more-help').addEventListener('click',()=>$<HTMLButtonElement>('#open-help').click());
   $('#more-import').addEventListener('click',()=>$<HTMLButtonElement>('#open-import-center').click());
+  $('#more-resume-setup').addEventListener('click',resumePrivateSetup);
+  $('#more-delete-character').addEventListener('click',()=>{$('#delete-character-name').textContent=character.name;$('#delete-character-status').textContent=baseCharacters.length<=1?'Import or keep at least one other character before deleting this one.':'';$<HTMLDialogElement>('#delete-character-dialog').showModal();});
   $('#more-export').addEventListener('click',()=>$<HTMLButtonElement>('#export-character').click());
   $('#more-settings').addEventListener('click',()=>$<HTMLButtonElement>('#open-settings').click());
   const compactFormQuery=window.matchMedia('(max-width:700px)');syncCharacterFormDrawer();compactFormQuery.addEventListener('change',syncCharacterFormDrawer);window.addEventListener('resize',()=>{if(innerWidth>700)setAppMenuOpen(false);syncCharacterFormDrawer();});
@@ -961,7 +994,7 @@ function initializeControls(){
   tabs.forEach((tab,index)=>{tab.addEventListener('click',()=>activateTab(tab));tab.addEventListener('keydown',(event:KeyboardEvent)=>{let next:number|undefined;if(event.key==='ArrowRight')next=(index+1)%tabs.length;else if(event.key==='ArrowLeft')next=(index-1+tabs.length)%tabs.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=tabs.length-1;if(next===undefined)return;event.preventDefault();const target=tabs[next];if(target)activateTab(target,true);});});
   $('#apply-damage').addEventListener('click',()=>{const amount=Number($<HTMLInputElement>('#damage-amount').value);const type=$<HTMLSelectElement>('#damage-type').value as DamageType;applyResult(applyDamage(state,resolveSheet(character,state),amount,type,character));});
   $('#apply-healing').addEventListener('click',()=>applyResult(heal(state,character,Number($<HTMLInputElement>('#damage-amount').value))));
-  $('#new-turn').addEventListener('click',()=>applyResult(startNewTurn(state)));$('#end-turn').addEventListener('click',()=>applyResult(endTurn(character,state)));$('#short-rest').addEventListener('click',()=>applyResult(shortRest(state)));$('#long-rest').addEventListener('click',()=>applyResult(longRest(character,state)));
+  const newTurn=()=>applyResult(startNewTurn(state)),finishTurn=()=>applyResult(endTurn(character,state));$('#new-turn').addEventListener('click',newTurn);$('#persistent-new-turn').addEventListener('click',newTurn);$('#end-turn').addEventListener('click',finishTurn);$('#persistent-end-turn').addEventListener('click',finishTurn);$('#short-rest').addEventListener('click',()=>applyResult(shortRest(state)));$('#long-rest').addEventListener('click',()=>applyResult(longRest(character,state)));
   $('#add-condition').addEventListener('click',()=>applyResult(applyCondition(character,state,$<HTMLSelectElement>('#condition-select').value)));$('#clear-conditions').addEventListener('click',()=>applyResult(clearConditions(state)));
   $('#clear-activity').addEventListener('click',()=>{state.log=[];$('#status-message').textContent='Recent activity cleared.';$('#play-status').textContent='Recent activity cleared.';renderLog();persist();});
   $('#open-help').addEventListener('click',()=>{filterHelpTopics();const dialog=$<HTMLDialogElement>('#help-dialog');dialog.showModal();$<HTMLInputElement>('#help-search').focus();});
@@ -984,8 +1017,11 @@ function initializeControls(){
   $('#confirm-dndbeyond-import').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}if(pendingDdbImport.blocked){setImportStatus(pendingDdbImport.blockReason??'This character is blocked by the 2024-only rules policy.');return;}const imported=applyImportedCharacter(pendingDdbImport.character);confirmedDdbSourceId=pendingDdbImport.sourceId;renderDdbReview(pendingDdbImport);setImportStatus(`${imported.name} imported after review. You can complete any remaining private mechanics here, then close this window.`);});
   $('#download-dndbeyond-json').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}downloadJson(pendingDdbImport.character,`${slug(pendingDdbImport.character.name)}-altered.json`);});
   $('#export-character').addEventListener('click',()=>downloadJson(character,`${character.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'altered-character'}.json`));
-  $('#open-import-center').addEventListener('click',()=>{renderInstalledPacks();setImportStatus('Import from a public D&D Beyond character link, or use a validated Altered JSON backup.');$<HTMLDialogElement>('#import-dialog').showModal();});
+  $('#open-import-center').addEventListener('click',()=>{renderInstalledPacks();if(pendingDdbImport){renderDdbReview(pendingDdbImport);setImportStatus(`Saved setup found for ${pendingDdbImport.character.name}. Resume it below or start a different import.`);}else setImportStatus('Import from a public D&D Beyond character link, or use a validated Altered JSON backup.');$<HTMLDialogElement>('#import-dialog').showModal();});
   $('#close-import-center').addEventListener('click',()=>$<HTMLDialogElement>('#import-dialog').close());
+  $('#resume-private-setup').addEventListener('click',resumePrivateSetup);
+  $('#start-new-import').addEventListener('click',()=>{void clearPendingDdbImport();$<HTMLInputElement>('#dndbeyond-source').value='';setImportStatus('Ready for a different public D&D Beyond character link or ID.');$<HTMLInputElement>('#dndbeyond-source').focus();});
+  const closeDelete=()=>$<HTMLDialogElement>('#delete-character-dialog').close();$('#close-delete-character').addEventListener('click',closeDelete);$('#cancel-delete-character').addEventListener('click',closeDelete);$('#confirm-delete-character').addEventListener('click',deleteCurrentCharacter);
   $('#owned-pack-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{const pack=safeOwnedContentParse(await file.text());const result=await installAndApplyPack(pack);setImportStatus(result.applied?`${pack.metadata.name} installed and applied to ${character.name}. ${packCounts(pack)}.`:`${pack.metadata.name} installed. It does not match ${character.name}, so the current sheet was not changed.`);renderSettings();}catch(error){setImportStatus(`Pack installation failed: ${error instanceof Error?error.message:'Unknown error'}`);}finally{input.value='';}});
   $('#download-pack-template').addEventListener('click',()=>downloadJson(ownedContentTemplate(character),`${slug(character.name)}-private-content-template.json`));
   $('#open-transform-builder').addEventListener('click',()=>{populateBuilderClassOptions();setBuilderStatus('The builder creates a validated local pack. Advanced fields are optional.');$<HTMLDialogElement>('#transform-builder-dialog').showModal();});
@@ -1015,6 +1051,7 @@ async function boot(){
   document.documentElement.dataset.alteredReady='true';
   void loadHostedAccount();
   installedPacks=await loadValidatedInstalledPacks();
+  const savedPending=savedDdbReport(await loadJsonSetting<unknown>(PENDING_DDB_SETTING));if(savedPending){pendingDdbImport=savedPending;renderDdbReview(savedPending);}else renderPendingSetupAccess();
   rebuildEffectiveCharacterLibrary(true);
   if(pendingActiveSnapshot?.option?.id){const option=availableTransformations(character,state).find(candidate=>candidate.id===pendingActiveSnapshot?.option?.id);if(option)state.activeTransform={option,startedTurn:boundedWhole(pendingActiveSnapshot.startedTurn,state.turn.number,1,1_000_000),duration:safeSavedText(pendingActiveSnapshot.duration,'',200),tempHpSource:Boolean(pendingActiveSnapshot.tempHpSource),...(pendingActiveSnapshot.spellConcentration?{spellConcentration:true}:{}),...(pendingActiveSnapshot.permanentUntilDispelled?{permanentUntilDispelled:true}:{})};}
   magicEffectsEnabled=await loadBooleanSetting('magic-effects-enabled',true);

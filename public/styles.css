@@ -1519,10 +1519,12 @@ body{min-height:100dvh}
   background:linear-gradient(180deg,rgba(24,30,35,.98),rgba(10,14,17,.98));box-shadow:var(--shadow)
 }
 .persistent-form-visual .form-art{width:100%;height:100%;min-height:0;border:0;border-radius:0}
+.persistent-form-side{min-width:0;min-height:0;display:flex;flex-direction:column;background:rgba(9,12,14,.96)}
 .persistent-form-copy{
-  min-height:56px;display:grid;gap:1px;padding:7px 9px;text-align:left;
+  min-height:56px;flex:1;display:grid;gap:1px;padding:7px 9px;text-align:left;
   border:0;border-top:1px solid var(--line);background:rgba(9,12,14,.96);color:var(--text)
 }
+.persistent-turn-controls{display:none}
 .persistent-form-kicker{color:var(--muted);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em}
 .persistent-form-copy>strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem}
 .persistent-form-open{color:var(--accent-2);font-size:.62rem}
@@ -1569,6 +1571,8 @@ body{min-height:100dvh}
 .more-view .dashboard-drawer[open]{display:block}.more-view .dashboard-drawer[open] .drawer-content{max-height:none}
 .more-view .drawer-content{overflow:visible;padding:2px 10px 10px}
 .more-view .activity-log{max-height:none;overflow:visible}
+.import-resume-panel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0;padding:9px 10px;border:1px solid rgba(121,247,255,.55);border-radius:10px;background:rgba(40,25,61,.42)}
+.import-resume-panel[hidden]{display:none}.import-resume-panel>div:first-child{display:grid;gap:2px}.import-resume-panel small{color:var(--muted)}
 .workspace-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:7px;padding-bottom:env(safe-area-inset-bottom)}
 .workspace-nav-button{min-height:48px;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);border-radius:11px;background:#151a1e;color:var(--muted);font-weight:800;font-size:.72rem}
 .workspace-nav-button span{color:var(--accent-2);font-size:.9rem}.workspace-nav-button.active{border-color:var(--accent);background:linear-gradient(180deg,#302719,#17191a);color:var(--text)}
@@ -1590,6 +1594,8 @@ html[data-altered-workspace="forms"] .persistent-form-copy>strong{font-size:1rem
   html[data-altered-workspace="forms"] .persistent-form-visual{grid-template-columns:minmax(170px,46%) minmax(0,1fr)}
   .persistent-form-visual .form-art{height:100%;min-height:0!important;border-right:1px solid var(--line)}
   .persistent-form-copy{min-height:0;border-top:0;padding:8px 10px;align-content:center}.persistent-form-copy>strong{font-size:.9rem}
+  .persistent-turn-controls{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:5px 7px 6px;border-top:1px solid var(--line);background:rgba(20,15,28,.96)}
+  .persistent-turn-controls .button{min-height:31px;padding:4px 5px;font-size:.6rem}.persistent-turn-controls span{grid-column:1/-1;color:var(--accent-2);font-size:.55rem;text-align:center}
   .workspace-view{scrollbar-gutter:auto}.play-view{padding:7px}
   .play-form-status{padding-bottom:5px}.play-form-status strong{font-size:.9rem}.play-form-status small{font-size:.58rem}
   .play-view .metric-grid{grid-template-columns:minmax(0,1.25fr) repeat(2,minmax(0,.75fr));gap:4px;margin-top:5px}
@@ -1600,12 +1606,13 @@ html[data-altered-workspace="forms"] .persistent-form-copy>strong{font-size:1rem
   .play-latest-result{grid-template-columns:auto minmax(60px,.4fr) auto minmax(0,1fr);min-height:38px;margin-top:5px;padding:4px 7px;gap:5px}.play-latest-result small{font-size:.55rem}
   .play-status{margin-top:3px;min-height:22px;padding-block:2px;font-size:.58rem}
   .play-utility-row{margin-top:3px;gap:5px}.play-utility-row .button{min-height:34px;padding:5px;font-size:.67rem}
-  .turn-bar{margin-top:4px;padding-top:4px;gap:5px}.turn-bar .button{min-height:35px;padding:5px;font-size:.68rem}.turn-bar span{font-size:.58rem}
+  .play-view .turn-bar{display:none}.turn-bar{margin-top:4px;padding-top:4px;gap:5px}.turn-bar .button{min-height:35px;padding:5px;font-size:.68rem}.turn-bar span{font-size:.58rem}
   .workspace-heading{margin-bottom:5px;padding-bottom:5px}.workspace-heading h2{font-size:.9rem}
   .forms-view,.task-view{padding:7px}.forms-view .hero-grid{display:block}.forms-view .status{max-height:none}
   .task-view .tabs{grid-template-columns:repeat(5,1fr);gap:3px}.task-view .tab{min-height:36px;font-size:.6rem}
   .task-view .active-effects{max-height:none;overflow:visible}
   .more-view>.workspace-heading{padding:6px 8px}.more-links{gap:5px;padding:6px}.more-links .button{min-height:38px;padding:5px;font-size:.67rem}
+  .import-resume-panel{align-items:stretch;flex-direction:column}.import-resume-panel .inline-actions{display:grid;grid-template-columns:1fr 1fr}
   .more-view .dashboard-drawer>summary{min-height:43px;padding:7px 9px}.more-view .dashboard-drawer[open] .drawer-content{max-height:none;padding:2px 8px 8px}
   .workspace-nav{gap:4px;margin-top:5px}.workspace-nav-button{min-height:45px;flex-direction:column;gap:0;padding:3px;font-size:.62rem}.workspace-nav-button span{font-size:.76rem}
 }

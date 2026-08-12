@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.26.6
+
+- Moved compact New Turn and End Turn controls into the persistent mobile form panel so they stay reachable on every focused screen.
+- Saved unfinished private-content questionnaires locally and added direct Resume Content Setup paths in More and Import.
+- Added explicit Add / Import Character and confirmed Delete Current Character controls, including protection against deleting the final character.
+- Preserved completed private mechanics, existing saves, imports, exports, combat rules, and desktop behavior.
+
 ## v0.26.5
 
 - Added a fixed, animated roll-result overlay with visible d20, modifier source, final total, and rules-aware natural 1/natural 20 presentation.

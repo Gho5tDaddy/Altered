@@ -39,6 +39,7 @@
     <main id="workspace" class="main-grid workspace" aria-label="Altered workspace">
       <aside class="persistent-form-visual" aria-label="Current form artwork">
         <div id="form-art" class="form-art" aria-live="polite"></div>
+        <div class="persistent-form-side">
         <button id="open-persistent-form" class="persistent-form-copy" type="button">
           <span id="persistent-form-state" class="persistent-form-kicker">Base Form</span>
           <strong id="persistent-form-name">Base Form</strong>
@@ -50,6 +51,12 @@
           </span>
           <small class="persistent-form-open">Open Forms &#8250;</small>
         </button>
+        <div class="persistent-turn-controls" aria-label="Always available turn controls">
+          <button id="persistent-new-turn" class="button primary compact" type="button">New Turn</button>
+          <button id="persistent-end-turn" class="button secondary compact" type="button">End Turn</button>
+          <span id="persistent-turn-number">Turn 1</span>
+        </div>
+        </div>
       </aside>
       <div class="workspace-stage">
       <section id="workspace-play" class="workspace-view play-view panel" data-workspace-view="play" aria-labelledby="play-view-title">
@@ -168,7 +175,9 @@
         <div class="workspace-heading panel"><div><span>Utilities</span><h2 id="more-view-title">More tools</h2></div><button class="text-button workspace-home" type="button">Back to Play</button></div>
         <div class="more-links panel" aria-label="Application tools">
           <button id="more-help" class="button secondary" type="button">Help</button>
-          <button id="more-import" class="button secondary" type="button">Import</button>
+          <button id="more-import" class="button secondary" type="button">Add / Import Character</button>
+          <button id="more-resume-setup" class="button secondary resume-setup-button" type="button" hidden>Resume Content Setup</button>
+          <button id="more-delete-character" class="button danger" type="button">Delete Current Character</button>
           <button id="more-export" class="button secondary" type="button">Export</button>
           <button id="more-settings" class="button secondary" type="button">Settings</button>
         </div>
@@ -328,6 +337,10 @@
     <div class="dialog-card import-center">
       <div class="section-title"><h2 id="import-dialog-title">Import & Private Content</h2><button id="close-import-center" class="text-button" type="button">Close</button></div>
       <p class="import-intro">Character data and private owned-content packs are kept separate. Packs stay on this device and are applied only when their character, class, subclass, level, or species match.</p>
+      <section id="import-resume-panel" class="import-resume-panel" aria-live="polite" hidden>
+        <div><strong id="import-resume-title">Unfinished content setup saved</strong><small id="import-resume-detail">Return to the next unanswered mechanic.</small></div>
+        <div class="inline-actions"><button id="resume-private-setup" class="button primary compact" type="button">Resume Setup</button><button id="start-new-import" class="button secondary compact" type="button">Start Different Import</button></div>
+      </section>
       <div class="import-grid">
         <section class="import-block ddb-import-block">
           <h3>D&amp;D Beyond character</h3>
@@ -376,6 +389,15 @@
         <div id="installed-pack-list" class="installed-pack-list"></div>
       </section>
       <div id="import-status" class="status" role="status" aria-live="polite"></div>
+    </div>
+  </dialog>
+
+  <dialog id="delete-character-dialog" aria-labelledby="delete-character-dialog-title">
+    <div class="dialog-card confirm-card">
+      <div class="section-title"><h2 id="delete-character-dialog-title">Delete Character?</h2><button id="close-delete-character" class="text-button" type="button">Close</button></div>
+      <p><strong id="delete-character-name">This character</strong> will be removed from this device. Private mechanics remain available if you import the character again.</p>
+      <div class="dialog-actions"><button id="cancel-delete-character" class="button secondary" type="button">Keep Character</button><button id="confirm-delete-character" class="button danger" type="button">Delete Character</button></div>
+      <div id="delete-character-status" class="status" role="status" aria-live="polite"></div>
     </div>
   </dialog>
 

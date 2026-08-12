@@ -8,7 +8,7 @@ test('static shell exposes accessible tabs, dialogs, and condition input',()=>{
   assert.equal((html.match(/role="tab"/g)??[]).length,5);
   assert.match(html,/id="tab-content"[^>]*role="tabpanel"[^>]*aria-labelledby="tab-actions"/);
   assert.match(html,/for="condition-select">Condition<\/label>/);
-  for(const id of ['help-dialog','import-dialog','private-mechanics-dialog','transform-builder-dialog','settings-dialog','temp-hp-dialog']){
+  for(const id of ['help-dialog','import-dialog','private-mechanics-dialog','transform-builder-dialog','settings-dialog','temp-hp-dialog','delete-character-dialog']){
     assert.match(html,new RegExp(`<dialog id="${id}"[^>]*aria-labelledby="${id.replace(/-dialog$/,'')}(?:-dialog)?-title"`));
   }
 });
@@ -17,6 +17,7 @@ test('paid mechanics use a compact private completion flow without credentials o
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const importer=readFileSync('src/dndbeyond.ts','utf8');const owned=readFileSync('src/owned-content.ts','utf8');
   assert.match(html,/id="dndbeyond-private-setup"/);assert.match(html,/id="private-mechanics-dialog"/);assert.match(html,/Short mechanical reminder/);assert.match(html,/never requests your D&amp;D Beyond password or cookies/i);
   assert.match(source,/ddbSetupPackId\(report\.sourceId,need\.id\)/);assert.match(source,/privateMechanicPack\(/);assert.match(source,/reapplied automatically whenever this character is imported/);
+  assert.match(html,/id="resume-private-setup"/);assert.match(html,/id="more-resume-setup"/);assert.match(source,/PENDING_DDB_SETTING='pending-ddb-import-v1'/);assert.match(source,/saveJsonSetting\(PENDING_DDB_SETTING,report\)/);assert.match(source,/loadJsonSetting<unknown>\(PENDING_DDB_SETTING\)/);
   assert.match(importer,/setupNeeds:DdbSetupNeed\[\]/);assert.match(importer,/SUBCLASS_FEATURES/);assert.match(owned,/schemaVersion:1,kind:'altered-owned-content-pack'/);
 });
 
@@ -207,13 +208,21 @@ test('the focused workspace uses form-panel space for live stats and explains ab
   const source=readFileSync('src/app.ts','utf8');
   const styles=readFileSync('public/styles.css','utf8');
   for(const id of ['persistent-hp','persistent-temp','persistent-ac','persistent-speed'])assert.match(html,new RegExp(`id="${id}"`));
+  for(const id of ['persistent-new-turn','persistent-end-turn','persistent-turn-number'])assert.match(html,new RegExp(`id="${id}"`));
   assert.match(source,/#persistent-hp/);
+  assert.match(source,/#persistent-new-turn/);assert.match(source,/#persistent-end-turn/);assert.match(styles,/\.play-view \.turn-bar\{display:none\}/);
   assert.match(styles,/\.play-view \.metric-grid\{display:none\}/);
   assert.match(html,/id="ability-actions-title">Use now/);
   assert.match(html,/id="ability-resources-title">Resources left/);
   assert.match(source,/What happens automatically\?/);
   assert.match(source,/featureReferenceSection/);
   assert.match(source,/Applied automatically/);
+});
+
+test('character management exposes safe add and delete paths',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');
+  assert.match(html,/id="more-import"[^>]*>Add \/ Import Character<\/button>/);assert.match(html,/id="more-delete-character"/);
+  assert.match(html,/id="delete-character-dialog"/);assert.match(source,/function deleteCurrentCharacter\(\)/);assert.match(source,/deletedCharacterIds/);assert.match(source,/baseCharacters\.length<=1/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{

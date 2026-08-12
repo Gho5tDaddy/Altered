@@ -43,6 +43,9 @@ export function removeArtOverride(characterId:string,targetId:string):Promise<vo
 
 export async function loadBooleanSetting(key:string,defaultValue:boolean):Promise<boolean>{const value=await getValue<unknown>(SETTINGS_STORE,key);return typeof value==='boolean'?value:defaultValue}
 export function saveBooleanSetting(key:string,value:boolean):Promise<void>{return setValue(SETTINGS_STORE,key,value)}
+export function loadJsonSetting<T>(key:string):Promise<T|undefined>{return getValue<T>(SETTINGS_STORE,key)}
+export function saveJsonSetting(key:string,value:unknown):Promise<void>{return setValue(SETTINGS_STORE,key,value)}
+export function removeSetting(key:string):Promise<void>{return deleteValue(SETTINGS_STORE,key)}
 
 export async function installExtensionPack(pack:OwnedContentPack):Promise<void>{
   const encoded=JSON.stringify(pack);if(encoded.length>2_000_000)throw new Error('Content pack exceeds the 2 MB local installation limit.');
