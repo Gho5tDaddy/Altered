@@ -37,6 +37,7 @@ test('help and first-launch walkthrough remain optional, searchable, and restart
   const source=readFileSync('src/app.ts','utf8');
   const styles=readFileSync('public/styles.css','utf8');
   assert.match(html,/id="open-help"[^>]*>Help<\/button>/);
+  assert.match(html,/id="more-help"[^>]*>Help<\/button>/);assert.match(source,/#more-help'\)\.addEventListener\('click'/);
   assert.match(html,/id="help-search"[^>]*type="search"/);
   assert.ok((html.match(/class="help-topic"/g)??[]).length>=15);
   for(const topic of ['What Altered is','What the app is for','Supported transformation types','Getting Started','Loading characters','Importing characters','Browsing forms, search, and filters','Activating forms','Ending forms and returning to normal','Tracking resources and turns','Images','Settings','Troubleshooting','FAQ','About'])assert.ok(html.includes(topic));

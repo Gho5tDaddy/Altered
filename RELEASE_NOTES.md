@@ -1,3 +1,11 @@
+# Altered v0.26.4 release notes
+
+## Runic druid icon and packaged-app verification
+
+Altered now uses a new app-ready icon built around a single ancient druidic capital A transforming from inert carved stone into luminous emerald natural magic, backed by a full moon and restrained clouds. The same source artwork is used for the PWA icon, Android launcher densities, adaptive maskable icon, and Android splash screen.
+
+The Android package was rebuilt with synchronized version metadata. Release verification rechecks the public D&D Beyond import boundary, 2024-only ruleset validation, multiclass and species feature handling, subclass- and level-gated Wild Shape forms, known-form restrictions, private owned-content overlays, Help from the More page, and the restartable tutorial. The icon release does not change saved-character, combat-state, import/export, or private-pack formats.
+
 # Altered v0.25.1 release notes
 
 The phone dashboard now keeps the large portrait and form chooser behind one native `Character & Form` dropdown. Its compact summary always identifies the selected or active form. Tap it to choose, inspect, transform, upload artwork, or end a form; close it to return the space to Actions, Spells, Features, and Rules.
