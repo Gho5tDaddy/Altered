@@ -14,7 +14,8 @@
     <header class="topbar">
       <div class="brand-mark" aria-hidden="true">A</div>
       <div class="brand-copy"><h1>ALTERED</h1><p>Rules-aware transformation character sheet</p></div>
-      <div class="top-actions">
+      <button id="toggle-app-menu" class="button secondary app-menu-toggle" type="button" aria-expanded="false" aria-controls="top-actions">Menu</button>
+      <div id="top-actions" class="top-actions" aria-label="Application controls">
         <div id="account-status" class="account-status" hidden>
           <span class="account-copy"><small>Signed in</small><strong id="account-name">Adventurer</strong></span>
           <a class="button secondary compact account-signout" href="/signout-with-chatgpt?return_to=%2F">Sign out</a>
@@ -91,7 +92,7 @@
           <button id="tab-rolls" class="tab" data-tab="rolls" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Saves & Skills</button>
           <button id="tab-spells" class="tab" data-tab="spells" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Spells</button>
           <button id="tab-features" class="tab" data-tab="features" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Features</button>
-          <button id="tab-rules" class="tab" data-tab="rules" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Why?</button>
+          <button id="tab-rules" class="tab" data-tab="rules" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Rules</button>
         </nav>
         <section id="latest-roll" class="latest-roll" aria-live="polite">
           <div class="latest-roll-copy"><span>Latest result</span><strong id="roll-title">Ready</strong></div>

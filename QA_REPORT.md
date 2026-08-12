@@ -1,4 +1,13 @@
-# Altered v0.24.3 QA report
+# Altered v0.24.4 QA report
+
+## v0.24.4 focused-dashboard verification
+
+- The audited 390 Ã— 844 header is 44 pixels high, the document remains viewport-bound, and the character sheet stays fully contained without page scrolling.
+- Action economy, quick features, and resources retain visible non-zero heights; horizontal overflow remains localized to those compact strips without exposed scrollbar tracks.
+- The mobile Menu exposes account, sign-out, Help, import, export, and settings controls with labels, 44-pixel action targets, `aria-expanded`, outside-click dismissal, and Escape dismissal with focus recovery.
+- The optional walkthrough restores focus to a visible desktop or mobile control after Skip, Finish, or Escape.
+- Hosted artwork is served from same-origin image routes and loads on demand; both standalone files still embed all six built-in images.
+- Strict TypeScript checking, clean build, **150/150 automated tests**, exact-worker desktop/phone startup, and live rendered interaction checks pass.
 
 ## v0.24.3 account and compact-dashboard verification
 

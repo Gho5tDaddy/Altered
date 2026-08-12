@@ -1459,3 +1459,31 @@ body{min-height:100dvh}
 @media(prefers-reduced-motion:reduce){
   .dashboard-drawer>summary::after,.form-tools-drawer>summary::after{transition:none}
 }
+
+/* v0.24.4 focused mobile controls and content-sized table drawers */
+.app-menu-toggle{display:none}
+.dashboard-drawer[open]{flex:0 1 auto}
+
+@media(max-width:700px){
+  .topbar{position:relative;z-index:40;flex-wrap:nowrap}
+  .brand-copy{min-width:0}
+  .app-menu-toggle{display:inline-flex;align-items:center;justify-content:center;min-height:40px;margin-left:auto;padding:7px 11px}
+  .top-actions{
+    position:absolute;top:calc(100% + 4px);right:0;z-index:41;
+    width:min(304px,calc(100vw - 12px));margin:0;padding:8px;
+    display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;
+    border:1px solid var(--line);border-radius:12px;
+    background:linear-gradient(180deg,rgba(27,33,38,.99),rgba(13,17,20,.99));
+    box-shadow:0 16px 38px rgba(0,0,0,.58)
+  }
+  .topbar.menu-open .top-actions{display:grid}
+  .top-actions .button{min-height:44px;padding-inline:7px}
+  .account-status{grid-column:1/-1;min-height:36px}
+  .account-signout{min-height:36px!important}
+  .action-economy,.quick-features,.resource-strip{
+    flex:0 0 auto;min-height:24px;padding-bottom:0;
+    scrollbar-width:none
+  }
+  .action-economy::-webkit-scrollbar,.quick-features::-webkit-scrollbar,.resource-strip::-webkit-scrollbar{display:none}
+  .tab-help{margin:0 0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.63rem}
+}

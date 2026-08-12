@@ -39,6 +39,7 @@ test('help and first-launch walkthrough remain optional, searchable, and restart
   assert.match(source,/availableWalkthroughSteps\(\)/);
   assert.match(source,/if\(!walkthroughCompleted\)startWalkthrough\(\)/);
   assert.match(source,/saveBooleanSetting\(WALKTHROUGH_SETTING,true\)/);
+  assert.match(source,/setTimeout\(\(\)=>returnFocus\.focus\(\{preventScroll:true\}\),0\)/);
   assert.match(styles,/\.walkthrough-target\{/);
   assert.match(styles,/@media\(prefers-reduced-motion:reduce\)/);
 });
@@ -67,11 +68,13 @@ test('the six current forms ship with app-ready artwork in both builds',()=>{
   const source=readFileSync('src/app.ts','utf8');
   const serviceWorker=readFileSync('public/sw.js','utf8');
   const standalone=readFileSync('dist/altered-standalone.html','utf8');
+  const hostedWorker=readFileSync('dist/server/index.js','utf8');
   for(const [form,file] of [['brown-bear','form-brown-bear.jpg'],['dire-wolf','form-dire-wolf.jpg'],['giant-octopus','form-giant-octopus.jpg'],['giant-spider','form-giant-spider.jpg'],['lion','form-lion.jpg'],['tiger','form-tiger.jpg']]){
     assert.match(source,new RegExp(`'form:${form}':'${file}'`));
     assert.ok(serviceWorker.includes(`'./${file}'`));
     assert.ok(readFileSync(`dist/${file}`,'utf8').length>100_000);
     assert.ok(!standalone.includes(`'${file}'`));
+    assert.ok(hostedWorker.includes(`/${file}`));
   }
   assert.match(source,/alt=`Built-in artwork for \$\{label\}`/);
   assert.match(standalone,/data:image\/jpeg;base64,/);
@@ -106,6 +109,7 @@ test('the exact hosted build executes before optional mobile storage hydration',
   assert.match(worker,/oai-authenticated-user-id/);
   assert.match(worker,/\/signin-with-chatgpt\?return_to=%2F/);
   assert.match(worker,/private, no-store/);
+  assert.match(worker,/url\.pathname in FORM_IMAGES/);
   assert.match(worker,/Cross-Origin-Resource-Policy/);
   assert.ok(!worker.includes('Live imports are unavailable'));
 });
@@ -116,6 +120,7 @@ test('account identity and compact dashboard stay incremental and accessible',()
   const styles=readFileSync('public/styles.css','utf8');
   const hostedServiceWorker=readFileSync('public/sw-hosted.js','utf8');
   assert.match(html,/id="account-status"[^>]*hidden/);
+  assert.match(html,/id="toggle-app-menu"[^>]*aria-expanded="false"[^>]*aria-controls="top-actions"/);
   assert.match(html,/id="account-name"/);
   assert.match(html,/href="\/signout-with-chatgpt\?return_to=%2F"/);
   assert.equal((html.match(/<details class="panel dashboard-drawer" name="table-controls"/g)??[]).length,4);
@@ -123,6 +128,7 @@ test('account identity and compact dashboard stay incremental and accessible',()
   assert.match(html,/class="form-tools-drawer"/);
   assert.match(source,/async function loadHostedAccount\(\)/);
   assert.match(source,/#account-name/);
+  assert.match(source,/function setAppMenuOpen\(open:boolean,restoreFocus=false\)/);
   assert.match(styles,/html,body\{width:100%;height:100%;overflow:hidden\}/);
   assert.match(styles,/\.tab-content\{min-height:0;flex:1 1 auto;overflow:auto/);
   assert.match(styles,/\.drawer-content\{[^}]*overflow:auto/);

@@ -1,6 +1,6 @@
 {
   "name": "altered-rules-engine",
-  "version": "0.24.3",
+  "version": "0.24.4",
   "private": true,
   "type": "commonjs",
   "scripts": {

@@ -83,6 +83,7 @@ let formSearch='';
 let formFilter='all';
 let walkthroughStepIndex=0;
 let walkthroughTarget:HTMLElement|undefined;
+let walkthroughReturnFocus:HTMLElement|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 type UiStatus='available'|'active'|'inactive'|'locked'|'unavailable'|'requirements'|'selected'|'favorite'|'new'|'importing'|'loading'|'success'|'warning'|'error';
 const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
@@ -114,6 +115,8 @@ function clearWalkthroughHighlight(){
 function finishWalkthrough(message:string){
   clearWalkthroughHighlight();$('#walkthrough').hidden=true;void saveBooleanSetting(WALKTHROUGH_SETTING,true);
   $('#status-message').textContent=message;
+  const returnFocus=walkthroughReturnFocus;walkthroughReturnFocus=undefined;
+  if(returnFocus?.isConnected)window.setTimeout(()=>returnFocus.focus({preventScroll:true}),0);
 }
 function renderWalkthroughStep(){
   const available=availableWalkthroughSteps();if(available.length===0){finishWalkthrough('Walkthrough skipped because its interface targets are unavailable.');return;}
@@ -126,8 +129,17 @@ function renderWalkthroughStep(){
   $('#walkthrough-next').textContent=walkthroughStepIndex===available.length-1?'Finish':'Next';
 }
 function startWalkthrough(){
-  const help=$<HTMLDialogElement>('#help-dialog');if(help.open)help.close();
+  const help=$<HTMLDialogElement>('#help-dialog');const active=document.activeElement;
+  const openHelp=$<HTMLButtonElement>('#open-help');const fallback=openHelp.offsetParent?openHelp:$<HTMLButtonElement>('#toggle-app-menu');
+  walkthroughReturnFocus=active instanceof HTMLElement&&active!==document.body&&!help.contains(active)?active:fallback;
+  if(help.open)help.close();
   walkthroughStepIndex=0;$('#walkthrough').hidden=false;renderWalkthroughStep();$<HTMLButtonElement>('#walkthrough-next').focus();
+}
+
+function setAppMenuOpen(open:boolean,restoreFocus=false){
+  const topbar=document.querySelector<HTMLElement>('.topbar');const toggle=$<HTMLButtonElement>('#toggle-app-menu');
+  topbar?.classList.toggle('menu-open',open);toggle.setAttribute('aria-expanded',String(open));
+  if(!open&&restoreFocus)toggle.focus({preventScroll:true});
 }
 function filterHelpTopics(){
   const query=$<HTMLInputElement>('#help-search').value.trim().toLowerCase();const terms=query.split(/\s+/).filter(Boolean);
@@ -812,6 +824,10 @@ function endCurrentForm(){const wasActive=Boolean(state.activeTransform);const r
 function initializeControls(){
   const damage=$<HTMLSelectElement>('#damage-type');for(const type of damageTypes){const option=document.createElement('option');option.value=type;option.textContent=type;damage.append(option);}damage.value='Slashing';
   const conditions=$<HTMLSelectElement>('#condition-select');for(const condition of commonConditions){const option=document.createElement('option');option.value=condition;option.textContent=condition;conditions.append(option);}
+  $('#toggle-app-menu').addEventListener('click',()=>setAppMenuOpen($<HTMLButtonElement>('#toggle-app-menu').getAttribute('aria-expanded')!=='true'));
+  $('#top-actions').addEventListener('click',event=>{if((event.target as Element).closest('button,a'))setAppMenuOpen(false);});
+  document.addEventListener('pointerdown',event=>{const topbar=document.querySelector<HTMLElement>('.topbar');if(topbar?.classList.contains('menu-open')&&!topbar.contains(event.target as Node))setAppMenuOpen(false);});
+  window.addEventListener('resize',()=>{if(innerWidth>700)setAppMenuOpen(false);});
   $('#sample-character').addEventListener('change',event=>{const id=(event.target as HTMLSelectElement).value;const found=characters.find(c=>c.id===id);if(found)setCharacter(found);});
   $('#form-select').addEventListener('change',event=>{selectedOptionId=(event.target as HTMLSelectElement).value;renderTransformSelector();renderArt();});
   $('#form-search').addEventListener('input',event=>{formSearch=(event.target as HTMLInputElement).value;renderTransformSelector();renderArt();});
@@ -832,7 +848,7 @@ function initializeControls(){
   $('#skip-walkthrough').addEventListener('click',()=>finishWalkthrough('Walkthrough skipped. Restart it anytime from Help.'));
   $('#walkthrough-back').addEventListener('click',()=>{walkthroughStepIndex--;renderWalkthroughStep();});
   $('#walkthrough-next').addEventListener('click',()=>{const available=availableWalkthroughSteps();if(walkthroughStepIndex>=available.length-1)finishWalkthrough('Walkthrough complete. Help remains available from the top bar.');else{walkthroughStepIndex++;renderWalkthroughStep();}});
-  window.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('#walkthrough').hidden)finishWalkthrough('Walkthrough closed. Restart it anytime from Help.');});
+  window.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(!$('#walkthrough').hidden)finishWalkthrough('Walkthrough closed. Restart it anytime from Help.');else if($<HTMLButtonElement>('#toggle-app-menu').getAttribute('aria-expanded')==='true')setAppMenuOpen(false,true);});
   $('#import-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{applyImportedCharacter(parseCharacter(safeJsonParse(await file.text())));}catch(error){const message=`Import failed: ${error instanceof Error?error.message:'Unknown error'}`;notify(message);setImportStatus(message);}finally{input.value='';}});
   $('#fetch-dndbeyond').addEventListener('click',()=>void fetchDdbCharacter());
   $('#dndbeyond-source').addEventListener('keydown',event=>{if((event as KeyboardEvent).key==='Enter'){event.preventDefault();void fetchDdbCharacter();}});

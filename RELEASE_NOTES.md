@@ -1,4 +1,12 @@
-# Altered v0.24.3 release notes
+# Altered v0.24.4 release notes
+
+The phone dashboard now prioritizes the character and turn controls. Secondary account and application commands live behind one labeled, keyboard-accessible Menu button, reducing the phone header from roughly 128 pixels to 44 pixels in the audited 390 Ã— 844 layout. Action economy, quick features, and resources can no longer collapse into bare scrollbar tracks, and the short tab guidance stays to one line so the first actual action appears sooner.
+
+Desktop controls remain in their familiar locations. Open table drawers now size to their contents instead of creating large empty panels, the former Why? tab is labeled Rules, and the walkthrough returns focus to a visible control after Skip, Finish, or Escape.
+
+The hosted page now requests built-in form artwork only when needed. The downloadable standalone files still embed all six images and remain self-contained. No game rules, save schema, character import/export format, private-pack format, storage system, or runtime dependency changed.
+
+## Previous v0.24.3 notes
 
 Anyone with the public link can now sign in to Altered or create a free ChatGPT account. Account credentials are handled by ChatGPT, so Altered never receives or stores a password. The app shows the signed-in identity and provides a direct sign-out control. Each account still receives an independent local sheet: character saves, combat state, settings, artwork overrides, and private owned-content packs remain in that browser and are not uploaded to an Altered database.
 

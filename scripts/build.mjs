@@ -35,11 +35,11 @@ hostedHtml=hostedHtml
   // A function replacement keeps those tokens literal instead of corrupting
   // the standalone script with the matched external script tag.
   .replace('<script src="app.bundle.js"></script>',()=>`<script>\n${bundle.replaceAll('</script>','<\\/script>')}\n</script>`);
+let standaloneHtml=hostedHtml.replace('<link rel="manifest" href="manifest.json">','');
 for(const name of publicNames.filter(name=>/^form-.*\.jpg$/i.test(name))){
   const image=await readFile(path.join(root,'public',name));
-  hostedHtml=hostedHtml.replaceAll(name,`data:image/jpeg;base64,${image.toString('base64')}`);
+  standaloneHtml=standaloneHtml.replaceAll(name,`data:image/jpeg;base64,${image.toString('base64')}`);
 }
-const standaloneHtml=hostedHtml.replace('<link rel="manifest" href="manifest.json">','');
 await Promise.all([
   writeFile(path.join(dist,'altered-standalone.html'),standaloneHtml),
   writeFile(path.join(dist,'altered-ferocitus.html'),standaloneHtml),
@@ -56,11 +56,16 @@ const icons=Object.fromEntries(await Promise.all(['icon-192.png','icon-512.png']
   `/${name}`,
   {type:'image/png',data:(await readFile(path.join(root,'public',name))).toString('base64')},
 ])));
+const formImages=Object.fromEntries(await Promise.all(publicNames.filter(name=>/^form-.*\.jpg$/i.test(name)).map(async name=>[
+  `/${name}`,
+  {type:'image/jpeg',data:(await readFile(path.join(root,'public',name))).toString('base64')},
+])));
 const workerTemplate=await readFile(path.join(root,'scripts','hosted-worker.template.js'),'utf8');
 const hostedWorker=workerTemplate
   .replace('__ALTERED_PAGE_BASE64__',()=>JSON.stringify(hostedPage))
   .replace('__ALTERED_MANIFEST__',()=>JSON.stringify(manifest))
   .replace('__ALTERED_SERVICE_WORKER__',()=>JSON.stringify(hostedServiceWorker))
-  .replace('__ALTERED_ICONS__',()=>JSON.stringify(icons));
+  .replace('__ALTERED_ICONS__',()=>JSON.stringify(icons))
+  .replace('__ALTERED_FORM_IMAGES__',()=>JSON.stringify(formImages));
 await writeFile(path.join(dist,'server','index.js'),hostedWorker);
 console.log(`Built ${dist}`);

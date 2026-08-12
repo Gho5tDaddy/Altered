@@ -26,7 +26,7 @@ Fresh downloads open with the validated Ferocitus character already loaded at fu
 
 ## Help and first launch
 
-The always-available **Help** button opens a searchable, compact guide to importing, browsing and activating forms, turn resources, images, settings, troubleshooting, and the app's scope. New browser profiles receive a short optional walkthrough. It can be skipped or closed at any time, remembers completion without changing character saves, and can be restarted from Help.
+The always-available **Help** command opens a searchable, compact guide to importing, browsing and activating forms, turn resources, images, settings, troubleshooting, and the app's scope. It stays in the desktop top bar and inside the labeled phone Menu. New browser profiles receive a short optional walkthrough. It can be skipped or closed at any time, remembers completion without changing character saves, and can be restarted from Help.
 
 ## Core table workflow
 

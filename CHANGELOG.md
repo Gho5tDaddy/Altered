@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.24.4
+
+- Replaced the tall phone header with one accessible Menu disclosure while preserving every existing account, Help, import, export, and settings control.
+- Prevented action-economy, quick-feature, and resource strips from collapsing on small screens and kept the first action visible sooner inside the focused sheet tab.
+- Renamed the unclear Why? tab to Rules, made open table drawers fit their content, and restored keyboard focus after the optional walkthrough closes.
+- Kept standalone form artwork embedded while making hosted artwork load on demand, reducing authenticated page delivery without changing image availability or offline caching.
+
 ## v0.24.3
 
 - Added a secure public account gate using Sign in with ChatGPT. Anyone with the link can sign in or create a free account; Altered never receives or stores passwords.

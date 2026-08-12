@@ -1,6 +1,14 @@
-# Altered v0.24.3 audit gap register
+# Altered v0.24.4 audit gap register
 
 This register distinguishes an incorrect result from a deliberately conditional or reference-only result. Altered must never present a reference-only mechanic as calculated.
+
+## Resolved in v0.24.4
+
+| Finding | Severity | Resolution | Regression evidence |
+|---|---:|---|---|
+| Phone resource and turn strips could flex-shrink to nearly zero height | High | Reserved compact strip height, removed exposed scrollbar tracks, and reclaimed the tall secondary-command header behind an accessible Menu | 390 Ã— 844 live viewport metrics and UI contract tests |
+| The first actionable card and table drawer content were obscured by avoidable guidance or empty expansion | Medium | Reduced mobile tab guidance to one line and made disclosures size to content without changing their actions | desktop/phone browser audit |
+| Walkthrough focus could remain on its hidden Skip button | Medium | Deferred focus recovery and selected a visible desktop or phone fallback | live keyboard/focus verification |
 
 ## Resolved in v0.24.3
 

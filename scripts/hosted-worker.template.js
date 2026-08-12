@@ -2,6 +2,7 @@ const PAGE=__ALTERED_PAGE_BASE64__;
 const MANIFEST=__ALTERED_MANIFEST__;
 const SERVICE_WORKER=__ALTERED_SERVICE_WORKER__;
 const ICONS=__ALTERED_ICONS__;
+const FORM_IMAGES=__ALTERED_FORM_IMAGES__;
 const LOGIN_PAGE=`<!doctype html>
 <html lang="en">
 <head>
@@ -253,6 +254,10 @@ export default {
     if(url.pathname in ICONS){
       const icon=ICONS[url.pathname];
       return new Response(request.method==='HEAD'?null:decodeBase64(icon.data),{headers:headers(icon.type,'public, max-age=86400')});
+    }
+    if(url.pathname in FORM_IMAGES){
+      const image=FORM_IMAGES[url.pathname];
+      return new Response(request.method==='HEAD'?null:decodeBase64(image.data),{headers:headers(image.type,'public, max-age=86400')});
     }
     if(url.pathname!=='/'&&url.pathname!=='/index.html')return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
     if(!authenticatedUser(request))return new Response(request.method==='HEAD'?null:LOGIN_PAGE,{headers:headers('text/html; charset=utf-8','private, no-store')});
