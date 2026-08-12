@@ -33,6 +33,9 @@ if(hostedArtResponse.status!==200||hostedArtResponse.headers.get('content-type')
 const hostedManifestResponse=await hostedWorker.fetch(new Request('https://altered.audit/manifest.json'));
 const hostedManifest=await hostedManifestResponse.json();
 if(hostedManifestResponse.status!==200||hostedManifest.short_name!=='Altered')throw new Error('Hosted PWA manifest failed validation.');
+const assetLinksResponse=await hostedWorker.fetch(new Request('https://altered.audit/.well-known/assetlinks.json'));
+const assetLinks=await assetLinksResponse.json();
+if(assetLinksResponse.status!==200||assetLinks[0]?.target?.package_name!=='com.ghostdaddy.altered')throw new Error('Android Digital Asset Links route failed validation.');
 const hostedServiceWorkerResponse=await hostedWorker.fetch(new Request('https://altered.audit/sw.js'));
 const hostedServiceWorker=await hostedServiceWorkerResponse.text();
 if(hostedServiceWorkerResponse.status!==200||!hostedServiceWorker.includes("url.pathname.startsWith('/api/')")||!hostedServiceWorker.includes("event.request.mode==='navigate'")||hostedServiceWorker.includes("'./index.html'")){

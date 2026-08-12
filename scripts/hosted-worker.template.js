@@ -1,5 +1,6 @@
 const PAGE=__ALTERED_PAGE_BASE64__;
 const MANIFEST=__ALTERED_MANIFEST__;
+const ASSET_LINKS=__ALTERED_ASSET_LINKS__;
 const SERVICE_WORKER=__ALTERED_SERVICE_WORKER__;
 const ICONS=__ALTERED_ICONS__;
 const FORM_IMAGES=__ALTERED_FORM_IMAGES__;
@@ -246,6 +247,7 @@ export default {
         :json(200,{displayName:user.displayName,email:user.email});
     }
     if(url.pathname==='/manifest.json')return new Response(request.method==='HEAD'?null:MANIFEST,{headers:headers('application/manifest+json; charset=utf-8','no-cache')});
+    if(url.pathname==='/.well-known/assetlinks.json')return new Response(request.method==='HEAD'?null:ASSET_LINKS,{headers:headers('application/json; charset=utf-8','public, max-age=3600')});
     if(url.pathname==='/sw.js')return new Response(request.method==='HEAD'?null:SERVICE_WORKER,{headers:headers('application/javascript; charset=utf-8','no-cache')});
     if(url.pathname==='/favicon.ico'){
       const icon=ICONS['/icon-192.png'];

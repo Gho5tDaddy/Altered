@@ -51,6 +51,7 @@ await mkdir(path.join(dist,'server'),{recursive:true});
 await writeFile(path.join(dist,'server','package.json'),'{"type":"module"}\n');
 const hostedPage=Buffer.from(hostedHtml,'utf8').toString('base64');
 const manifest=await readFile(path.join(root,'public','manifest.json'),'utf8');
+const assetLinks=await readFile(path.join(root,'public','assetlinks.json'),'utf8');
 const hostedServiceWorker=await readFile(path.join(root,'public','sw-hosted.js'),'utf8');
 const icons=Object.fromEntries(await Promise.all(['icon-192.png','icon-512.png','icon-maskable-512.png'].map(async name=>[
   `/${name}`,
@@ -64,6 +65,7 @@ const workerTemplate=await readFile(path.join(root,'scripts','hosted-worker.temp
 const hostedWorker=workerTemplate
   .replace('__ALTERED_PAGE_BASE64__',()=>JSON.stringify(hostedPage))
   .replace('__ALTERED_MANIFEST__',()=>JSON.stringify(manifest))
+  .replace('__ALTERED_ASSET_LINKS__',()=>JSON.stringify(assetLinks))
   .replace('__ALTERED_SERVICE_WORKER__',()=>JSON.stringify(hostedServiceWorker))
   .replace('__ALTERED_ICONS__',()=>JSON.stringify(icons))
   .replace('__ALTERED_FORM_IMAGES__',()=>JSON.stringify(formImages));

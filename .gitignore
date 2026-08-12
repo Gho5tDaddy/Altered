@@ -11,6 +11,13 @@ dist/
 android-wrapper/twa/.gradle/
 android-wrapper/twa/app/build/
 android-wrapper/twa/build/
+android-wrapper/twa/local.properties
+android-wrapper/twa/app-release-*.apk
+android-wrapper/twa/app-release-*.apk.idsig
+android-wrapper/twa/app-release-*.aab
+android-wrapper/twa/store_icon.png
+android-wrapper/art/altered-icon-source.png
+android-wrapper/art/altered-icon-v2.png
 
 # Logs and temporary files
 *.log
