@@ -1614,3 +1614,45 @@ html[data-altered-workspace="forms"] .persistent-form-copy strong{font-size:1rem
 @media(prefers-reduced-motion:reduce){
   .persistent-form-copy,.task-launcher,.workspace-nav-button{transition:none!important}
 }
+
+/* v0.26.1 moonlit contrast: brighter secondary copy and arcane accents */
+:root{
+  --muted:#c7cadd;
+  --accent:#8f7bdd;
+  --accent-2:#b9ddff;
+  --blue:#88bddb;
+  --rune-gold:rgba(176,193,255,.42);
+  --rune-faint:rgba(176,193,255,.18)
+}
+.brand-copy p,
+.metric span,.section-title h2,.side-column h2,label,.character-title span,.helper,.source-note,.status,.roll-row small,.item-card p,.metric small,
+.latest-roll-copy span,.latest-roll-value>span,.vitality-heading>div>span,.vitality-heading>div>small,.vitality-part>span,.vitality-part>small,
+.panel-help,.art-target-label,.setting-row small,.settings-data h3,.settings-data>p,.content-pack small,.registry-chip,.catalog-health p,
+.task-launcher span,.play-latest-result>span,.play-latest-result small,.play-status,.turn-bar span,.persistent-form-copy span,.play-form-status span,.play-form-status small,
+.log-row,.activity-log .log-row,.source-note,.tab-help,.slot-picker,.unavailable-spells>summary,.import-intro,.ddb-coverage-row span:last-child,
+.ddb-coverage-status,.ddb-private-setup>summary small,.ddb-setup-kind,.ddb-setup-item small,.import-block p,.installed-pack span,.installed-pack small,
+.advanced-builder p,.form-results-status,.ui-status,.help-search-status,.help-topic p,.help-topic ol,.help-topic ul,.walkthrough-card p,
+.account-copy small,.dashboard-drawer>summary small,.drawer-tools,.workspace-nav-button{
+  color:var(--muted)
+}
+.text-button,.persistent-form-copy small,.workspace-heading span,.play-summary-button>span:first-child,.play-latest-result b,
+.resource-chip b,.roll-result strong,.latest-roll-value>strong,.active-effects h3,.effect-benefit,.account-copy strong,
+.form-tools-drawer>summary,.unavailable-spells[open]>summary,.help-intro strong,.walkthrough-progress{
+  color:var(--accent-2)
+}
+.panel .section-title h2::before,.side-column h2::before{color:rgba(185,221,255,.76)}
+.section-title::after,.side-column h2::after,.panel>.section-title::after{
+  background:linear-gradient(90deg,rgba(185,221,255,.3),rgba(143,123,221,.34) 38%,transparent 100%)
+}
+.button:disabled{opacity:.7;color:#c9cce0}
+.economy-chip.used{opacity:.78;color:#c0c4d7}
+.badge.inactive{opacity:.75}.ui-status.inactive{color:#c3c7d8}
+.task-launcher:hover,.task-launcher:focus-visible{border-color:var(--accent);background:#211e35}
+.workspace-nav-button.active{
+  border-color:var(--accent);background:linear-gradient(180deg,#292442,#151720);color:#f5f2ff;
+  box-shadow:inset 0 1px rgba(226,232,255,.08),0 0 14px rgba(143,123,221,.12)
+}
+.workspace-nav-button span{color:var(--accent-2)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[role="tabpanel"]:focus-visible{
+  outline-color:rgba(185,221,255,.72)
+}
