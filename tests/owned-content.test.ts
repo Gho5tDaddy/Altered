@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {applyOwnedContentPack,matchesOwnedContentPack,ownedContentTemplate,parseOwnedContentPack} from '../src/owned-content.js';
+import {applyOwnedContentPack,matchesOwnedContentPack,ownedContentTemplate,parseOwnedContentPack,privateMechanicPack} from '../src/owned-content.js';
 import {parseCharacter} from '../src/schema.js';
 import {SAMPLE_CHARACTERS} from '../src/sample-data.js';
 
@@ -13,6 +13,12 @@ test('private owned-content template validates and applies to its character',()=
   assert.equal(result.applied,true);
   assert.equal(result.added.transformations,1);
   assert.ok(result.character.transformationGrants?.some(grant=>grant.id==='example-transformation'));
+});
+
+test('compact private mechanic completion remains schema-v1 character-local data',()=>{
+  const pack=privateMechanicPack(moon,{packId:'ddb-123-paid-feature',name:'Paid Feature',source:'D&D Beyond character 123 — user-confirmed',summary:'Add 10 feet to Speed while this feature is available.',mode:'speed',speedBonus:10,retainInWildShape:true,activation:'none'});
+  assert.equal(pack.schemaVersion,1);assert.deepEqual(pack.appliesTo,[{characterId:moon.id}]);assert.equal(pack.content.features[0]?.grants?.speedBonus,10);assert.equal(pack.content.features[0]?.retention?.wildshape,true);
+  const result=applyOwnedContentPack(moon,pack);assert.equal(result.applied,true);assert.equal(result.added.features,1);
 });
 
 test('subclass matching is case-insensitive and level-aware',()=>{

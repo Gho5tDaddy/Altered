@@ -1,4 +1,12 @@
-# Altered v0.24.5 release notes
+# Altered v0.25.0 release notes
+
+Public D&D Beyond imports now identify private or unsupported character options with one compact `Needs Setup` section. The user can open the authorized character page, enter a short mechanical reminder in their own words, and choose a supported treatment such as conditional, Speed bonus, resistance, immunity, Armor Class formula, or an activated transformation. Completed items are labeled and automatically reapply to the matching character on that browser.
+
+This provides gameplay support for paid or campaign-shared options without copying books, scraping protected pages, or asking for a D&D Beyond password or cookies. Imported Armor Class, ability scores, saves, Speed, and Hit Points remain authoritative so private entries cannot casually duplicate existing sheet totals. The existing schema-v1 owned-content pack, import/export, local persistence, hosted authentication, rules engine, and standalone formats remain compatible.
+
+The setup detector recognizes existing Altered coverage and no longer flags ordinary weapons, Ability Score Improvement, Weapon Mastery, or Circle of the Moon as missing private rules. The complete automated suite contains 153 passing tests.
+
+## Previous v0.24.5 notes
 
 Selecting a beast now replaces the Base Form portrait with a full-frame preview instead of squeezing a second image into the portrait card. The portrait is labeled `FORM PREVIEW` until Transform succeeds, then changes to `ACTIVE FORM` and starts the existing continuous form aura.
 

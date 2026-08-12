@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.25.0
+
+- Added a compact `Needs Setup` review for imported paid, campaign-shared, and homebrew character options that are not part of Altered's distributable SRD rules.
+- Added a guided private-mechanics editor for reminders, conditional mechanics, Speed bonuses, damage resistance/immunity, Armor Class formulas, and activated transformations.
+- Kept private confirmations character-specific, browser-local, schema-v1 compatible, exportable, and automatically reapplied after later character imports.
+- Avoided requesting D&D Beyond credentials, scraping protected pages, copying book descriptions, or double-counting numeric totals already imported from the character sheet.
+- Reduced false setup flags for built-in feat hooks, Ability Score Improvement, ordinary weapons, and the already-supported Circle of the Moon subclass.
+
 ## v0.24.5
 
 - Replaced the clipped mobile selected-form thumbnail with a full-frame portrait preview that behaves consistently at phone and desktop sizes.

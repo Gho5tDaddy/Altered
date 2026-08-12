@@ -1,5 +1,5 @@
 import type {
-  Character,OwnedContentApplyResult,OwnedContentMatch,OwnedContentPack,OwnedContentPackContent,
+  Ability,ActionCost,Character,DamageType,OwnedContentApplyResult,OwnedContentMatch,OwnedContentPack,OwnedContentPackContent,
   OwnedContentPackMetadata,ResourcePool,Spell,TransformationGrant,ImportedFeatureRule,Creature
 } from './types.js';
 import {parseCharacter} from './schema.js';
@@ -12,6 +12,20 @@ const text=(value:unknown,path:string,max=240)=>{
 };
 const optionalText=(value:unknown,max:number)=>typeof value==='string'&&value.trim()?value.trim().slice(0,max):undefined;
 const PACK_ID=/^[a-z0-9][a-z0-9._-]{0,119}$/i;
+
+export interface PrivateMechanicCompletion {
+  packId:string;
+  name:string;
+  source:string;
+  summary:string;
+  mode:'reference'|'conditional'|'speed'|'resistance'|'immunity'|'ac-formula';
+  retainInWildShape:boolean;
+  activation?:ActionCost;
+  speedBonus?:number;
+  damageType?:DamageType;
+  acBase?:number;
+  acAbilities?:Ability[];
+}
 
 function parseMatch(value:unknown,index:number):OwnedContentMatch{
   if(!isObject(value))throw new Error(`appliesTo[${index}] must be an object.`);
@@ -77,6 +91,28 @@ export function parseOwnedContentPack(input:unknown):OwnedContentPack{
 export function safeOwnedContentParse(raw:string):OwnedContentPack{
   if(raw.length>2_000_000)throw new Error('Owned-content pack exceeds the 2 MB safety limit.');
   return parseOwnedContentPack(JSON.parse(raw));
+}
+
+export function privateMechanicPack(character:Character,completion:PrivateMechanicCompletion):OwnedContentPack{
+  const grants:NonNullable<ImportedFeatureRule['grants']>={};
+  if(completion.mode==='speed'&&completion.speedBonus!==undefined)grants.speedBonus=completion.speedBonus;
+  if(completion.mode==='resistance'&&completion.damageType)grants.resistances=[completion.damageType];
+  if(completion.mode==='immunity'&&completion.damageType)grants.immunities=[completion.damageType];
+  if(completion.mode==='ac-formula')grants.acFormula={base:completion.acBase??10,abilities:completion.acAbilities??[]};
+  const calculated=['speed','resistance','immunity','ac-formula'].includes(completion.mode);
+  const feature:ImportedFeatureRule={
+    id:`private-${completion.packId}`.slice(0,120),name:completion.name,source:completion.source,summary:completion.summary,
+    automation:calculated?'calculated':completion.mode==='reference'?'reference':'conditional',
+    retention:{wildshape:completion.retainInWildShape},
+    ...(completion.activation&&completion.activation!=='none'?{activation:completion.activation}:{}),
+    ...(Object.keys(grants).length?{grants}:{})
+  };
+  return parseOwnedContentPack({
+    schemaVersion:1,kind:'altered-owned-content-pack',
+    metadata:{id:completion.packId,name:`${completion.name} — Private Mechanics`,version:'1.0.0',source:completion.source,description:'User-confirmed private mechanics. Contains no source-book text or artwork.',privateUse:true,createdAt:new Date().toISOString()},
+    appliesTo:[{characterId:character.id}],
+    content:{customForms:[],knownForms:[],seenForms:[],transformationGrants:[],features:[feature],resources:[],spells:[]}
+  });
 }
 
 export function matchesOwnedContentPack(character:Character,pack:OwnedContentPack):boolean{

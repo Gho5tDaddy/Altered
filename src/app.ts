@@ -1,14 +1,14 @@
 import type {Ability,AttackAction,Character,ConditionEffect,CreatureAction,DamagePacket,DamageType,GameState,OwnedContentMatch,OwnedContentPack,ResolvedSheet,Spell,TransformationEffects,TransformationOption,TransitionResult} from './types.js';
 import {CONDITIONS,CREATURES,classLevel,contentRegistrySnapshot} from './content-registry.js';
 import {parseCharacter,safeJsonParse} from './schema.js';
-import {applyDdbSrdCreatures,ddbCoverageLabel,extractDdbCharacterId,importDdbCharacter} from './dndbeyond.js';
+import {applyDdbSrdCreatures,ddbCoverageLabel,ddbSetupPackId,extractDdbCharacterId,importDdbCharacter} from './dndbeyond.js';
 import type {DdbImportReport} from './dndbeyond.js';
 import {normalizeSrdCreature,parseSrdCatalogPage,parseSrdCatalogStatus} from './srd-catalog.js';
 import type {SrdCatalogStatus} from './srd-catalog.js';
 import {installExtensionPack,listExtensionPackRecords,loadArtOverride,loadBooleanSetting,optimizePortrait,removeArtOverride,removeExtensionPack,saveArtOverride,saveBooleanSetting} from './storage.js';
 import {SAMPLE_CHARACTERS} from './sample-data.js';
 import {FEROCITUS_CHARACTER} from './ferocitus-data.js';
-import {applyOwnedContentPack,applyOwnedContentPacks,ownedContentTemplate,parseOwnedContentPack,safeOwnedContentParse} from './owned-content.js';
+import {applyOwnedContentPack,applyOwnedContentPacks,ownedContentTemplate,parseOwnedContentPack,privateMechanicPack,safeOwnedContentParse} from './owned-content.js';
 import {rulesAuditSnapshot} from './audit-ledger.js';
 import {
   actionCostError,applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,criticalDiceExpression,criticalHitThreshold,
@@ -77,6 +77,7 @@ let installedPacks:OwnedContentPack[]=[];
 let pendingActiveSnapshot:Partial<GameState>['activeTransform']|undefined;
 let invalidPackCount=0;
 let pendingDdbImport:DdbImportReport|null=null;
+let confirmedDdbSourceId:string|null=null;
 let srdCatalogStatus:SrdCatalogStatus|null=null;
 let srdCatalogMessage='Checking the live legal SRD support catalog...';
 let formSearch='';
@@ -375,7 +376,42 @@ function renderDdbReview(report:DdbImportReport){
   for(const item of report.coverage){const row=document.createElement('div');row.className='ddb-coverage-row';const status=statusChip(item.status==='verified'?'success':item.status==='review'?'warning':'inactive',ddbCoverageLabel(item.status));status.classList.add('ddb-coverage-status',item.status);row.append(text('strong',item.label),status,text('span',item.detail));coverage.append(row);}
   const warnings=$('#dndbeyond-warnings');clear(warnings);
   for(const item of report.warnings){const warning=document.createElement('p');warning.className=`ddb-warning ${item.severity}`;warning.append(statusChip(item.severity==='warning'?'warning':'inactive',item.severity==='warning'?'Warning':'Notice'),document.createTextNode(item.message));warnings.append(warning);}
-  const confirm=$<HTMLButtonElement>('#confirm-dndbeyond-import');confirm.disabled=report.blocked;confirm.textContent=report.blocked?'2024 Rules Required':'Confirm Import';if(report.blockReason)confirm.title=report.blockReason;else confirm.removeAttribute('title');
+  const setup=$<HTMLDetailsElement>('#dndbeyond-private-setup');setup.hidden=report.setupNeeds.length===0;
+  const setupList=$('#dndbeyond-setup-list');clear(setupList);let completed=0;
+  for(const need of report.setupNeeds){
+    const packId=ddbSetupPackId(report.sourceId,need.id);const done=installedPacks.some(pack=>pack.metadata.id===packId);if(done)completed++;
+    const row=document.createElement('div');row.className='ddb-setup-item';const copy=document.createElement('div');copy.append(text('strong',need.label),text('small',need.detail));
+    const action=button(done?'Review':'Set Up',()=>openPrivateMechanics(need.id),'button compact secondary');row.append(text('span',need.kind,'ddb-setup-kind'),copy,done?statusChip('success','Completed'):action);setupList.append(row);
+  }
+  const remaining=report.setupNeeds.length-completed;$('#dndbeyond-setup-summary').textContent=remaining?`${remaining} of ${report.setupNeeds.length} need setup`:`${completed} completed`;
+  const setupBadge=$('#dndbeyond-setup-badge');setupBadge.className=`ui-status ${remaining?'requirements':'success'}`;setupBadge.textContent=remaining?'Needs Setup':'Completed';
+  const confirm=$<HTMLButtonElement>('#confirm-dndbeyond-import');const confirmed=confirmedDdbSourceId===report.sourceId;confirm.disabled=report.blocked||confirmed;confirm.textContent=report.blocked?'2024 Rules Required':confirmed?'Character Imported':'Confirm Import';if(report.blockReason)confirm.title=report.blockReason;else confirm.removeAttribute('title');
+}
+function privateMechanicMode(feature:OwnedContentPack['content']['features'][number]|undefined){
+  if(feature?.grants?.speedBonus!==undefined)return 'speed';if(feature?.grants?.resistances?.length)return 'resistance';if(feature?.grants?.immunities?.length)return 'immunity';if(feature?.grants?.acFormula)return 'ac-formula';return feature?.automation==='conditional'?'conditional':'reference';
+}
+function syncPrivateMechanicFields(){
+  if(!pendingDdbImport)return;const need=pendingDdbImport.setupNeeds.find(entry=>entry.id===$<HTMLSelectElement>('#private-mechanic-need').value);if(!need)return;
+  const pack=installedPacks.find(entry=>entry.metadata.id===ddbSetupPackId(pendingDdbImport!.sourceId,need.id));const feature=pack?.content.features[0];
+  $('#private-mechanic-detail').textContent=need.detail;$<HTMLInputElement>('#private-mechanic-name').value=feature?.name??need.label;$<HTMLTextAreaElement>('#private-mechanic-summary').value=feature?.summary??'';
+  $<HTMLSelectElement>('#private-mechanic-mode').value=privateMechanicMode(feature);$<HTMLSelectElement>('#private-mechanic-activation').value=feature?.activation??'none';$<HTMLInputElement>('#private-mechanic-wildshape').checked=feature?.retention?.wildshape!==false;
+  $<HTMLInputElement>('#private-mechanic-speed').value=String(feature?.grants?.speedBonus??10);$<HTMLSelectElement>('#private-mechanic-damage').value=feature?.grants?.resistances?.[0]??feature?.grants?.immunities?.[0]??'Acid';$<HTMLInputElement>('#private-mechanic-ac-base').value=String(feature?.grants?.acFormula?.base??10);
+  $<HTMLSelectElement>('#private-mechanic-ac-ability-one').value=feature?.grants?.acFormula?.abilities[0]??'';$<HTMLSelectElement>('#private-mechanic-ac-ability-two').value=feature?.grants?.acFormula?.abilities[1]??'';syncPrivateMechanicMode();
+}
+function syncPrivateMechanicMode(){
+  const mode=$<HTMLSelectElement>('#private-mechanic-mode').value;$('#private-mechanic-speed-fields').hidden=mode!=='speed';$('#private-mechanic-damage-fields').hidden=mode!=='resistance'&&mode!=='immunity';$('#private-mechanic-ac-fields').hidden=mode!=='ac-formula';
+}
+function openPrivateMechanics(needId?:string){
+  if(!pendingDdbImport||pendingDdbImport.setupNeeds.length===0){setImportStatus('Fetch a D&D Beyond character with private mechanics to complete first.');return;}
+  const select=$<HTMLSelectElement>('#private-mechanic-need');clear(select);for(const need of pendingDdbImport.setupNeeds){const option=document.createElement('option');option.value=need.id;const done=installedPacks.some(pack=>pack.metadata.id===ddbSetupPackId(pendingDdbImport!.sourceId,need.id));option.textContent=`${need.label}${done?' · Completed':''}`;select.append(option);}select.value=needId&&pendingDdbImport.setupNeeds.some(need=>need.id===needId)?needId:pendingDdbImport.setupNeeds.find(need=>!installedPacks.some(pack=>pack.metadata.id===ddbSetupPackId(pendingDdbImport!.sourceId,need.id)))?.id??pendingDdbImport.setupNeeds[0]!.id;
+  $('#private-mechanics-character').textContent=`${pendingDdbImport.character.name} · DDB ${pendingDdbImport.sourceId}`;const source=$<HTMLAnchorElement>('#private-mechanics-source-link');source.href=`https://www.dndbeyond.com/characters/${pendingDdbImport.sourceId}`;$('#private-mechanics-status').textContent='Choose how Altered should treat this mechanic. Nothing is saved until you press Save Private Mechanic.';syncPrivateMechanicFields();$<HTMLDialogElement>('#private-mechanics-dialog').showModal();
+}
+async function savePrivateMechanic(){
+  if(!pendingDdbImport)throw new Error('Fetch and review a D&D Beyond character first.');const need=pendingDdbImport.setupNeeds.find(entry=>entry.id===$<HTMLSelectElement>('#private-mechanic-need').value);if(!need)throw new Error('Choose a mechanic to complete.');
+  const name=$<HTMLInputElement>('#private-mechanic-name').value.trim(),summary=$<HTMLTextAreaElement>('#private-mechanic-summary').value.trim();if(!name||!summary)throw new Error('Display name and a short mechanical reminder are required.');
+  const mode=$<HTMLSelectElement>('#private-mechanic-mode').value as 'reference'|'conditional'|'speed'|'resistance'|'immunity'|'ac-formula';const abilityValues=[$<HTMLSelectElement>('#private-mechanic-ac-ability-one').value,$<HTMLSelectElement>('#private-mechanic-ac-ability-two').value].filter((value,index,all):value is Ability=>Boolean(value)&&all.indexOf(value)===index) as Ability[];
+  const pack=privateMechanicPack(pendingDdbImport.character,{packId:ddbSetupPackId(pendingDdbImport.sourceId,need.id),name,source:`D&D Beyond character ${pendingDdbImport.sourceId} — user-confirmed`,summary,mode,retainInWildShape:$<HTMLInputElement>('#private-mechanic-wildshape').checked,activation:$<HTMLSelectElement>('#private-mechanic-activation').value as TransformationOption['actionCost'],speedBonus:Number($<HTMLInputElement>('#private-mechanic-speed').value),damageType:$<HTMLSelectElement>('#private-mechanic-damage').value as DamageType,acBase:Number($<HTMLInputElement>('#private-mechanic-ac-base').value),acAbilities:abilityValues});
+  await installExtensionPack(pack);installedPacks=await loadValidatedInstalledPacks();if(baseCharacter.id===pendingDdbImport.character.id)rebuildEffectiveCharacterLibrary(true);renderInstalledPacks();renderDdbReview(pendingDdbImport);renderSettings();render();$('#private-mechanics-status').textContent=`${name} saved privately. It will be reapplied automatically whenever this character is imported on this device.`;syncPrivateMechanicFields();
 }
 async function loadSrdCreature(name:string){
   const params=new URLSearchParams({domain:'creatures',q:name,exact:'1'});
@@ -397,7 +433,7 @@ async function fetchDdbCharacter(explicitSource?:string){
   const source=explicitSource??$<HTMLInputElement>('#dndbeyond-source').value;const id=extractDdbCharacterId(source);
   if(!id){setImportStatus('Enter a public D&D Beyond character link or numeric character ID.');return;}
   $<HTMLInputElement>('#dndbeyond-source').value=id;const trigger=$<HTMLButtonElement>('#fetch-dndbeyond');trigger.disabled=true;trigger.textContent='Fetching…';
-  pendingDdbImport=null;$('#dndbeyond-review').hidden=true;setImportStatus(`Retrieving D&D Beyond character ${id} without account credentials…`);
+  pendingDdbImport=null;confirmedDdbSourceId=null;$('#dndbeyond-review').hidden=true;setImportStatus(`Retrieving D&D Beyond character ${id} without account credentials…`);
   try{
     // The private hosted app authenticates same-origin API requests at its
     // edge. The worker never forwards the incoming request or its cookies to
@@ -854,7 +890,13 @@ function initializeControls(){
   $('#import-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{applyImportedCharacter(parseCharacter(safeJsonParse(await file.text())));}catch(error){const message=`Import failed: ${error instanceof Error?error.message:'Unknown error'}`;notify(message);setImportStatus(message);}finally{input.value='';}});
   $('#fetch-dndbeyond').addEventListener('click',()=>void fetchDdbCharacter());
   $('#dndbeyond-source').addEventListener('keydown',event=>{if((event as KeyboardEvent).key==='Enter'){event.preventDefault();void fetchDdbCharacter();}});
-  $('#confirm-dndbeyond-import').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}if(pendingDdbImport.blocked){setImportStatus(pendingDdbImport.blockReason??'This character is blocked by the 2024-only rules policy.');return;}const imported=applyImportedCharacter(pendingDdbImport.character);pendingDdbImport=null;$('#dndbeyond-review').hidden=true;setImportStatus(`${imported.name} imported after review. Export an Altered JSON backup once you finish checking any flagged areas.`);});
+  $('#open-private-mechanics').addEventListener('click',()=>openPrivateMechanics());
+  $('#close-private-mechanics').addEventListener('click',()=>$<HTMLDialogElement>('#private-mechanics-dialog').close());
+  $('#private-mechanic-need').addEventListener('change',syncPrivateMechanicFields);
+  $('#private-mechanic-mode').addEventListener('change',syncPrivateMechanicMode);
+  $('#private-mechanics-form').addEventListener('submit',event=>{event.preventDefault();void (async()=>{try{await savePrivateMechanic();}catch(error){$('#private-mechanics-status').textContent=`Could not save mechanic: ${error instanceof Error?error.message:'Unknown error'}`;}})();});
+  $('#private-mechanic-transformation').addEventListener('click',()=>{if(!pendingDdbImport)return;if(pendingDdbImport.blocked){$('#private-mechanics-status').textContent=pendingDdbImport.blockReason??'This character cannot be imported under the 2024-only policy.';return;}const need=pendingDdbImport.setupNeeds.find(entry=>entry.id===$<HTMLSelectElement>('#private-mechanic-need').value);if(character.id!==pendingDdbImport.character.id)applyImportedCharacter(pendingDdbImport.character);$<HTMLDialogElement>('#private-mechanics-dialog').close();populateBuilderClassOptions();$<HTMLInputElement>('#builder-pack-name').value=`${character.name} Private Mechanics`;$<HTMLInputElement>('#builder-source').value=`D&D Beyond character ${pendingDdbImport.sourceId} — user-confirmed`;$<HTMLInputElement>('#builder-label').value=need?.label??'';$<HTMLSelectElement>('#builder-match').value='character';setBuilderStatus('The reviewed character is loaded. Add only the activation, duration, and effects you confirmed in your authorized source.');$<HTMLDialogElement>('#transform-builder-dialog').showModal();});
+  $('#confirm-dndbeyond-import').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}if(pendingDdbImport.blocked){setImportStatus(pendingDdbImport.blockReason??'This character is blocked by the 2024-only rules policy.');return;}const imported=applyImportedCharacter(pendingDdbImport.character);confirmedDdbSourceId=pendingDdbImport.sourceId;renderDdbReview(pendingDdbImport);setImportStatus(`${imported.name} imported after review. You can complete any remaining private mechanics here, then close this window.`);});
   $('#download-dndbeyond-json').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}downloadJson(pendingDdbImport.character,`${slug(pendingDdbImport.character.name)}-altered.json`);});
   $('#export-character').addEventListener('click',()=>downloadJson(character,`${character.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'altered-character'}.json`));
   $('#open-import-center').addEventListener('click',()=>{renderInstalledPacks();setImportStatus('Import from a public D&D Beyond character link, or use a validated Altered JSON backup.');$<HTMLDialogElement>('#import-dialog').showModal();});

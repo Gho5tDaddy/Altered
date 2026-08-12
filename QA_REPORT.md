@@ -1,4 +1,12 @@
-# Altered v0.24.5 QA report
+# Altered v0.25.0 QA report
+
+## v0.25.0 private-mechanics verification
+
+- A live public Ferocitus import identifies only unsupported feats, attuned magic-item mechanics, manually resolved spells, and other genuinely private options; built-in Circle of the Moon, Weapon Mastery, Ability Score Improvement, and ordinary weapons are excluded.
+- Saving a conditional Sentinel reminder creates a schema-v1 character-matched pack, marks the item Completed immediately, survives a page reload, and reapplies when Ferocitus is imported again.
+- The setup editor links to the public character page but never requests D&D Beyond credentials or copies a description. It requires a user-authored short reminder and warns against duplicating imported numeric totals.
+- The review remains open after character confirmation so remaining private mechanics can be completed without refetching.
+- Strict TypeScript checking, clean build, all **153/153 automated tests**, phone/desktop browser checks, and hosted security checks pass.
 
 ## v0.24.5 form-preview verification
 

@@ -187,7 +187,7 @@
         </details>
         <details class="help-topic" data-help-keywords="importing characters dnd beyond public json private content">
           <summary><span aria-hidden="true">⇩</span> Importing characters</summary>
-          <p>Open <strong>Import & Content</strong>. For D&amp;D Beyond, temporarily make the character Public, paste its link or ID, then review every warning before confirming. Altered JSON backups and private rules packs remain supported.</p>
+          <p>Open <strong>Import & Content</strong>. For D&amp;D Beyond, temporarily make the character Public, paste its link or ID, and review the result. If <strong>Needs Setup</strong> appears, use your authorized character page to enter only short playable mechanics; they remain private on this device and reapply automatically.</p>
         </details>
         <details class="help-topic" data-help-keywords="browsing forms search filters available locked">
           <summary><span aria-hidden="true">⌕</span> Browsing forms, search, and filters</summary>
@@ -219,7 +219,7 @@
         </details>
         <details class="help-topic" data-help-keywords="faq save offline paid content phone delete reset">
           <summary><span aria-hidden="true">?</span> FAQ</summary>
-          <p><strong>Does it save?</strong> Yes, locally. <strong>Does it work offline?</strong> The installed PWA keeps its validated built-in rules. <strong>Does it copy paid books?</strong> No; paid mechanics require your character data or private structured pack. <strong>Can I use a phone?</strong> Yes, when Altered is started in LAN mode on the same private network.</p>
+          <p><strong>Does it save?</strong> Yes, locally. <strong>Does it work offline?</strong> The installed PWA keeps its validated built-in rules. <strong>Does it copy paid books?</strong> No; <strong>Needs Setup</strong> stores only your short private mechanical confirmations. <strong>Can I use a phone?</strong> Yes; use the hosted link from any current phone browser.</p>
         </details>
         <details class="help-topic" data-help-keywords="about version privacy legal rules 2024">
           <summary><span aria-hidden="true">A</span> About</summary>
@@ -257,6 +257,12 @@
             <div id="dndbeyond-review-summary" class="ddb-review-summary"></div>
             <div id="dndbeyond-coverage" class="ddb-coverage"></div>
             <div id="dndbeyond-warnings" class="ddb-warnings"></div>
+            <details id="dndbeyond-private-setup" class="ddb-private-setup" hidden>
+              <summary><span><strong>Private mechanics</strong><small id="dndbeyond-setup-summary">No additional setup required</small></span><span id="dndbeyond-setup-badge" class="ui-status requirements">Needs Setup</span></summary>
+              <p>Altered found character options whose full mechanics are not in its shared legal rules pack. Complete only the pieces that matter in play; your confirmations stay in this browser.</p>
+              <div id="dndbeyond-setup-list" class="ddb-setup-list"></div>
+              <button id="open-private-mechanics" class="button secondary" type="button">Complete Private Mechanics</button>
+            </details>
             <div class="inline-actions import-actions">
               <button id="confirm-dndbeyond-import" class="button primary" type="button">Import Reviewed Character</button>
               <button id="download-dndbeyond-json" class="button secondary" type="button">Download Altered JSON</button>
@@ -285,6 +291,28 @@
       </section>
       <div id="import-status" class="status" role="status" aria-live="polite"></div>
     </div>
+  </dialog>
+
+  <dialog id="private-mechanics-dialog" class="wide-dialog" aria-labelledby="private-mechanics-title">
+    <form id="private-mechanics-form" class="dialog-card private-mechanics-card">
+      <div class="section-title"><h2 id="private-mechanics-title">Complete Private Mechanics</h2><button id="close-private-mechanics" class="text-button" type="button">Close</button></div>
+      <p class="import-intro">Use your authorized D&amp;D Beyond page as the reference. Enter a short mechanical reminder—not copied descriptions. Altered never requests your D&amp;D Beyond password or cookies.</p>
+      <div class="private-mechanics-source"><span id="private-mechanics-character"></span><a id="private-mechanics-source-link" href="https://www.dndbeyond.com/characters" target="_blank" rel="noopener noreferrer">Open character in D&amp;D Beyond</a></div>
+      <div class="builder-grid private-mechanics-grid">
+        <div class="builder-wide"><label for="private-mechanic-need">Mechanic to complete</label><select id="private-mechanic-need"></select><small id="private-mechanic-detail" class="source-note"></small></div>
+        <div><label for="private-mechanic-name">Display name</label><input id="private-mechanic-name" required maxlength="160"></div>
+        <div><label for="private-mechanic-mode">Treatment</label><select id="private-mechanic-mode"><option value="reference">Reminder only</option><option value="conditional">Conditional mechanic</option><option value="speed">Always-on Speed bonus</option><option value="resistance">Always-on damage resistance</option><option value="immunity">Always-on damage immunity</option><option value="ac-formula">Armor Class formula</option></select></div>
+        <div class="builder-wide"><label for="private-mechanic-summary">Short mechanical reminder</label><textarea id="private-mechanic-summary" required maxlength="500" rows="3" placeholder="Describe only what you need at the table, in your own words."></textarea></div>
+        <div><label for="private-mechanic-activation">Activation</label><select id="private-mechanic-activation"><option value="none">Passive / none</option><option value="action">Action</option><option value="bonus">Bonus Action</option><option value="reaction">Reaction</option><option value="magic-action">Magic action</option></select></div>
+        <label class="setting-row compact-setting" for="private-mechanic-wildshape"><span><strong>Retained in Wild Shape</strong><small>Turn off only when your source says the feature is not retained or its requirements cannot be met.</small></span><input id="private-mechanic-wildshape" type="checkbox" checked></label>
+        <div id="private-mechanic-speed-fields" hidden><label for="private-mechanic-speed">Speed bonus (feet)</label><input id="private-mechanic-speed" type="number" min="-100" max="200" value="10"></div>
+        <div id="private-mechanic-damage-fields" hidden><label for="private-mechanic-damage">Damage type</label><select id="private-mechanic-damage"><option>Acid</option><option>Bludgeoning</option><option>Cold</option><option>Fire</option><option>Force</option><option>Lightning</option><option>Necrotic</option><option>Piercing</option><option>Poison</option><option>Psychic</option><option>Radiant</option><option>Slashing</option><option>Thunder</option></select></div>
+        <div id="private-mechanic-ac-fields" class="builder-wide private-mechanic-ac" hidden><div><label for="private-mechanic-ac-base">AC base</label><input id="private-mechanic-ac-base" type="number" min="0" max="30" value="10"></div><div><label for="private-mechanic-ac-ability-one">Add ability</label><select id="private-mechanic-ac-ability-one"><option value="">None</option><option value="str">Strength</option><option value="dex">Dexterity</option><option value="con">Constitution</option><option value="int">Intelligence</option><option value="wis">Wisdom</option><option value="cha">Charisma</option></select></div><div><label for="private-mechanic-ac-ability-two">Add second ability</label><select id="private-mechanic-ac-ability-two"><option value="">None</option><option value="str">Strength</option><option value="dex">Dexterity</option><option value="con">Constitution</option><option value="int">Intelligence</option><option value="wis">Wisdom</option><option value="cha">Charisma</option></select></div></div>
+      </div>
+      <p class="source-note">Already-imported AC, ability scores, saving throws, Speed, and Hit Points must not be entered again. For an activated stance, summoned body part, or form, use the existing transformation builder.</p>
+      <div class="dialog-actions builder-actions"><button id="private-mechanic-transformation" class="button secondary" type="button">Create Activated Form</button><button class="button primary" type="submit">Save Private Mechanic</button></div>
+      <div id="private-mechanics-status" class="status" role="status" aria-live="polite"></div>
+    </form>
   </dialog>
 
   <dialog id="transform-builder-dialog" class="wide-dialog" aria-labelledby="transform-builder-title">

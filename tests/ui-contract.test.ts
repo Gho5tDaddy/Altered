@@ -8,9 +8,16 @@ test('static shell exposes accessible tabs, dialogs, and condition input',()=>{
   assert.equal((html.match(/role="tab"/g)??[]).length,5);
   assert.match(html,/id="tab-content"[^>]*role="tabpanel"[^>]*aria-labelledby="tab-actions"/);
   assert.match(html,/for="condition-select">Condition<\/label>/);
-  for(const id of ['help-dialog','import-dialog','transform-builder-dialog','settings-dialog','temp-hp-dialog']){
+  for(const id of ['help-dialog','import-dialog','private-mechanics-dialog','transform-builder-dialog','settings-dialog','temp-hp-dialog']){
     assert.match(html,new RegExp(`<dialog id="${id}"[^>]*aria-labelledby="${id.replace(/-dialog$/,'')}(?:-dialog)?-title"`));
   }
+});
+
+test('paid mechanics use a compact private completion flow without credentials or copied rules text',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const importer=readFileSync('src/dndbeyond.ts','utf8');const owned=readFileSync('src/owned-content.ts','utf8');
+  assert.match(html,/id="dndbeyond-private-setup"/);assert.match(html,/id="private-mechanics-dialog"/);assert.match(html,/Short mechanical reminder/);assert.match(html,/never requests your D&amp;D Beyond password or cookies/i);
+  assert.match(source,/ddbSetupPackId\(report\.sourceId,need\.id\)/);assert.match(source,/privateMechanicPack\(/);assert.match(source,/reapplied automatically whenever this character is imported/);
+  assert.match(importer,/setupNeeds:DdbSetupNeed\[\]/);assert.match(importer,/SUBCLASS_FEATURES/);assert.match(owned,/schemaVersion:1,kind:'altered-owned-content-pack'/);
 });
 
 test('every static button is connected to an application control path',()=>{

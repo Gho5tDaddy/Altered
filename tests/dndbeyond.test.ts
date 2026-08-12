@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {applyDdbSrdCreatures,extractDdbCharacterId,importDdbCharacter} from '../src/dndbeyond.js';
+import {applyDdbSrdCreatures,ddbSetupPackId,extractDdbCharacterId,importDdbCharacter} from '../src/dndbeyond.js';
 
 const spell=(id:number,name:string,level:number,extra:Record<string,unknown>={})=>({
   definition:{id,name,level,concentration:false,components:[1,2],modifiers:[],...extra},
@@ -178,6 +178,19 @@ test('normalizes a Ferocitus-shaped multiclass character without guessing core v
   assert.ok(report.warnings.some(item=>item.code==='ruleset-review'));
   assert.ok(report.warnings.some(item=>item.code==='item-text-review'));
   assert.ok(report.warnings.some(item=>item.code==='circle-moon-spells-restored'));
+  assert.deepEqual(report.setupNeeds.map(need=>[need.kind,need.label]),[
+    ['feat','Sentinel'],['item','Cloak of Protection'],['item','Insignia of Claws'],
+  ]);
+  assert.equal(ddbSetupPackId(report.sourceId,report.setupNeeds[0]!.id),'ddb-152187683-feat-sentinel');
+});
+
+test('identifies unsupported paid subclass features without copying descriptions',()=>{
+  const payload=JSON.parse(JSON.stringify(ferocitusPayload)) as any;const druid=payload.data.classes[1];assert.ok(druid);
+  druid.subclassDefinition={name:'Circle of Stars',classFeatures:[{name:'Starry Form',requiredLevel:3},{name:'Cosmic Omen',requiredLevel:6}]};
+  const report=importDdbCharacter(payload,'152187683');const setup=report.setupNeeds.filter(need=>need.kind==='subclass');
+  assert.deepEqual(setup.map(need=>need.label),['Starry Form']);
+  assert.ok(setup[0]?.detail.includes('Circle of Stars Druid feature'));
+  assert.ok(!JSON.stringify(setup).includes('description'));
 });
 
 test('blocks clearly legacy or mixed D&D Beyond characters from the 2024-only engine',()=>{

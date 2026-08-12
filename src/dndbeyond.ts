@@ -1,5 +1,5 @@
 import type {Ability,ActionCost,Character,CharacterItem,CharacterRuleset,Creature,DamagePacket,DamageType,ProficiencyRank,ResourcePool,Spell} from './types.js';
-import {CREATURES,MOON_FORM_SPELL_LEVELS} from './content-registry.js';
+import {CREATURES,MOON_FORM_SPELL_LEVELS,SUBCLASS_FEATURES} from './content-registry.js';
 import {parseCharacter} from './schema.js';
 
 type JsonObject=Record<string,unknown>;
@@ -17,6 +17,14 @@ export interface DdbImportCoverage {
   detail:string;
 }
 
+export type DdbSetupKind='subclass'|'feat'|'item'|'spell'|'homebrew';
+export interface DdbSetupNeed {
+  id:string;
+  kind:DdbSetupKind;
+  label:string;
+  detail:string;
+}
+
 export interface DdbImportReport {
   sourceId:string;
   character:Character;
@@ -25,6 +33,7 @@ export interface DdbImportReport {
   warnings:DdbImportWarning[];
   coverage:DdbImportCoverage[];
   supportRequests:{creatures:string[]};
+  setupNeeds:DdbSetupNeed[];
 }
 
 const ABILITIES:Ability[]=['str','dex','con','int','wis','cha'];
@@ -506,6 +515,26 @@ function homebrewCount(data:JsonObject):number{
   return count;
 }
 
+const BUILT_IN_FEAT_MECHANICS=new Set(['alert','tough','war caster','weapon mastery']);
+function setupNeeds(data:JsonObject,classes:Character['classes'],feats:string[],items:CharacterItem[],spells:Spell[],homebrew:number):DdbSetupNeed[]{
+  const needs:DdbSetupNeed[]=[];const add=(need:DdbSetupNeed)=>{if(!needs.some(entry=>entry.id===need.id))needs.push(need);};
+  const knownSubclasses=new Set([...Object.keys(SUBCLASS_FEATURES),'Circle of the Moon'].map(name=>name.toLowerCase()));
+  for(const rawClass of array(data.classes)){
+    const entry=object(rawClass),subclass=object(entry.subclassDefinition),subclassName=string(subclass.name);if(!subclassName||knownSubclasses.has(subclassName.toLowerCase()))continue;
+    const className=string(object(entry.definition).name)||classes.find(candidate=>candidate.subclass?.toLowerCase()===subclassName.toLowerCase())?.name||'Class';const classLevel=whole(entry.level);
+    const featureNames=array(subclass.classFeatures).flatMap(raw=>{const feature=object(raw),name=string(feature.name);const required=whole(feature.requiredLevel??feature.level,1);return name&&required<=classLevel?[{name,required}]:[];});
+    if(featureNames.length){for(const feature of featureNames)add({id:`subclass-${slug(subclassName)}-${slug(feature.name)}`,kind:'subclass',label:feature.name,detail:`${subclassName} ${className} feature${feature.required>1?` (level ${feature.required})`:''}; confirm only its playable mechanics from your authorized D&D Beyond source.`});}
+    else add({id:`subclass-${slug(subclassName)}`,kind:'subclass',label:subclassName,detail:`This subclass is not included in Altered's shared SRD rules pack. Add its transformation-relevant features from your authorized D&D Beyond source.`});
+  }
+  for(const feat of feats)if(!BUILT_IN_FEAT_MECHANICS.has(feat.toLowerCase())&&!/ability score improvement/i.test(feat))add({id:`feat-${slug(feat)}`,kind:'feat',label:feat,detail:'Altered imported the feat choice, but its situation-specific mechanics need a private confirmation before they can affect play.'});
+  for(const item of items)if(item.equipped&&item.requiresAttunement&&item.attuned)add({id:`item-${slug(item.id)}`,kind:'item',label:item.name,detail:'Numeric sheet totals are already imported. Add only special actions, conditions, or transformation interactions so bonuses are not counted twice.'});
+  for(const spell of spells)if(spell.resolution==='manual')add({id:`spell-${slug(spell.id??spell.name)}`,kind:'spell',label:spell.name,detail:'The spell is available, but its conditional effect remains manual until you confirm a supported private mechanic.'});
+  if(homebrew)add({id:'homebrew-content',kind:'homebrew',label:`Homebrew content (${homebrew})`,detail:'Homebrew is private user content. Confirm any mechanics that should remain available or change while transformed.'});
+  return needs.slice(0,100);
+}
+
+export function ddbSetupPackId(sourceId:string,needId:string):string{return `ddb-${sourceId}-${slug(needId)}`.slice(0,120);}
+
 export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImportReport{
   if(!isObject(payload))throw new Error('D&D Beyond returned an invalid response.');
   if(payload.success===false)throw new Error(string(payload.message)||'D&D Beyond did not return this character.');
@@ -535,6 +564,7 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
     knownForms,seenForms:knownForms,spells,spellSlots:parseSpellSlots(data,classes),feats,features:[],resources,equipment:defense.equipment,items,provenance:{provider:'dndbeyond',sourceId,ruleset:ruleset.ruleset,rulesetEvidence:ruleset.evidence,reviewRequired:ruleset.reviewRequired},customForms:[],
   };
   const character=parseCharacter(raw);
+  const privateSetup=setupNeeds(data,classes,feats,items,spells,homebrew);
   const coverage:DdbImportCoverage[]=[
     {label:'2024 ruleset',status:ruleset.ruleset==='2024'&&!ruleset.reviewRequired?'verified':'review',detail:`${ruleset.ruleset.toUpperCase()} · ${ruleset.evidence.join(' · ')}`},
     {label:'Identity and levels',status:'verified',detail:`${character.name} · ${character.classes.map(entry=>`${entry.name} ${entry.level}${entry.subclass?` (${entry.subclass})`:''}`).join(' / ')}`},
@@ -545,7 +575,7 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
     {label:'Wild Shape selections',status:druid&&druid.level>=2?(knownForms.length?'verified':'review'):'not-provided',detail:knownForms.length?knownForms.map(id=>CREATURES[id]?.name??id).join(', '):'No form names were provided or matched'},
     {label:'Items and homebrew',status:activeItems.length||homebrew?'review':'not-provided',detail:`${items.length} item record${items.length===1?'':'s'} · ${activeItems.length} equipped · ${homebrew} homebrew entr${homebrew===1?'y':'ies'}`},
   ];
-  return {sourceId,character,blocked,...(blockReason?{blockReason}:{}),warnings,coverage,supportRequests:{creatures:formSelection.unmapped}};
+  return {sourceId,character,blocked,...(blockReason?{blockReason}:{}),warnings,coverage,supportRequests:{creatures:formSelection.unmapped},setupNeeds:privateSetup};
 }
 
 export function ddbCoverageLabel(status:CoverageStatus):string{

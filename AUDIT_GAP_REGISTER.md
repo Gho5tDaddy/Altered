@@ -1,6 +1,13 @@
-# Altered v0.24.5 audit gap register
+# Altered v0.25.0 audit gap register
 
 This register distinguishes an incorrect result from a deliberately conditional or reference-only result. Altered must never present a reference-only mechanic as calculated.
+
+## Resolved in v0.25.0
+
+| Finding | Severity | Resolution | Regression evidence |
+|---|---:|---|---|
+| Imported paid or campaign-shared options could be named but had no simple path to become usable without a hand-authored pack | High | Added character-local `Needs Setup` detection and a compact private mechanic completion editor using the existing schema-v1 pack system | D&D Beyond detection, owned-content application, persistence, and live Ferocitus browser checks |
+| Broad import warnings could falsely imply ordinary weapons or supported core features required private setup | Medium | Limited setup requests to unsupported executable mechanics and excluded known built-in feat/subclass coverage | D&D Beyond importer regression tests |
 
 ## Resolved in v0.24.5
 

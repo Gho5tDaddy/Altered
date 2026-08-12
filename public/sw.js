@@ -1,4 +1,4 @@
-const CACHE='altered-v0.24.5-ferocitus';
+const CACHE='altered-v0.25.0-ferocitus';
 const ASSETS=['./','./index.html','./styles.css','./app.bundle.js','./manifest.json','./icon-192.png','./icon-512.png','./sample-character.json','./sample-characters.json','./form-brown-bear.jpg','./form-dire-wolf.jpg','./form-giant-octopus.jpg','./form-giant-spider.jpg','./form-lion.jpg','./form-tiger.jpg'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))));self.clients.claim();});
