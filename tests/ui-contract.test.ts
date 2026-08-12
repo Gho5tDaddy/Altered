@@ -86,13 +86,14 @@ test('phone gameplay uses focused views while keeping the form artwork persisten
   assert.match(styles,/one task, one scroll region, persistent form art/);assert.match(styles,/\.workspace-view\{[^}]*overflow:auto/);assert.match(styles,/\.persistent-form-visual \.form-art/);
 });
 
-test('moonlit text palette keeps secondary and disabled states legible',()=>{
+test('arcane glow palette keeps secondary and disabled states luminous and legible',()=>{
   const styles=readFileSync('public/styles.css','utf8');
-  assert.match(styles,/moonlit contrast: brighter secondary copy and arcane accents/);
-  assert.match(styles,/--muted:#c7cadd/);assert.match(styles,/--accent:#8f7bdd/);assert.match(styles,/--accent-2:#b9ddff/);
-  assert.match(styles,/\.button:disabled\{opacity:\.7;color:#c9cce0\}/);
-  assert.match(styles,/\.economy-chip\.used\{opacity:\.78;color:#c0c4d7\}/);
-  assert.match(styles,/\.workspace-nav-button\.active\{[\s\S]*background:linear-gradient\(180deg,#292442,#151720\)/);
+  assert.match(styles,/arcane glow: luminous text contrast and magical state accents/);
+  assert.match(styles,/--muted:#e4e9ff/);assert.match(styles,/--accent:#b478ff/);assert.match(styles,/--accent-2:#79f7ff/);
+  assert.match(styles,/\.button:disabled\{opacity:\.82;color:#e0e4f7/);
+  assert.match(styles,/\.economy-chip\.used\{opacity:\.9;color:#d8def2/);
+  assert.match(styles,/text-shadow:0 0 5px rgba\(121,247,255,\.52\)/);
+  assert.match(styles,/\.workspace-nav-button\.active\{[\s\S]*background:linear-gradient\(180deg,#3a2358,#171421\)/);
 });
 
 test('the six current forms ship with app-ready artwork in both builds',()=>{

@@ -1615,14 +1615,14 @@ html[data-altered-workspace="forms"] .persistent-form-copy strong{font-size:1rem
   .persistent-form-copy,.task-launcher,.workspace-nav-button{transition:none!important}
 }
 
-/* v0.26.1 moonlit contrast: brighter secondary copy and arcane accents */
+/* v0.26.2 arcane glow: luminous text contrast and magical state accents */
 :root{
-  --muted:#c7cadd;
-  --accent:#8f7bdd;
-  --accent-2:#b9ddff;
-  --blue:#88bddb;
-  --rune-gold:rgba(176,193,255,.42);
-  --rune-faint:rgba(176,193,255,.18)
+  --muted:#e4e9ff;
+  --accent:#b478ff;
+  --accent-2:#79f7ff;
+  --blue:#75d8ff;
+  --rune-gold:rgba(121,247,255,.54);
+  --rune-faint:rgba(180,120,255,.24)
 }
 .brand-copy p,
 .metric span,.section-title h2,.side-column h2,label,.character-title span,.helper,.source-note,.status,.roll-row small,.item-card p,.metric small,
@@ -1633,26 +1633,30 @@ html[data-altered-workspace="forms"] .persistent-form-copy strong{font-size:1rem
 .ddb-coverage-status,.ddb-private-setup>summary small,.ddb-setup-kind,.ddb-setup-item small,.import-block p,.installed-pack span,.installed-pack small,
 .advanced-builder p,.form-results-status,.ui-status,.help-search-status,.help-topic p,.help-topic ol,.help-topic ul,.walkthrough-card p,
 .account-copy small,.dashboard-drawer>summary small,.drawer-tools,.workspace-nav-button{
-  color:var(--muted)
+  color:var(--muted);text-shadow:0 0 5px rgba(157,183,255,.24)
 }
 .text-button,.persistent-form-copy small,.workspace-heading span,.play-summary-button>span:first-child,.play-latest-result b,
 .resource-chip b,.roll-result strong,.latest-roll-value>strong,.active-effects h3,.effect-benefit,.account-copy strong,
 .form-tools-drawer>summary,.unavailable-spells[open]>summary,.help-intro strong,.walkthrough-progress{
-  color:var(--accent-2)
+  color:var(--accent-2);text-shadow:0 0 5px rgba(121,247,255,.52),0 0 13px rgba(121,247,255,.2)
 }
-.panel .section-title h2::before,.side-column h2::before{color:rgba(185,221,255,.76)}
+.panel .section-title h2::before,.side-column h2::before{color:rgba(121,247,255,.94);text-shadow:0 0 7px rgba(121,247,255,.56)}
 .section-title::after,.side-column h2::after,.panel>.section-title::after{
-  background:linear-gradient(90deg,rgba(185,221,255,.3),rgba(143,123,221,.34) 38%,transparent 100%)
+  background:linear-gradient(90deg,rgba(121,247,255,.58),rgba(180,120,255,.56) 38%,transparent 100%);
+  box-shadow:0 0 8px rgba(121,247,255,.2)
 }
-.button:disabled{opacity:.7;color:#c9cce0}
-.economy-chip.used{opacity:.78;color:#c0c4d7}
-.badge.inactive{opacity:.75}.ui-status.inactive{color:#c3c7d8}
-.task-launcher:hover,.task-launcher:focus-visible{border-color:var(--accent);background:#211e35}
+.button:disabled{opacity:.82;color:#e0e4f7;text-shadow:0 0 4px rgba(157,183,255,.2)}
+.economy-chip.used{opacity:.9;color:#d8def2;text-shadow:0 0 4px rgba(157,183,255,.18)}
+.badge.inactive{opacity:.86}.ui-status.inactive{color:#dde4fa}
+.ui-status.active{border-color:#b478ff;color:#f0dcff;background:rgba(105,48,154,.34);box-shadow:0 0 11px rgba(180,120,255,.25)}
+.ui-status.selected{border-color:#79f7ff;color:#d7fcff;background:rgba(35,115,128,.3);box-shadow:0 0 11px rgba(121,247,255,.22)}
+.task-launcher:hover,.task-launcher:focus-visible{border-color:var(--accent);background:#29203e;box-shadow:0 0 12px rgba(180,120,255,.18)}
 .workspace-nav-button.active{
-  border-color:var(--accent);background:linear-gradient(180deg,#292442,#151720);color:#f5f2ff;
-  box-shadow:inset 0 1px rgba(226,232,255,.08),0 0 14px rgba(143,123,221,.12)
+  border-color:var(--accent);background:linear-gradient(180deg,#3a2358,#171421);color:#fffaff;
+  box-shadow:inset 0 1px rgba(241,224,255,.14),0 0 14px rgba(180,120,255,.3),0 0 24px rgba(180,120,255,.12);
+  text-shadow:0 0 7px rgba(224,188,255,.44)
 }
-.workspace-nav-button span{color:var(--accent-2)}
+.workspace-nav-button span{color:var(--accent-2);text-shadow:0 0 6px rgba(121,247,255,.58),0 0 14px rgba(121,247,255,.22)}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[role="tabpanel"]:focus-visible{
-  outline-color:rgba(185,221,255,.72)
+  outline-color:rgba(121,247,255,.94);box-shadow:0 0 0 2px rgba(121,247,255,.18),0 0 12px rgba(121,247,255,.24)
 }
