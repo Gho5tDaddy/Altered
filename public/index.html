@@ -38,9 +38,11 @@
 
     <main class="main-grid">
       <section class="sheet panel">
-        <div class="hero-grid">
-          <div id="form-art" class="form-art" aria-live="polite"></div>
-          <div class="transform-panel">
+        <details id="character-form-drawer" class="character-form-drawer" open>
+          <summary><span><strong>Character &amp; Form</strong><small id="character-form-summary">Base Form selected</small></span><span class="drawer-hint" aria-hidden="true"></span></summary>
+          <div class="hero-grid">
+            <div id="form-art" class="form-art" aria-live="polite"></div>
+            <div class="transform-panel">
             <label for="form-select">Choose form</label>
             <select id="form-select"></select>
             <details class="form-tools-drawer">
@@ -78,8 +80,9 @@
             </div>
             <p id="form-reason" class="helper"></p>
             <div id="status-message" class="status" role="status" aria-live="polite"></div>
+            </div>
           </div>
-        </div>
+        </details>
 
         <div id="metric-grid" class="metric-grid"></div>
         <div id="action-economy" class="action-economy"></div>
@@ -195,7 +198,7 @@
         </details>
         <details class="help-topic" data-help-keywords="activating forms transform selected available resource">
           <summary><span aria-hidden="true">✧</span> Activating forms</summary>
-          <p>Select a form, read the status chips and short reason, then press Transform or Activate. The app spends the correct action and resource only after all requirements pass.</p>
+          <p>On a phone, tap <strong>Character &amp; Form</strong> to open the portrait and form chooser. Select a form, read its status, then press Transform or Activate. Close the drawer afterward to give Actions and Spells more room.</p>
         </details>
         <details class="help-topic" data-help-keywords="ending forms return normal base release revert">
           <summary><span aria-hidden="true">↶</span> Ending forms and returning to normal</summary>

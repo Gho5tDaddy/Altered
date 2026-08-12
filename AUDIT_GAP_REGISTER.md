@@ -1,6 +1,12 @@
-# Altered v0.25.0 audit gap register
+# Altered v0.25.1 audit gap register
 
 This register distinguishes an incorrect result from a deliberately conditional or reference-only result. Altered must never present a reference-only mechanic as calculated.
+
+## Resolved in v0.25.1
+
+| Finding | Severity | Resolution | Regression evidence |
+|---|---:|---|---|
+| The fixed phone dashboard left too little height for the selected Actions or Spells content | High | Reused the complete portrait/form panel inside a phone-only native disclosure whose compact summary identifies the current selection | 390 × 844 collapsed/expanded interaction metrics, desktop regression check, and UI contract test |
 
 ## Resolved in v0.25.0
 

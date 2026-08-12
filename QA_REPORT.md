@@ -1,4 +1,12 @@
-# Altered v0.25.0 QA report
+# Altered v0.25.1 QA report
+
+## v0.25.1 mobile gameplay-space verification
+
+- At 390 × 844, the phone opens with `Character & Form` collapsed, a 44-pixel summary target, no horizontal overflow, and 256 pixels available to the Base Form action list instead of 112.
+- One tap exposes the original portrait, chooser, filters, status chips, Transform/End Form controls, and artwork tools; choosing and transforming into Dire Wolf updates the compact summary to `Dire Wolf active`.
+- Closing the disclosure during Dire Wolf play leaves 192 pixels for its action list while the active-effects panel remains present.
+- A fresh 1440 × 900 load keeps the disclosure open with its summary hidden, preserving the established desktop layout and accessibility tree.
+- Strict TypeScript checking, clean build, all **154/154 automated tests**, exact-worker browser audit, and live mobile interaction checks pass.
 
 ## v0.25.0 private-mechanics verification
 

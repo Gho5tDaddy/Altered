@@ -85,6 +85,7 @@ let formFilter='all';
 let walkthroughStepIndex=0;
 let walkthroughTarget:HTMLElement|undefined;
 let walkthroughReturnFocus:HTMLElement|undefined;
+let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 type UiStatus='available'|'active'|'inactive'|'locked'|'unavailable'|'requirements'|'selected'|'favorite'|'new'|'importing'|'loading'|'success'|'warning'|'error';
 const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
@@ -115,6 +116,7 @@ function clearWalkthroughHighlight(){
 }
 function finishWalkthrough(message:string){
   clearWalkthroughHighlight();$('#walkthrough').hidden=true;void saveBooleanSetting(WALKTHROUGH_SETTING,true);
+  if(window.matchMedia('(max-width:700px)').matches)$<HTMLDetailsElement>('#character-form-drawer').open=false;
   $('#status-message').textContent=message;
   const returnFocus=walkthroughReturnFocus;walkthroughReturnFocus=undefined;
   if(returnFocus?.isConnected)window.setTimeout(()=>returnFocus.focus({preventScroll:true}),0);
@@ -122,6 +124,7 @@ function finishWalkthrough(message:string){
 function renderWalkthroughStep(){
   const available=availableWalkthroughSteps();if(available.length===0){finishWalkthrough('Walkthrough skipped because its interface targets are unavailable.');return;}
   walkthroughStepIndex=Math.max(0,Math.min(walkthroughStepIndex,available.length-1));const current=available[walkthroughStepIndex];if(!current)return;
+  current.target.closest<HTMLDetailsElement>('#character-form-drawer')?.setAttribute('open','');
   clearWalkthroughHighlight();walkthroughTarget=current.target;walkthroughTarget.classList.add('walkthrough-target');
   walkthroughTarget.scrollIntoView({block:'center',behavior:reduceMotion?'auto':'smooth'});
   $('#walkthrough-step').textContent=`Step ${walkthroughStepIndex+1} of ${available.length}`;
@@ -141,6 +144,11 @@ function setAppMenuOpen(open:boolean,restoreFocus=false){
   const topbar=document.querySelector<HTMLElement>('.topbar');const toggle=$<HTMLButtonElement>('#toggle-app-menu');
   topbar?.classList.toggle('menu-open',open);toggle.setAttribute('aria-expanded',String(open));
   if(!open&&restoreFocus)toggle.focus({preventScroll:true});
+}
+function syncCharacterFormDrawer(){
+  const compact=window.matchMedia('(max-width:700px)').matches;const drawer=$<HTMLDetailsElement>('#character-form-drawer');
+  if(compactFormLayout===undefined||compact!==compactFormLayout)drawer.open=!compact;
+  compactFormLayout=compact;
 }
 function filterHelpTopics(){
   const query=$<HTMLInputElement>('#help-search').value.trim().toLowerCase();const terms=query.split(/\s+/).filter(Boolean);
@@ -560,6 +568,7 @@ function renderTransformSelector(){
   for(const o of visible){const name=groupName(o);let group=groups.get(name);if(!group){group=document.createElement('optgroup');group.label=name;groups.set(name,group);select.append(group);}const item=document.createElement('option');item.value=o.id;item.textContent=`${o.label}${o.id===activeId?' · Active':o.usable?'':' · Locked'}`;item.title=o.id===activeId?'Currently active':o.reason??o.source;group.append(item);}
   select.value=selectedOptionId;
   const selected=options.find(o=>o.id===selectedOptionId);const active=state.activeTransform?.option;
+  $('#character-form-summary').textContent=active&&selected?.id!==active.id?`${selected?.label??'Form'} selected · ${active.label} active`:active?`${active.label} active`:`${selected?.label??'Base Form'} selected`;
   const economyError=selected&&selected.profile!=='base'&&selected.id!==active?.id?actionCostError(state,selected.actionCost,sheet.conditionImmunities):null;
   const results=$('#form-results-status');const hiddenSelection=Boolean(selected&&!matched.some(option=>option.id===selected.id)&&selected.profile!=='base');results.textContent=!search&&formFilter==='all'?'':`${matched.length} of ${options.length} forms shown${hiddenSelection?' · selected form retained':''}.`;
   const statuses=$('#form-status-strip');clear(statuses);
@@ -865,7 +874,7 @@ function initializeControls(){
   $('#toggle-app-menu').addEventListener('click',()=>setAppMenuOpen($<HTMLButtonElement>('#toggle-app-menu').getAttribute('aria-expanded')!=='true'));
   $('#top-actions').addEventListener('click',event=>{if((event.target as Element).closest('button,a'))setAppMenuOpen(false);});
   document.addEventListener('pointerdown',event=>{const topbar=document.querySelector<HTMLElement>('.topbar');if(topbar?.classList.contains('menu-open')&&!topbar.contains(event.target as Node))setAppMenuOpen(false);});
-  window.addEventListener('resize',()=>{if(innerWidth>700)setAppMenuOpen(false);});
+  const compactFormQuery=window.matchMedia('(max-width:700px)');syncCharacterFormDrawer();compactFormQuery.addEventListener('change',syncCharacterFormDrawer);window.addEventListener('resize',()=>{if(innerWidth>700)setAppMenuOpen(false);syncCharacterFormDrawer();});
   $('#sample-character').addEventListener('change',event=>{const id=(event.target as HTMLSelectElement).value;const found=characters.find(c=>c.id===id);if(found)setCharacter(found);});
   $('#form-select').addEventListener('change',event=>{selectedOptionId=(event.target as HTMLSelectElement).value;renderTransformSelector();renderArt();});
   $('#form-search').addEventListener('input',event=>{formSearch=(event.target as HTMLInputElement).value;renderTransformSelector();renderArt();});

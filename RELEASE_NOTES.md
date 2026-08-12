@@ -1,4 +1,12 @@
-# Altered v0.25.0 release notes
+# Altered v0.25.1 release notes
+
+The phone dashboard now keeps the large portrait and form chooser behind one native `Character & Form` dropdown. Its compact summary always identifies the selected or active form. Tap it to choose, inspect, transform, upload artwork, or end a form; close it to return the space to Actions, Spells, Features, and Rules.
+
+At the audited 390 × 844 layout, the collapsed Base Form workspace grows from 112 to 256 pixels while the document remains viewport-bound and free of horizontal overflow. Active Dire Wolf play retains a 192-pixel action region even with the active-effects explanation visible. Desktop and Mac layouts continue showing the complete portrait and form controls without the mobile summary.
+
+No rules, action economy, transformations, saves, D&D Beyond imports, JSON formats, private packs, or dependencies changed.
+
+## Previous v0.25.0 notes
 
 Public D&D Beyond imports now identify private or unsupported character options with one compact `Needs Setup` section. The user can open the authorized character page, enter a short mechanical reminder in their own words, and choose a supported treatment such as conditional, Speed bonus, resistance, immunity, Armor Class formula, or an activated transformation. Completed items are labeled and automatically reapply to the matching character on that browser.
 

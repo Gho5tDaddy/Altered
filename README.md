@@ -38,6 +38,8 @@ The always-available **Help** command opens a searchable, compact guide to impor
 
 The **Active now** panel explains the effects that currently change the sheet. Barkskin raises Armor Class to its 2024 minimum and remains visible through Wild Shape until ended. In Moon Wild Shape the panel lists the Circle spells that can still be cast; during Rage it shows the active resistances and Strength benefits and explains why spells are blocked.
 
+On phones, the portrait and complete form chooser live inside one **Character & Form** disclosure. Its summary always shows the selected or active form. Open it only when choosing, transforming, ending a form, or changing artwork; close it during play to give the active Actions, Spells, Features, or Rules tab substantially more room. Desktop and Mac layouts keep the full panel visible.
+
 Brown Bear, Dire Wolf, Giant Octopus, Giant Spider, Lion, and Tiger include matching built-in artwork. Uploaded per-character or per-form art still takes priority, and Reset Art restores the bundled image. The PWA caches these images for offline play, while the standalone HTML embeds them directly.
 
 The turn strip tracks the Action, Bonus Action, Reaction, and the 2024 one-slot-spell-per-turn limit separately. Spending an Action never consumes the Bonus Action, and a cantrip does not consume the slot-spell limit. Barkskin, Wild Shape, and Rage each require a Bonus Action, so Altered keeps the Action available after Barkskin while clearly requiring Wild Shape or Rage to wait for another turn.

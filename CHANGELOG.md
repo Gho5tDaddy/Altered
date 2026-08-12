@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.25.1
+
+- Moved the existing portrait and form chooser into a phone-only `Character & Form` disclosure, keeping the desktop presentation unchanged.
+- Defaulted the phone disclosure closed after startup and walkthrough completion, increasing the Base Form action workspace from 112 to 256 pixels at the audited 390 × 844 viewport.
+- Kept the selected or active form visible in the disclosure summary and retained the existing chooser, search, filters, status explanation, transformation controls, artwork, and aura.
+- Added responsive, accessibility, interaction, and regression coverage without changing gameplay, saves, imports, exports, or private packs.
+
 ## v0.25.0
 
 - Added a compact `Needs Setup` review for imported paid, campaign-shared, and homebrew character options that are not part of Altered's distributable SRD rules.

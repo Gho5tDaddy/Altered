@@ -75,6 +75,13 @@ test('form browsing and visual statuses explain availability without changing fo
   assert.match(styles,/\.help-topic summary:focus-visible/);
 });
 
+test('phone gameplay keeps the existing character and form controls in one accessible disclosure',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
+  assert.match(html,/<details id="character-form-drawer"[^>]*open>/);assert.match(html,/<summary><span><strong>Character &amp; Form/);assert.match(html,/id="character-form-summary"/);
+  assert.match(source,/function syncCharacterFormDrawer\(\)/);assert.match(source,/matchMedia\('\(max-width:700px\)'\)/);assert.match(source,/#character-form-summary/);
+  assert.match(styles,/@media\(max-width:700px\)[\s\S]*\.character-form-drawer>summary/);assert.match(styles,/\.character-form-drawer\[open\] \.drawer-hint::before\{content:"Close"\}/);
+});
+
 test('the six current forms ship with app-ready artwork in both builds',()=>{
   const source=readFileSync('src/app.ts','utf8');
   const serviceWorker=readFileSync('public/sw.js','utf8');
