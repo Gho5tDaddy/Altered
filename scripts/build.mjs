@@ -52,7 +52,7 @@ await writeFile(path.join(dist,'server','package.json'),'{"type":"module"}\n');
 const hostedPage=Buffer.from(hostedHtml,'utf8').toString('base64');
 const manifest=await readFile(path.join(root,'public','manifest.json'),'utf8');
 const hostedServiceWorker=await readFile(path.join(root,'public','sw-hosted.js'),'utf8');
-const icons=Object.fromEntries(await Promise.all(['icon-192.png','icon-512.png'].map(async name=>[
+const icons=Object.fromEntries(await Promise.all(['icon-192.png','icon-512.png','icon-maskable-512.png'].map(async name=>[
   `/${name}`,
   {type:'image/png',data:(await readFile(path.join(root,'public',name))).toString('base64')},
 ])));

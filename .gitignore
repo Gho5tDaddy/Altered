@@ -7,6 +7,10 @@ dist/
 .tools/
 .npm-cache/
 .codex-remote-attachments/
+.android-signing/
+android-wrapper/twa/.gradle/
+android-wrapper/twa/app/build/
+android-wrapper/twa/build/
 
 # Logs and temporary files
 *.log
