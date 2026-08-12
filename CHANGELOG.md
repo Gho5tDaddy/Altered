@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.26.5
+
+- Added a fixed, animated roll-result overlay with visible d20, modifier source, final total, and rules-aware natural 1/natural 20 presentation.
+- Added total-based visual grading after all ability, proficiency, form, feature, and minimum-roll modifiers, including a separate gold treatment for totals of 25 or more.
+- Put live HP, Temporary HP, AC, and Speed beside the persistent form portrait and removed the duplicate mobile Play metric row.
+- Reorganized Abilities & Features into `Use now`, `Resources left`, and expandable automatic/reference groups with explicit state labels.
+- Used tall mobile space for a larger form focal point while keeping task screens compact and preserving all saved data and game mechanics.
+
 ## v0.25.1
 
 - Moved the existing portrait and form chooser into a phone-only `Character & Form` disclosure, keeping the desktop presentation unchanged.

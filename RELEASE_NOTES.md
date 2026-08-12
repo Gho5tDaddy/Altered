@@ -1,3 +1,15 @@
+# Altered v0.26.5 release notes
+
+## Visible outcomes and transformation cockpit polish
+
+Roll results now appear in a fixed, animated overlay above navigation, so a save, skill, initiative, attack, spell, or healing result remains clear without scrolling back to the top. D20 tests show the kept die, final modifier source, form- or character-derived bonuses, Advantage or Disadvantage, minimum-roll effects, and final total. Natural 1 and natural 20 receive dramatic red and electric cyan-green treatments; non-natural totals of 25 or higher receive a separate gold exceptional-total treatment without being mislabeled as automatic success.
+
+The persistent form panel now uses its previously empty copy area for live HP, Temporary HP, Armor Class, and walking Speed on every focused screen. The mobile Play view removes the duplicate full statistic row and uses tall-screen space to make the form artwork and primary controls easier to see. Task screens keep a smaller portrait so their working controls remain close at hand.
+
+Abilities & Features now separates activated controls, remaining resources, and passive reference material. Plain-language guidance explains which buttons spend resources and which benefits Altered applies automatically; form traits, active overlays, and character references use compact expandable groups with explicit applied, conditional, and inactive labels.
+
+No rules-engine formulas, character schema, combat-state persistence, D&D Beyond import, export, private-pack, or standalone format changed.
+
 # Altered v0.26.4 release notes
 
 ## Runic druid icon and packaged-app verification

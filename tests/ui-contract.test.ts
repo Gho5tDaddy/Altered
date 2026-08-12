@@ -184,6 +184,38 @@ test('recent activity exposes a clear control that preserves non-log state',()=>
   assert.match(source,/Recent activity cleared\./);
 });
 
+test('roll outcomes remain visible, explain modifiers, and grade dramatic totals without changing rules',()=>{
+  const html=readFileSync('public/index.html','utf8');
+  const source=readFileSync('src/app.ts','utf8');
+  const styles=readFileSync('public/styles.css','utf8');
+  assert.match(html,/id="roll-toast"[^>]*role="status"[^>]*aria-live="polite"/);
+  assert.match(styles,/\.roll-toast\{[^}]*position:fixed[^}]*z-index:120/);
+  assert.match(source,/function showFloatingRoll\(/);
+  assert.match(source,/showFloatingRoll\(totalText,detail,title,presentation\)/);
+  assert.match(source,/Exceptional total · all bonuses included/);
+  assert.match(source,/total>=25/);
+  assert.match(source,/Natural 1 · lowest possible die/);
+  assert.match(source,/Natural 20 · highest possible die/);
+  assert.match(source,/const resolvedSource=modifierSource\?\?save\?\.source/);
+  assert.match(styles,/\.roll-toast\.tone-critical-failure/);
+  assert.match(styles,/\.roll-toast\.tone-critical-success/);
+  assert.match(styles,/\.roll-toast\.tone-exceptional/);
+});
+
+test('the focused workspace uses form-panel space for live stats and explains ability controls',()=>{
+  const html=readFileSync('public/index.html','utf8');
+  const source=readFileSync('src/app.ts','utf8');
+  const styles=readFileSync('public/styles.css','utf8');
+  for(const id of ['persistent-hp','persistent-temp','persistent-ac','persistent-speed'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(source,/#persistent-hp/);
+  assert.match(styles,/\.play-view \.metric-grid\{display:none\}/);
+  assert.match(html,/id="ability-actions-title">Use now/);
+  assert.match(html,/id="ability-resources-title">Resources left/);
+  assert.match(source,/What happens automatically\?/);
+  assert.match(source,/featureReferenceSection/);
+  assert.match(source,/Applied automatically/);
+});
+
 test('combat state and spell availability are explained before a click',()=>{
   const html=readFileSync('public/index.html','utf8');
   const source=readFileSync('src/app.ts','utf8');

@@ -40,7 +40,15 @@
       <aside class="persistent-form-visual" aria-label="Current form artwork">
         <div id="form-art" class="form-art" aria-live="polite"></div>
         <button id="open-persistent-form" class="persistent-form-copy" type="button">
-          <span id="persistent-form-state">Base Form</span><strong id="persistent-form-name">Base Form</strong><small>Open Forms &#8250;</small>
+          <span id="persistent-form-state" class="persistent-form-kicker">Base Form</span>
+          <strong id="persistent-form-name">Base Form</strong>
+          <span class="persistent-form-stats" aria-label="Live current form statistics">
+            <span><small>HP</small><b id="persistent-hp">0 / 0</b></span>
+            <span><small>Temp</small><b id="persistent-temp">0</b></span>
+            <span><small>AC</small><b id="persistent-ac">0</b></span>
+            <span><small>Speed</small><b id="persistent-speed">0 ft.</b></span>
+          </span>
+          <small class="persistent-form-open">Open Forms &#8250;</small>
         </button>
       </aside>
       <div class="workspace-stage">
@@ -131,9 +139,15 @@
       <section id="workspace-task" class="workspace-view task-view panel" data-workspace-view="task" aria-labelledby="task-view-title" hidden>
         <div class="workspace-heading"><div><span>Focused tool</span><h2 id="task-view-title" tabindex="-1">Actions</h2></div><button id="close-task-view" class="text-button" type="button">Back to Play</button></div>
         <section id="task-abilities" class="task-abilities" hidden>
-          <div class="section-title"><h2>Abilities &amp; resources</h2><span>Use and track</span></div>
-          <div id="quick-features" class="quick-features"></div>
-          <div id="resource-strip" class="resource-strip"></div>
+          <div class="ability-guide"><strong>Use abilities here</strong><span>Available buttons apply or spend an ability. Disabled buttons explain what is missing.</span></div>
+          <section class="ability-control-group" aria-labelledby="ability-actions-title">
+            <div class="ability-group-heading"><h3 id="ability-actions-title">Use now</h3><span>Tap an available ability</span></div>
+            <div id="quick-features" class="quick-features"></div>
+          </section>
+          <section class="ability-control-group" aria-labelledby="ability-resources-title">
+            <div class="ability-group-heading"><h3 id="ability-resources-title">Resources left</h3><span>Current / maximum</span></div>
+            <div id="resource-strip" class="resource-strip"></div>
+          </section>
         </section>
         <section id="active-effects" class="active-effects" aria-live="polite" hidden></section>
         <nav class="tabs" role="tablist" aria-label="Character sheet sections">
@@ -206,6 +220,13 @@
       <button id="nav-more" class="workspace-nav-button" type="button"><span aria-hidden="true">&#8943;</span>More</button>
     </nav>
   </div>
+
+  <output id="roll-toast" class="roll-toast" role="status" aria-live="polite" aria-atomic="true" hidden>
+    <span class="roll-toast-kicker">Roll result</span>
+    <strong id="roll-toast-title" class="roll-toast-title">Ready</strong>
+    <b id="roll-toast-total" class="roll-toast-total">&mdash;</b>
+    <span id="roll-toast-detail" class="roll-toast-detail"></span>
+  </output>
 
   <section id="walkthrough" class="walkthrough" role="dialog" aria-modal="false" aria-labelledby="walkthrough-title" hidden>
     <div class="walkthrough-card">
