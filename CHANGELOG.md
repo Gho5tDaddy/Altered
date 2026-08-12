@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.27.0
+
+- Added lazy-loaded PDF parsing and on-device OCR with editable, 2024-only review before character creation.
+- Routed exported D&D Beyond PDF filenames through the existing public structured-character import when an ID is available.
+- Added the same validation and confirmation stage to character JSON imports.
+- Moved executable action controls immediately below action headings and labeled attack buttons explicitly.
+- Added reusable battlefield-condition toggles, including Pack Tactics Advantage only after confirming an eligible ally within 5 feet.
+- Added both Rend → Roar and Roar → Rend Lion Multiattack choices and preserved per-component resolution.
+- Kept schema-v1 saves, existing JSON files, private packs, D&D Beyond imports, and combat-state persistence compatible.
+
 ## v0.26.6
 
 - Moved compact New Turn and End Turn controls into the persistent mobile form panel so they stay reachable on every focused screen.

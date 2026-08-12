@@ -1,3 +1,15 @@
+# Altered v0.27.0 release notes
+
+## Reviewed PDF/OCR imports and explicit conditional attacks
+
+Altered can now read character PDFs directly. It uses embedded fields and text first, then offers device-side OCR for scanned or flattened sheets. Every detected core value is shown in an editable review before import, 2024 rules must be confirmed, and uncertain spells, features, items, proficiencies, or transformations are never invented. A D&D Beyond character ID found in an exported PDF filename still triggers the more complete public structured-sheet import. PDF libraries load only when needed, preserving normal startup performance.
+
+Character JSON now follows the same validate, review, warn, and confirm flow instead of changing the active character immediately. Existing schema-v1 JSON remains compatible.
+
+Attack and use buttons now appear immediately below each action heading. Conditional attack prerequisites use explicit checkboxes: Pack Tactics asks the player to confirm an eligible conscious ally within 5 feet before applying Advantage and names the source in the roll breakdown. The mechanism also handles current target- or line-of-sight-dependent Disadvantage conditions without guessing battlefield state.
+
+Lion Multiattack now exposes all legal 2024 sequences: Rend → Rend, Rend → Roar, and Roar → Rend. Each selected sequence resolves in order with separate attack rolls or saving throws.
+
 # Altered v0.26.6 release notes
 
 ## Always-visible turns and resumable character setup

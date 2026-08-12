@@ -120,7 +120,7 @@ test('SRD replacement Multiattack produces a legal selectable variant instead of
   });
   const multi=lion.actions.find(action=>action.type==='multiattack');assert.equal(multi?.type,'multiattack');if(multi?.type!=='multiattack')return;
   assert.deepEqual(multi.sequence,['rend','rend']);
-  assert.deepEqual(multi.variants,[{id:'replace-with-roar',label:'Rend + Roar',sequence:['rend','roar']}]);
+  assert.deepEqual(multi.variants,[{id:'replace-with-roar',label:'Rend → Roar',sequence:['rend','roar']},{id:'roar-first',label:'Roar → Rend',sequence:['roar','rend']}]);
 });
 
 test('SRD save normalization preserves half-damage-on-success timing',()=>{

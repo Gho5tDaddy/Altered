@@ -1,6 +1,6 @@
 {
   "name": "altered-rules-engine",
-  "version": "0.26.6",
+  "version": "0.27.0",
   "private": true,
   "type": "commonjs",
   "scripts": {
@@ -18,6 +18,11 @@
     "audit": "npm run verify && npm run browser:audit && node scripts/audit.mjs"
   },
   "devDependencies": {
+    "esbuild": "^0.25.9",
     "typescript": "5.8.3"
+  },
+  "dependencies": {
+    "pdfjs-dist": "5.4.54",
+    "tesseract.js": "^6.0.1"
   }
 }

@@ -187,7 +187,11 @@ function multiattackAction(raw:Record<string,unknown>,actions:Exclude<CreatureAc
   }
   if(sequence.length===0)return undefined;
   const replacement=actions.find(action=>replacementClause.toLowerCase().includes(action.name.toLowerCase()));
-  const variants=replacement&&sequence.length>0&&!sequence.includes(replacement.id)?[{id:`replace-with-${replacement.id}`,label:`${actions.find(action=>action.id===sequence[0])?.name??sequence[0]} + ${replacement.name}`,sequence:[...sequence.slice(0,-1),replacement.id]}]:undefined;
+  const baseName=actions.find(action=>action.id===sequence[0])?.name??sequence[0];
+  const variants=replacement&&sequence.length>0&&!sequence.includes(replacement.id)?[
+    {id:`replace-with-${replacement.id}`,label:`${baseName} → ${replacement.name}`,sequence:[...sequence.slice(0,-1),replacement.id]},
+    {id:`${replacement.id}-first`,label:`${replacement.name} → ${baseName}`,sequence:[replacement.id,...sequence.slice(0,-1)]},
+  ]:undefined;
   return {id:slug(string(raw.name)||'Multiattack'),name:string(raw.name)||'Multiattack',type:'multiattack',cost:'action',sequence,...(variants?{variants}:{}),notes:description.slice(0,500)};
 }
 

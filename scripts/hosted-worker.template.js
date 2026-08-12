@@ -4,6 +4,7 @@ const ASSET_LINKS=__ALTERED_ASSET_LINKS__;
 const SERVICE_WORKER=__ALTERED_SERVICE_WORKER__;
 const ICONS=__ALTERED_ICONS__;
 const FORM_IMAGES=__ALTERED_FORM_IMAGES__;
+const TOOL_ASSETS=__ALTERED_TOOL_ASSETS__;
 const LOGIN_PAGE=`<!doctype html>
 <html lang="en">
 <head>
@@ -46,7 +47,7 @@ const srdDomains=Object.freeze({
   rules:56,classes:24,species:9,backgrounds:4,feats:17,items:203,magicitems:757,
   weapons:38,armor:13,creatures:331,spells:339,weaponproperties:17,
 });
-const contentSecurityPolicy="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+const contentSecurityPolicy="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 const apiWindowMs=10*60*1000;
 
 function headers(contentType,cacheControl='no-cache'){
@@ -260,6 +261,10 @@ export default {
     if(url.pathname in FORM_IMAGES){
       const image=FORM_IMAGES[url.pathname];
       return new Response(request.method==='HEAD'?null:decodeBase64(image.data),{headers:headers(image.type,'public, max-age=86400')});
+    }
+    if(url.pathname in TOOL_ASSETS){
+      const asset=TOOL_ASSETS[url.pathname];
+      return new Response(request.method==='HEAD'?null:decodeBase64(asset.data),{headers:headers(asset.type,'public, max-age=31536000, immutable')});
     }
     if(url.pathname!=='/'&&url.pathname!=='/index.html')return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
     if(!authenticatedUser(request))return new Response(request.method==='HEAD'?null:LOGIN_PAGE,{headers:headers('text/html; charset=utf-8','private, no-store')});
