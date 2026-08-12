@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.24.5
+
+- Replaced the clipped mobile selected-form thumbnail with a full-frame portrait preview that behaves consistently at phone and desktop sizes.
+- Added an explicit `FORM PREVIEW` state before transformation while preserving `ACTIVE FORM` and its continuous pulse only after the transformation succeeds.
+- Kept form selection, action economy, save data, imports, exports, and transformation rules unchanged.
+
 ## v0.24.4
 
 - Replaced the tall phone header with one accessible Menu disclosure while preserving every existing account, Help, import, export, and settings control.

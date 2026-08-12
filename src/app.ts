@@ -273,15 +273,17 @@ function renderArt(){
   const aura=activeAuraVisual();const active=aura.replacement;
   const preview=!aura.active?currentOption():undefined;
   const activeForm=creatureById(active?.formId);
-  const mainTarget=activeForm?{targetId:`form:${activeForm.id}`,label:activeForm.name,fallbackKey:activeForm.artKey}:{targetId:'base',label:character.name,fallbackKey:'base'};
-  container.classList.toggle('is-active',aura.active);container.classList.toggle('is-base',!aura.active);
+  const previewForm=preview&&preview.profile!=='base'&&preview.formId?creatureById(preview.formId):undefined;
+  const displayedForm=activeForm??previewForm;
+  const previewing=!aura.active&&Boolean(previewForm);
+  const mainTarget=displayedForm?{targetId:`form:${displayedForm.id}`,label:displayedForm.name,fallbackKey:displayedForm.artKey}:{targetId:'base',label:character.name,fallbackKey:'base'};
+  container.classList.toggle('is-active',aura.active);container.classList.toggle('is-preview',previewing);container.classList.toggle('is-base',!aura.active&&!previewing);
   appendPortrait(container,mainTarget.targetId,mainTarget.fallbackKey,mainTarget.label);
   if(aura.active){const pulse=document.createElement('div');pulse.className='form-aura-pulse';pulse.setAttribute('aria-hidden','true');container.append(pulse);}
-  container.append(text('div',aura.active?'ACTIVE FORM':'BASE FORM','form-state '+(aura.active?'active':'base')));
-  container.append(text('div',aura.label,'art-label'));
-  if(!aura.active&&preview&&preview.profile!=='base'&&preview.formId){
-    const form=creatureById(preview.formId);if(form){const chip=document.createElement('div');chip.className='form-preview';const icon=document.createElement('div');icon.className='form-preview-icon';appendPortrait(icon,`form:${form.id}`,form.artKey,form.name,'preview-art');const copy=document.createElement('div');copy.append(text('span','Selected form'),text('strong',preview.label));chip.append(icon,copy);container.append(chip);}
-  }
+  const stateLabel=aura.active?'ACTIVE FORM':previewing?'FORM PREVIEW':'BASE FORM';
+  const stateClass=aura.active?'active':previewing?'preview':'base';
+  container.append(text('div',stateLabel,`form-state ${stateClass}`));
+  container.append(text('div',aura.active?aura.label:previewing?preview?.label??mainTarget.label:character.name,'art-label'));
   const target=artTargetInfo();$('#art-target-label').textContent=`Artwork target: ${target.label}`;
   const reset=$<HTMLButtonElement>('#reset-art');const cached=artOverrideCache.get(artCacheKey(target.targetId));reset.disabled=!cached;
 }

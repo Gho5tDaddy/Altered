@@ -1,6 +1,12 @@
-# Altered v0.24.4 audit gap register
+# Altered v0.24.5 audit gap register
 
 This register distinguishes an incorrect result from a deliberately conditional or reference-only result. Altered must never present a reference-only mechanic as calculated.
+
+## Resolved in v0.24.5
+
+| Finding | Severity | Resolution | Regression evidence |
+|---|---:|---|---|
+| Selecting a creature before transformation squeezed a second image over the Base Form portrait on narrow screens | High | Reused the full portrait frame for selected-form preview, labeled it separately from active state, and removed the overflowing miniature overlay | 390 × 844 and 1440 × 900 live viewport metrics plus UI contract tests |
 
 ## Resolved in v0.24.4
 

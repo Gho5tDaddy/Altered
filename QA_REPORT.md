@@ -1,4 +1,11 @@
-# Altered v0.24.4 QA report
+# Altered v0.24.5 QA report
+
+## v0.24.5 form-preview verification
+
+- Selecting Dire Wolf from Base Form replaces the portrait at full frame and displays `FORM PREVIEW`; no legacy miniature preview element remains.
+- The preview does not activate the transformation aura. After Transform succeeds, the same portrait displays `ACTIVE FORM` with one persistent aura pulse.
+- The audited 390 × 844 phone and 1440 × 900 desktop layouts have no page-level horizontal overflow and retain cover-cropped, undistorted artwork.
+- Strict TypeScript checking, clean build, the complete automated suite, exact-worker browser audit, and generated audit evidence pass.
 
 ## v0.24.4 focused-dashboard verification
 

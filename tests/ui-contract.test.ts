@@ -56,10 +56,14 @@ test('form browsing and visual statuses explain availability without changing fo
   assert.match(source,/o\.id===activeId\?' · Active'/);
   assert.match(source,/statusChip\('selected'\)/);
   assert.match(source,/image\.loading='lazy'/);
+  assert.match(source,/const displayedForm=activeForm\?\?previewForm/);
+  assert.match(source,/previewing\?'FORM PREVIEW':'BASE FORM'/);
+  assert.ok(!source.includes("chip.className='form-preview'"),'selected creature art must use the full portrait frame on narrow layouts');
   for(const state of ['available','active','inactive','locked','unavailable','requirements','selected','favorite','new','importing','loading','success','warning','error'])assert.match(source,new RegExp(`${state}:\\{icon:`));
   assert.match(styles,/\.ui-status\.available/);
   assert.match(styles,/\.ui-status\.locked/);
-  assert.match(styles,/\.main-form-art img,.preview-art img/);
+  assert.match(styles,/\.main-form-art img\{/);
+  assert.match(styles,/\.form-art\.is-preview/);
   assert.match(styles,/\.top-actions\{width:100%;margin-left:0;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(styles,/\.help-topic summary:focus-visible/);
 });

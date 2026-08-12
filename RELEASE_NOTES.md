@@ -1,4 +1,10 @@
-# Altered v0.24.4 release notes
+# Altered v0.24.5 release notes
+
+Selecting a beast now replaces the Base Form portrait with a full-frame preview instead of squeezing a second image into the portrait card. The portrait is labeled `FORM PREVIEW` until Transform succeeds, then changes to `ACTIVE FORM` and starts the existing continuous form aura.
+
+The correction uses the existing responsive portrait component and is verified at both 390 × 844 phone and 1440 × 900 desktop dimensions, so it applies equally to Android, Windows, and macOS browsers. No gameplay rule, transformation state, action economy, save schema, character import/export format, or private-pack format changed.
+
+## Previous v0.24.4 notes
 
 The phone dashboard now prioritizes the character and turn controls. Secondary account and application commands live behind one labeled, keyboard-accessible Menu button, reducing the phone header from roughly 128 pixels to 44 pixels in the audited 390 Ã— 844 layout. Action economy, quick features, and resources can no longer collapse into bare scrollbar tracks, and the short tab guidance stays to one line so the first actual action appears sooner.
 

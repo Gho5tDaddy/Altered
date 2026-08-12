@@ -12,7 +12,7 @@ Installed copies open like an app and update from the same secure hosted release
 
 ## Downloadable offline app
 
-Extract `Altered-v0.24.4-cross-platform.zip`, then open `Altered-v0.24.4.html` in a current browser. The file is self-contained and includes Ferocitus, the rules engine, Help, and all six built-in form images.
+Extract `Altered-v0.24.5-cross-platform.zip`, then open `Altered-v0.24.5.html` in a current browser. The file is self-contained and includes Ferocitus, the rules engine, Help, and all six built-in form images.
 
 The offline file works on Android, Windows, and macOS, but direct D&D Beyond fetches and the live SRD catalog require the hosted app. An Altered JSON backup can be imported offline.
 
