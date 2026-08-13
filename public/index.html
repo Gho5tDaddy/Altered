@@ -182,6 +182,28 @@
           <button id="more-settings" class="button secondary" type="button">Settings</button>
         </div>
         <aside class="side-column">
+        <details class="panel dashboard-drawer customize-drawer" name="more-controls" open>
+          <summary><span>Customize</span><small>Artwork &amp; homebrew</small></summary>
+          <div class="drawer-content customize-content">
+            <section class="customize-group" aria-labelledby="customize-art-title">
+              <div><strong id="customize-art-title">Artwork</strong><small id="more-art-target">Character and form images stay on this device.</small></div>
+              <div class="customize-actions">
+                <label class="button secondary file-button">Upload Character Image<input id="character-art-file" type="file" accept="image/*"></label>
+                <label class="button secondary file-button">Upload Current Form Image<input id="current-form-art-file" type="file" accept="image/*"></label>
+                <button id="more-reset-art" class="button secondary" type="button">Reset Current Image</button>
+              </div>
+            </section>
+            <section class="customize-group" aria-labelledby="customize-homebrew-title">
+              <div><strong id="customize-homebrew-title">Homebrew &amp; private mechanics</strong><small>Create local, validated additions without editing JSON.</small></div>
+              <div class="customize-actions">
+                <button id="create-homebrew-ability" class="button primary" type="button">Create Ability or Feature</button>
+                <button id="create-homebrew-transformation" class="button secondary" type="button">Create Transformation</button>
+                <button id="manage-private-content" class="button secondary" type="button">Manage Private Content</button>
+              </div>
+            </section>
+          </div>
+        </details>
+
         <details class="panel dashboard-drawer" name="more-controls">
           <summary><span>Damage & Healing</span><small>Adjust vitality</small></summary>
           <div class="drawer-content">
@@ -302,7 +324,11 @@
         </details>
         <details class="help-topic" data-help-keywords="images artwork upload crop reset portrait lazy">
           <summary><span aria-hidden="true">▣</span> Images</summary>
-          <p>The current form artwork remains visible on every workspace and grows while browsing Forms. Uploads are cropped without distortion, optimized locally, and stored only on this device. Reset Art restores the built-in portrait.</p>
+          <p>Open <strong>More → Customize</strong> to upload a character portrait or separate artwork for the selected or active form. Images are cropped without distortion, optimized locally, and stored only on this device. Reset Current Image restores the built-in portrait.</p>
+        </details>
+        <details class="help-topic" data-help-keywords="homebrew custom private ability feature transformation create manual">
+          <summary><span aria-hidden="true">+</span> Homebrew and custom abilities</summary>
+          <p>Open <strong>More → Customize</strong>. Create Ability or Feature handles reminders, conditional action buttons, Speed bonuses, resistances, immunities, and Armor Class formulas. Create Transformation handles forms and activated states. Manage Private Content lets you export or remove anything you created.</p>
         </details>
         <details class="help-topic" data-help-keywords="settings aura motion catalog">
           <summary><span aria-hidden="true">⚙</span> Settings</summary>
@@ -430,10 +456,10 @@
   <dialog id="private-mechanics-dialog" class="wide-dialog" aria-labelledby="private-mechanics-title">
     <form id="private-mechanics-form" class="dialog-card private-mechanics-card">
       <div class="section-title"><h2 id="private-mechanics-title">Complete Private Mechanics</h2><button id="close-private-mechanics" class="text-button" type="button">Close</button></div>
-      <p class="import-intro">Use your authorized D&amp;D Beyond page as the reference. Enter a short mechanical reminder—not copied descriptions. Altered never requests your D&amp;D Beyond password or cookies.</p>
+      <p id="private-mechanics-intro" class="import-intro">Use your authorized D&amp;D Beyond page as the reference. Enter a short mechanical reminder—not copied descriptions. Altered never requests your D&amp;D Beyond password or cookies.</p>
       <div class="private-mechanics-source"><span id="private-mechanics-character"></span><a id="private-mechanics-source-link" href="https://www.dndbeyond.com/characters" target="_blank" rel="noopener noreferrer">Open character in D&amp;D Beyond</a></div>
       <div class="builder-grid private-mechanics-grid">
-        <div class="builder-wide"><label for="private-mechanic-need">Mechanic to complete</label><select id="private-mechanic-need"></select><small id="private-mechanic-detail" class="source-note"></small></div>
+        <div id="private-mechanic-need-field" class="builder-wide"><label for="private-mechanic-need">Mechanic to complete</label><select id="private-mechanic-need"></select><small id="private-mechanic-detail" class="source-note"></small></div>
         <div><label for="private-mechanic-name">Display name</label><input id="private-mechanic-name" required maxlength="160"></div>
         <div><label for="private-mechanic-mode">Treatment</label><select id="private-mechanic-mode"><option value="reference">Reminder only</option><option value="conditional">Conditional mechanic</option><option value="speed">Always-on Speed bonus</option><option value="resistance">Always-on damage resistance</option><option value="immunity">Always-on damage immunity</option><option value="ac-formula">Armor Class formula</option></select></div>
         <div class="builder-wide"><label for="private-mechanic-summary">Short mechanical reminder</label><textarea id="private-mechanic-summary" required maxlength="500" rows="3" placeholder="Describe only what you need at the table, in your own words."></textarea></div>
@@ -517,7 +543,7 @@
         <div id="content-pack-list" class="content-pack-list"></div>
         <div class="catalog-health">
           <div class="section-title"><h3>Legal SRD support catalog</h3><button id="refresh-srd-catalog" class="button compact secondary" type="button">Check now</button></div>
-          <p id="srd-catalog-status" role="status" aria-live="polite">Checking the live legal SRD support catalog...</p>
+          <p id="srd-catalog-status" class="catalog-check-result checking" role="status" aria-live="polite">Checking the live legal SRD support catalog...</p>
         </div>
       </div>
     </div>

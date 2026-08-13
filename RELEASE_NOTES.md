@@ -1,3 +1,13 @@
+# Altered v0.27.1 release notes
+
+## Visible customization and verifiable SRD checks
+
+More now has one clear Customize drawer. Users can upload a character portrait, upload separate artwork for the selected or active form, restore the current built-in image, create a private ability or feature without JSON, create a private transformation, and manage/export/remove installed private content.
+
+The manual ability editor extends the existing validated schema-v1 private-pack system. It supports reference reminders, conditional activated controls, Speed bonuses, resistances, immunities, and Armor Class formulas. Activated private abilities now appear under Abilities, spend the selected part of the action economy, and present their result clearly. Saved characters, D&D Beyond imports, PDF/JSON imports, existing private packs, combat state, and artwork remain compatible.
+
+The live SRD catalog button now shows an unmistakable Checking state, disables duplicate requests, and finishes with Current and verified, Needs review, or an explained offline error plus a timestamp.
+
 # Altered v0.27.0 release notes
 
 ## Reviewed PDF/OCR imports and explicit conditional attacks

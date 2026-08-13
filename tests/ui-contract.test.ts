@@ -273,6 +273,13 @@ test('PWA manifest has a stable identity, scope, and description',()=>{
   assert.ok(typeof manifest.description==='string'&&manifest.description.length>20);
 });
 
+test('More exposes local artwork and homebrew creation without requiring JSON',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');
+  for(const id of ['character-art-file','current-form-art-file','more-reset-art','create-homebrew-ability','create-homebrew-transformation','manage-private-content'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(html,/More → Customize/);assert.match(html,/Create Ability or Feature/);assert.match(source,/function openManualPrivateMechanic/);assert.match(source,/User-created homebrew mechanic/);
+  assert.match(source,/entry\.id\.startsWith\('private-'\)&&entry\.activation/);assert.match(source,/bindArtworkInput\('#character-art-file'/);assert.match(source,/bindArtworkInput\('#current-form-art-file'/);
+});
+
 test('service worker never caches private or changing API responses',()=>{
   const source=readFileSync('public/sw.js','utf8');
   assert.match(source,/if\(url\.pathname\.startsWith\('\/api\/'\)\)return/);

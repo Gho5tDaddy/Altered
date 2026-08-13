@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.27.1
+
+- Added an obvious `More → Customize` workspace for character artwork, current-form artwork, private abilities, and private transformations.
+- Reused the existing optimized local artwork store and schema-v1 private-pack system; no saved-character or import format changed.
+- Added a guided manual ability/feature creator for reminders, conditional activated controls, Speed, resistance, immunity, and Armor Class formulas.
+- Made activated private abilities spend their selected Action, Bonus Action, Reaction, or Magic Action and show a clear result.
+- Made the live SRD check visibly progress from Checking to Current, Needs review, or an explained offline error with a check timestamp.
+
 ## v0.27.0
 
 - Added lazy-loaded PDF parsing and on-device OCR with editable, 2024-only review before character creation.

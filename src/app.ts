@@ -81,12 +81,14 @@ let pendingActiveSnapshot:Partial<GameState>['activeTransform']|undefined;
 let invalidPackCount=0;
 let pendingDdbImport:DdbImportReport|null=null;
 let confirmedDdbSourceId:string|null=null;
+let manualPrivateMechanic=false;
 let pendingJsonImport:Character|null=null;
 let pendingPdfFile:File|null=null;
 let pendingPdfDraft:PdfCharacterDraft|null=null;
 let deletedCharacterIds=new Set<string>();
 let srdCatalogStatus:SrdCatalogStatus|null=null;
 let srdCatalogMessage='Checking the live legal SRD support catalog...';
+let srdCatalogChecking=false;
 let formSearch='';
 let formFilter='all';
 type WorkspaceView='play'|'forms'|'task'|'more';
@@ -293,6 +295,11 @@ function artTargetInfo(){
   if(form)return {targetId:`form:${form.id}`,label:form.name,fallbackKey:form.artKey,option};
   return {targetId:'base',label:character.name,fallbackKey:'base',option};
 }
+function currentFormArtTarget(){const target=artTargetInfo();return target.targetId.startsWith('form:')?target:null;}
+async function saveArtwork(file:File,target:{targetId:string;label:string}){
+  notify(`Optimizing artwork for ${target.label}…`);const optimized=await optimizePortrait(file);await saveArtOverride(character.id,target.targetId,optimized);artOverrideCache.set(artCacheKey(target.targetId),optimized);notify(`Custom artwork saved for ${target.label}.`);renderArt();
+}
+async function resetArtwork(target:{targetId:string;label:string}){await removeArtOverride(character.id,target.targetId);artOverrideCache.set(artCacheKey(target.targetId),undefined);notify(`Default artwork restored for ${target.label}.`);renderArt();}
 function queueArtLoad(targetId:string){
   const key=artCacheKey(targetId);if(artOverrideCache.has(key)||artLoading.has(key))return;artLoading.add(key);
   void loadArtOverride(character.id,targetId).then(value=>{artOverrideCache.set(key,value);artLoading.delete(key);if(artTargetInfo().targetId===targetId)renderArt();}).catch(()=>{artOverrideCache.set(key,undefined);artLoading.delete(key);});
@@ -334,6 +341,7 @@ function renderArt(){
   $('#persistent-form-state').textContent=stateLabel;$('#persistent-form-name').textContent=displayLabel;
   const target=artTargetInfo();$('#art-target-label').textContent=`Artwork target: ${target.label}`;
   const reset=$<HTMLButtonElement>('#reset-art');const cached=artOverrideCache.get(artCacheKey(target.targetId));reset.disabled=!cached;
+  const currentForm=currentFormArtTarget();$('#more-art-target').textContent=currentForm?`Character: ${character.name} · current form: ${currentForm.label}`:`Character: ${character.name} · choose or activate a form before adding separate form art.`;const formInput=$<HTMLInputElement>('#current-form-art-file');formInput.disabled=!currentForm;formInput.parentElement?.classList.toggle('is-disabled',!currentForm);formInput.parentElement?.setAttribute('title',currentForm?`Upload artwork for ${currentForm.label}`:'Choose or activate a form first');$<HTMLButtonElement>('#more-reset-art').disabled=!cached;
 }
 function auraPaletteClass(){
   const active=state.activeTransform?.option;
@@ -386,7 +394,7 @@ function renderSettings(){
   $<HTMLInputElement>('#magic-effects-enabled').checked=magicEffectsEnabled;$<HTMLInputElement>('#reduce-motion').checked=reduceMotion;
   $('#content-registry-summary').textContent=`${auditSnapshot.rules} source-ledgered rules cover ${auditSnapshot.functions} state-changing functions (${auditSnapshot.counts.calculated} calculated, ${auditSnapshot.counts.conditional} conditional). ${registrySnapshot.packs.length} versioned built-in packs plus ${installedPacks.length} private local packs are verified through ${registrySnapshot.verifiedThrough}.`;
   renderContentRegistry($('#content-pack-list'));
-  $('#srd-catalog-status').textContent=srdCatalogStatus?`${srdCatalogStatus.healthy?'Current':'Needs review'} · ${srdCatalogStatus.recordCount.toLocaleString()} legal SRD 5.2.1 support records · checked ${new Date(srdCatalogStatus.checkedAt).toLocaleString()}. The live catalog supplies relevant import data; validated built-in rules remain available offline.`:srdCatalogMessage;
+  const catalog=$('#srd-catalog-status');const state=srdCatalogChecking?'checking':srdCatalogStatus?.healthy?'success':srdCatalogStatus?'warning':srdCatalogMessage.includes('unavailable')?'error':'idle';catalog.className=`catalog-check-result ${state}`;catalog.textContent=srdCatalogChecking?'Checking the live legal SRD 5.2.1 catalog now…':srdCatalogStatus?`${srdCatalogStatus.healthy?'✓ Current and verified':'⚠ Needs review'} · ${srdCatalogStatus.recordCount.toLocaleString()} legal SRD 5.2.1 support records · checked ${new Date(srdCatalogStatus.checkedAt).toLocaleString()}. The live catalog supplies relevant import data; validated built-in rules remain available offline.`:srdCatalogMessage;const check=$<HTMLButtonElement>('#refresh-srd-catalog');check.disabled=srdCatalogChecking;check.textContent=srdCatalogChecking?'Checking…':srdCatalogStatus?'Check Again':'Check Now';
 }
 function slug(value:string){return value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,70)||'private-content';}
 function downloadJson(data:unknown,filename:string){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=filename;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
@@ -479,6 +487,7 @@ function privateMechanicMode(feature:OwnedContentPack['content']['features'][num
   if(feature?.grants?.speedBonus!==undefined)return 'speed';if(feature?.grants?.resistances?.length)return 'resistance';if(feature?.grants?.immunities?.length)return 'immunity';if(feature?.grants?.acFormula)return 'ac-formula';return feature?.automation==='conditional'?'conditional':'reference';
 }
 function syncPrivateMechanicFields(){
+  if(manualPrivateMechanic)return;
   if(!pendingDdbImport)return;const need=pendingDdbImport.setupNeeds.find(entry=>entry.id===$<HTMLSelectElement>('#private-mechanic-need').value);if(!need)return;
   const pack=installedPacks.find(entry=>entry.metadata.id===ddbSetupPackId(pendingDdbImport!.sourceId,need.id));const feature=pack?.content.features[0];
   $('#private-mechanic-detail').textContent=need.detail;$<HTMLInputElement>('#private-mechanic-name').value=feature?.name??need.label;$<HTMLTextAreaElement>('#private-mechanic-summary').value=feature?.summary??'';
@@ -490,16 +499,25 @@ function syncPrivateMechanicMode(){
   const mode=$<HTMLSelectElement>('#private-mechanic-mode').value;$('#private-mechanic-speed-fields').hidden=mode!=='speed';$('#private-mechanic-damage-fields').hidden=mode!=='resistance'&&mode!=='immunity';$('#private-mechanic-ac-fields').hidden=mode!=='ac-formula';
 }
 function openPrivateMechanics(needId?:string){
+  manualPrivateMechanic=false;
   if(!pendingDdbImport||pendingDdbImport.setupNeeds.length===0){setImportStatus('Fetch a D&D Beyond character with private mechanics to complete first.');return;}
   const select=$<HTMLSelectElement>('#private-mechanic-need');clear(select);for(const need of pendingDdbImport.setupNeeds){const option=document.createElement('option');option.value=need.id;const done=installedPacks.some(pack=>pack.metadata.id===ddbSetupPackId(pendingDdbImport!.sourceId,need.id));option.textContent=`${need.label}${done?' · Completed':''}`;select.append(option);}select.value=needId&&pendingDdbImport.setupNeeds.some(need=>need.id===needId)?needId:pendingDdbImport.setupNeeds.find(need=>!installedPacks.some(pack=>pack.metadata.id===ddbSetupPackId(pendingDdbImport!.sourceId,need.id)))?.id??pendingDdbImport.setupNeeds[0]!.id;
-  $('#private-mechanics-character').textContent=`${pendingDdbImport.character.name} · DDB ${pendingDdbImport.sourceId}`;const source=$<HTMLAnchorElement>('#private-mechanics-source-link');source.href=`https://www.dndbeyond.com/characters/${pendingDdbImport.sourceId}`;$('#private-mechanics-status').textContent='Choose how Altered should treat this mechanic. Nothing is saved until you press Save Private Mechanic.';syncPrivateMechanicFields();$<HTMLDialogElement>('#private-mechanics-dialog').showModal();
+  $('#private-mechanics-title').textContent='Complete Private Mechanics';$('#private-mechanics-intro').textContent='Use your authorized D&D Beyond page as the reference. Enter a short mechanical reminder—not copied descriptions. Altered never requests your D&D Beyond password or cookies.';$('#private-mechanic-need-field').hidden=false;$('#private-mechanics-character').textContent=`${pendingDdbImport.character.name} · DDB ${pendingDdbImport.sourceId}`;const source=$<HTMLAnchorElement>('#private-mechanics-source-link');source.hidden=false;source.href=`https://www.dndbeyond.com/characters/${pendingDdbImport.sourceId}`;$<HTMLButtonElement>('#private-mechanic-transformation').textContent='Create Activated Form';$('#private-mechanics-status').textContent='Choose how Altered should treat this mechanic. Nothing is saved until you press Save Private Mechanic.';syncPrivateMechanicFields();$<HTMLDialogElement>('#private-mechanics-dialog').showModal();
+}
+function openManualPrivateMechanic(){
+  manualPrivateMechanic=true;$('#private-mechanics-title').textContent='Create Ability or Feature';$('#private-mechanics-intro').textContent='Create a concise homebrew or private mechanic for your current character. Altered validates it, stores it only on this device, and includes it in private-content exports.';$('#private-mechanic-need-field').hidden=true;$('#private-mechanics-character').textContent=`For ${character.name} · stored privately on this device`;const source=$<HTMLAnchorElement>('#private-mechanics-source-link');source.hidden=true;
+  const select=$<HTMLSelectElement>('#private-mechanic-need');clear(select);const option=document.createElement('option');option.value='manual';option.textContent='New homebrew ability';select.append(option);
+  $<HTMLInputElement>('#private-mechanic-name').value='';$<HTMLTextAreaElement>('#private-mechanic-summary').value='';$<HTMLSelectElement>('#private-mechanic-mode').value='conditional';$<HTMLSelectElement>('#private-mechanic-activation').value='action';$<HTMLInputElement>('#private-mechanic-wildshape').checked=true;$<HTMLInputElement>('#private-mechanic-speed').value='10';$<HTMLSelectElement>('#private-mechanic-damage').value='Acid';$<HTMLInputElement>('#private-mechanic-ac-base').value='10';$<HTMLSelectElement>('#private-mechanic-ac-ability-one').value='';$<HTMLSelectElement>('#private-mechanic-ac-ability-two').value='';$<HTMLButtonElement>('#private-mechanic-transformation').textContent='Create Transformation Instead';
+  syncPrivateMechanicMode();$('#private-mechanics-status').textContent='Choose Reminder only for reference text, Conditional for a use button, or a calculated option for Speed, resistance, immunity, or Armor Class. Nothing is saved until you press Save Private Mechanic.';$<HTMLDialogElement>('#private-mechanics-dialog').showModal();$<HTMLInputElement>('#private-mechanic-name').focus();
 }
 async function savePrivateMechanic(){
-  if(!pendingDdbImport)throw new Error('Fetch and review a D&D Beyond character first.');const need=pendingDdbImport.setupNeeds.find(entry=>entry.id===$<HTMLSelectElement>('#private-mechanic-need').value);if(!need)throw new Error('Choose a mechanic to complete.');
+  const report=manualPrivateMechanic?null:pendingDdbImport;if(!manualPrivateMechanic&&!report)throw new Error('Fetch and review a D&D Beyond character first.');const need=report?.setupNeeds.find(entry=>entry.id===$<HTMLSelectElement>('#private-mechanic-need').value);if(!manualPrivateMechanic&&!need)throw new Error('Choose a mechanic to complete.');
   const name=$<HTMLInputElement>('#private-mechanic-name').value.trim(),summary=$<HTMLTextAreaElement>('#private-mechanic-summary').value.trim();if(!name||!summary)throw new Error('Display name and a short mechanical reminder are required.');
   const mode=$<HTMLSelectElement>('#private-mechanic-mode').value as 'reference'|'conditional'|'speed'|'resistance'|'immunity'|'ac-formula';const abilityValues=[$<HTMLSelectElement>('#private-mechanic-ac-ability-one').value,$<HTMLSelectElement>('#private-mechanic-ac-ability-two').value].filter((value,index,all):value is Ability=>Boolean(value)&&all.indexOf(value)===index) as Ability[];
-  const pack=privateMechanicPack(pendingDdbImport.character,{packId:ddbSetupPackId(pendingDdbImport.sourceId,need.id),name,source:`D&D Beyond character ${pendingDdbImport.sourceId} — user-confirmed`,summary,mode,retainInWildShape:$<HTMLInputElement>('#private-mechanic-wildshape').checked,activation:$<HTMLSelectElement>('#private-mechanic-activation').value as TransformationOption['actionCost'],speedBonus:Number($<HTMLInputElement>('#private-mechanic-speed').value),damageType:$<HTMLSelectElement>('#private-mechanic-damage').value as DamageType,acBase:Number($<HTMLInputElement>('#private-mechanic-ac-base').value),acAbilities:abilityValues});
-  await installExtensionPack(pack);installedPacks=await loadValidatedInstalledPacks();if(baseCharacter.id===pendingDdbImport.character.id)rebuildEffectiveCharacterLibrary(true);renderInstalledPacks();renderDdbReview(pendingDdbImport);renderSettings();render();$('#private-mechanics-status').textContent=`${name} saved privately. It will be reapplied automatically whenever this character is imported on this device.`;syncPrivateMechanicFields();
+  const target=report?.character??character;const packId=report&&need?ddbSetupPackId(report.sourceId,need.id):`manual-${slug(target.id)}-${slug(name)}-${Date.now().toString(36)}`;const source=report?`D&D Beyond character ${report.sourceId} — user-confirmed`:'User-created homebrew mechanic';
+  const pack=privateMechanicPack(target,{packId,name,source,summary,mode,retainInWildShape:$<HTMLInputElement>('#private-mechanic-wildshape').checked,activation:$<HTMLSelectElement>('#private-mechanic-activation').value as TransformationOption['actionCost'],speedBonus:Number($<HTMLInputElement>('#private-mechanic-speed').value),damageType:$<HTMLSelectElement>('#private-mechanic-damage').value as DamageType,acBase:Number($<HTMLInputElement>('#private-mechanic-ac-base').value),acAbilities:abilityValues});
+  if(manualPrivateMechanic){await installAndApplyPack(pack);renderSettings();$<HTMLDialogElement>('#private-mechanics-dialog').close();notify(`${name} created and added to ${character.name}.`);return;}
+  await installExtensionPack(pack);installedPacks=await loadValidatedInstalledPacks();if(report&&baseCharacter.id===report.character.id)rebuildEffectiveCharacterLibrary(true);renderInstalledPacks();if(report)renderDdbReview(report);renderSettings();render();$('#private-mechanics-status').textContent=`${name} saved privately. It will be reapplied automatically whenever this character is imported on this device.`;syncPrivateMechanicFields();
 }
 async function loadSrdCreature(name:string){
   const params=new URLSearchParams({domain:'creatures',q:name,exact:'1'});
@@ -509,13 +527,13 @@ async function loadSrdCreature(name:string){
   return exact?normalizeSrdCreature(exact):null;
 }
 async function refreshSrdCatalogStatus(){
-  srdCatalogMessage='Checking the live legal SRD support catalog...';renderSettings();
+  if(srdCatalogChecking)return;srdCatalogChecking=true;srdCatalogMessage='Checking the live legal SRD support catalog...';renderSettings();
   try{
     const response=await fetch('/api/srd/status',{headers:{Accept:'application/json','X-Altered-Request':'app'},cache:'no-store'});const payload=await response.json() as unknown;
     if(!response.ok)throw new Error('Catalog status request failed.');srdCatalogStatus=parseSrdCatalogStatus(payload);
     srdCatalogMessage=srdCatalogStatus.healthy?'The legal SRD support catalog is current.':'The catalog changed and needs validation before new records affect transformations.';
-  }catch{srdCatalogStatus=null;srdCatalogMessage='Live SRD catalog unavailable. Altered is using its validated offline transformation rules; try Check now when connected.';}
-  renderSettings();
+  }catch(error){srdCatalogStatus=null;srdCatalogMessage=`Live SRD catalog unavailable${error instanceof Error?`: ${error.message}`:''}. Altered is still using its validated offline transformation rules.`;}
+  finally{srdCatalogChecking=false;renderSettings();}
 }
 async function fetchDdbCharacter(explicitSource?:string):Promise<boolean>{
   const source=explicitSource??$<HTMLInputElement>('#dndbeyond-source').value;const id=extractDdbCharacterId(source);
@@ -764,6 +782,9 @@ function renderQuickFeatures(){
   if(state.concentrationChecks.length){const pending=state.concentrationChecks[0];if(pending)box.append(button(`Concentration DC ${pending.dc}`,()=>{const save=resolveSheet(character,state).saves.con;const rules=concentrationSaveMode(character,state);const mode=combinedMode(rules.mode as 'normal'|'advantage'|'disadvantage');const total=d20(save.modifier,mode,'Concentration save',undefined,undefined,undefined,save.source);applyResult(resolveConcentrationCheck(state,total));},'button primary'));}
   if(state.activeTransform?.option.profile==='true-polymorph'&&state.activeTransform.spellConcentration&&!state.activeTransform.permanentUntilDispelled)box.append(button('Complete 1-Hour True Polymorph',()=>applyResult(completeTruePolymorph(state)),'button primary'));
   if(state.concentration)box.append(button('End Concentration',()=>applyResult(endConcentration(state,'Ended voluntarily.',character))));
+  for(const feature of sheet.features.filter(entry=>entry.id.startsWith('private-')&&entry.activation&&entry.activation!=='none'&&entry.status!=='inactive')){
+    const activation=feature.activation!;const error=actionCostError(state,activation,sheet.conditionImmunities);const use=button(`${feature.name} · ${actionCostLabel(activation)}`,()=>{const failure=spendActionCost(state,activation,sheet.conditionImmunities);if(failure){notify(failure);render();return;}showRoll('Activated',`${feature.summary} Resolve any target or battlefield prerequisites from your source.` ,feature.name);render();},error?'button secondary':'button primary');use.disabled=Boolean(error);if(error)use.title=error;box.append(use);
+  }
   if(box.childElementCount===0)box.append(text('span','No activated abilities are available right now. Passive benefits are applied automatically and explained below.','ability-empty'));
 }
 
@@ -1011,6 +1032,9 @@ function initializeControls(){
   $('#more-delete-character').addEventListener('click',()=>{$('#delete-character-name').textContent=character.name;$('#delete-character-status').textContent=baseCharacters.length<=1?'Import or keep at least one other character before deleting this one.':'';$<HTMLDialogElement>('#delete-character-dialog').showModal();});
   $('#more-export').addEventListener('click',()=>$<HTMLButtonElement>('#export-character').click());
   $('#more-settings').addEventListener('click',()=>$<HTMLButtonElement>('#open-settings').click());
+  $('#create-homebrew-ability').addEventListener('click',openManualPrivateMechanic);
+  $('#create-homebrew-transformation').addEventListener('click',()=>$<HTMLButtonElement>('#open-transform-builder').click());
+  $('#manage-private-content').addEventListener('click',()=>{$<HTMLButtonElement>('#open-import-center').click();window.setTimeout(()=>$('#installed-pack-list').scrollIntoView({block:'nearest'}),0);});
   const compactFormQuery=window.matchMedia('(max-width:700px)');syncCharacterFormDrawer();compactFormQuery.addEventListener('change',syncCharacterFormDrawer);window.addEventListener('resize',()=>{if(innerWidth>700)setAppMenuOpen(false);syncCharacterFormDrawer();});
   $('#sample-character').addEventListener('change',event=>{const id=(event.target as HTMLSelectElement).value;const found=characters.find(c=>c.id===id);if(found)setCharacter(found);});
   $('#form-select').addEventListener('change',event=>{selectedOptionId=(event.target as HTMLSelectElement).value;renderTransformSelector();renderArt();});
@@ -1047,7 +1071,7 @@ function initializeControls(){
   $('#private-mechanic-need').addEventListener('change',syncPrivateMechanicFields);
   $('#private-mechanic-mode').addEventListener('change',syncPrivateMechanicMode);
   $('#private-mechanics-form').addEventListener('submit',event=>{event.preventDefault();void (async()=>{try{await savePrivateMechanic();}catch(error){$('#private-mechanics-status').textContent=`Could not save mechanic: ${error instanceof Error?error.message:'Unknown error'}`;}})();});
-  $('#private-mechanic-transformation').addEventListener('click',()=>{if(!pendingDdbImport)return;if(pendingDdbImport.blocked){$('#private-mechanics-status').textContent=pendingDdbImport.blockReason??'This character cannot be imported under the 2024-only policy.';return;}const need=pendingDdbImport.setupNeeds.find(entry=>entry.id===$<HTMLSelectElement>('#private-mechanic-need').value);if(character.id!==pendingDdbImport.character.id)applyImportedCharacter(pendingDdbImport.character);$<HTMLDialogElement>('#private-mechanics-dialog').close();populateBuilderClassOptions();$<HTMLInputElement>('#builder-pack-name').value=`${character.name} Private Mechanics`;$<HTMLInputElement>('#builder-source').value=`D&D Beyond character ${pendingDdbImport.sourceId} — user-confirmed`;$<HTMLInputElement>('#builder-label').value=need?.label??'';$<HTMLSelectElement>('#builder-match').value='character';setBuilderStatus('The reviewed character is loaded. Add only the activation, duration, and effects you confirmed in your authorized source.');$<HTMLDialogElement>('#transform-builder-dialog').showModal();});
+  $('#private-mechanic-transformation').addEventListener('click',()=>{if(manualPrivateMechanic){$<HTMLDialogElement>('#private-mechanics-dialog').close();$<HTMLButtonElement>('#open-transform-builder').click();return;}if(!pendingDdbImport)return;if(pendingDdbImport.blocked){$('#private-mechanics-status').textContent=pendingDdbImport.blockReason??'This character cannot be imported under the 2024-only policy.';return;}const need=pendingDdbImport.setupNeeds.find(entry=>entry.id===$<HTMLSelectElement>('#private-mechanic-need').value);if(character.id!==pendingDdbImport.character.id)applyImportedCharacter(pendingDdbImport.character);$<HTMLDialogElement>('#private-mechanics-dialog').close();populateBuilderClassOptions();$<HTMLInputElement>('#builder-pack-name').value=`${character.name} Private Mechanics`;$<HTMLInputElement>('#builder-source').value=`D&D Beyond character ${pendingDdbImport.sourceId} — user-confirmed`;$<HTMLInputElement>('#builder-label').value=need?.label??'';$<HTMLSelectElement>('#builder-match').value='character';setBuilderStatus('The reviewed character is loaded. Add only the activation, duration, and effects you confirmed in your authorized source.');$<HTMLDialogElement>('#transform-builder-dialog').showModal();});
   $('#confirm-dndbeyond-import').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}if(pendingDdbImport.blocked){setImportStatus(pendingDdbImport.blockReason??'This character is blocked by the 2024-only rules policy.');return;}const imported=applyImportedCharacter(pendingDdbImport.character);confirmedDdbSourceId=pendingDdbImport.sourceId;renderDdbReview(pendingDdbImport);setImportStatus(`${imported.name} imported after review. You can complete any remaining private mechanics here, then close this window.`);});
   $('#download-dndbeyond-json').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}downloadJson(pendingDdbImport.character,`${slug(pendingDdbImport.character.name)}-altered.json`);});
   $('#export-character').addEventListener('click',()=>downloadJson(character,`${character.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'altered-character'}.json`));
@@ -1064,8 +1088,9 @@ function initializeControls(){
   $('#transform-builder-form').addEventListener('submit',event=>{event.preventDefault();void (async()=>{try{const pack=createPackFromBuilder();const result=await installAndApplyPack(pack);setBuilderStatus(`${pack.metadata.name} created and installed. ${result.applied?'The transformation is now available on this character.':'The pack was saved but did not match the current character.'}`);setImportStatus(`${pack.metadata.name} installed from the private transformation builder.`);renderSettings();}catch(error){setBuilderStatus(`Could not create transformation: ${error instanceof Error?error.message:'Unknown error'}`);}})();});
   $('#keep-current-thp').addEventListener('click',()=>{if(pendingTempChoice)resolveTempHpChoice(state,'current',pendingTempChoice.incoming,pendingTempChoice.source);pendingTempChoice=null;$<HTMLDialogElement>('#temp-hp-dialog').close();notify('Kept current Temporary Hit Points.');render();});
   $('#keep-new-thp').addEventListener('click',()=>{if(pendingTempChoice)resolveTempHpChoice(state,'incoming',pendingTempChoice.incoming,pendingTempChoice.source);pendingTempChoice=null;$<HTMLDialogElement>('#temp-hp-dialog').close();notify('Replaced Temporary Hit Points with the new source.');render();});
-  $('#art-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;const target=artTargetInfo();try{notify(`Optimizing artwork for ${target.label}…`);const optimized=await optimizePortrait(file);await saveArtOverride(character.id,target.targetId,optimized);artOverrideCache.set(artCacheKey(target.targetId),optimized);notify(`Custom artwork saved for ${target.label}.`);renderArt();}catch(error){notify(`Artwork could not be saved: ${error instanceof Error?error.message:'Unknown error'}`);}finally{input.value='';}});
-  $('#reset-art').addEventListener('click',async()=>{const target=artTargetInfo();await removeArtOverride(character.id,target.targetId);artOverrideCache.set(artCacheKey(target.targetId),undefined);notify(`Default artwork restored for ${target.label}.`);renderArt();});
+  const bindArtworkInput=(selector:string,target:()=>({targetId:string;label:string}|null))=>$(selector).addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;const chosen=target();try{if(!chosen)throw new Error('Choose or activate a form before uploading separate form artwork.');await saveArtwork(file,chosen);}catch(error){notify(`Artwork could not be saved: ${error instanceof Error?error.message:'Unknown error'}`);}finally{input.value='';}});
+  bindArtworkInput('#art-file',()=>artTargetInfo());bindArtworkInput('#character-art-file',()=>({targetId:'base',label:character.name}));bindArtworkInput('#current-form-art-file',()=>currentFormArtTarget());
+  $('#reset-art').addEventListener('click',()=>void resetArtwork(artTargetInfo()));$('#more-reset-art').addEventListener('click',()=>void resetArtwork(artTargetInfo()));
   $('#open-settings').addEventListener('click',()=>{renderSettings();$<HTMLDialogElement>('#settings-dialog').showModal();});
   $('#close-settings').addEventListener('click',()=>$<HTMLDialogElement>('#settings-dialog').close());
   $('#refresh-srd-catalog').addEventListener('click',()=>void refreshSrdCatalogStatus());
