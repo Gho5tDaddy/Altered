@@ -2075,3 +2075,104 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .workspace,html[data-altered-workspace="forms"] .workspace{grid-template-rows:192px minmax(0,1fr)}
 }
 @media(prefers-reduced-motion:reduce){.brand-menu-cue{transition:none}}
+
+/* v0.29.3 moonlit state language: stronger guidance without changing layout or rules. */
+:root{
+  --state-ready:#53ff99;--state-active:#79f7ff;--state-passive:#c9a6ff;
+  --state-warning:#ffd36b;--state-blocked:#ff5b73;--state-inert:#b6c0d1;
+  --stone-edge-lit:#788795
+}
+.app-shell.aura-aquatic{--aura-one:#4de8ff;--aura-two:#367cff;--aura-three:#d8fbff;--aura-four:rgba(60,173,255,.14);--aura-flow-speed:9.2s}
+.app-shell.aura-venom{--aura-one:#b76cff;--aura-two:#6bff9c;--aura-three:#f1dcff;--aura-four:rgba(160,83,255,.13);--aura-flow-speed:8.1s}
+.app-shell.aura-feline{--aura-one:#7dff9b;--aura-two:#f4ad43;--aura-three:#efffd7;--aura-four:rgba(113,242,128,.13);--aura-flow-speed:8.4s}
+.app-shell.aura-ursine{--aura-one:#81e89d;--aura-two:#c99347;--aura-three:#eaffd9;--aura-four:rgba(109,207,126,.12);--aura-flow-speed:9s}
+.app-shell.aura-lupine{--aura-one:#75e7ff;--aura-two:#7f83ff;--aura-three:#eff7ff;--aura-four:rgba(112,188,255,.14);--aura-flow-speed:8.7s}
+.app-shell.aura-avian{--aura-one:#a8ecff;--aura-two:#d0b6ff;--aura-three:#fffef0;--aura-four:rgba(181,225,255,.13);--aura-flow-speed:9.5s}
+
+/* A sparse, static moonlit sky adds atmosphere without a particle system. */
+body::after{
+  background:
+    radial-gradient(circle at 7% 17%,rgba(160,244,255,.82) 0 1px,transparent 1.8px),
+    radial-gradient(circle at 19% 71%,rgba(195,169,255,.58) 0 1px,transparent 1.8px),
+    radial-gradient(circle at 38% 9%,rgba(224,248,255,.62) 0 1px,transparent 1.7px),
+    radial-gradient(circle at 63% 23%,rgba(130,222,255,.56) 0 1px,transparent 1.8px),
+    radial-gradient(circle at 81% 67%,rgba(187,154,255,.62) 0 1px,transparent 1.8px),
+    radial-gradient(circle at 94% 34%,rgba(232,251,255,.72) 0 1px,transparent 1.7px),
+    radial-gradient(ellipse at 50% -18%,rgba(81,130,173,.16),transparent 48%),
+    radial-gradient(ellipse at center,transparent 43%,rgba(0,0,0,.58) 100%),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.009) 0 1px,transparent 1px 5px);
+  opacity:.72
+}
+
+/* Thicker-looking carved stone edges use inset light, so control dimensions never shift. */
+.button,.tab,.workspace-nav-button{
+  border-color:var(--stone-edge-lit);
+  box-shadow:inset 0 0 0 2px rgba(126,139,151,.24),inset 0 1px rgba(255,255,255,.11),inset 0 -3px 6px rgba(0,0,0,.82),0 5px 11px rgba(0,0,0,.42)
+}
+.button::before,.tab::before{border-color:rgba(193,218,228,.17)}
+.panel,.persistent-form-visual{box-shadow:inset 0 0 0 1px rgba(137,155,169,.16),inset 0 1px rgba(218,238,246,.06),var(--shadow)}
+.app-shell.form-active:not(.effects-disabled) .persistent-form-visual{
+  border-color:color-mix(in srgb,var(--aura-one) 72%,#6c7882);
+  box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--aura-one) 24%,transparent),0 0 23px color-mix(in srgb,var(--aura-one) 31%,transparent),0 0 46px color-mix(in srgb,var(--aura-two) 15%,transparent),var(--shadow)
+}
+.workspace-stage{
+  background:
+    radial-gradient(circle at 9% 18%,rgba(150,239,255,.34) 0 1px,transparent 1.8px),
+    radial-gradient(circle at 27% 77%,rgba(199,167,255,.25) 0 1px,transparent 1.8px),
+    radial-gradient(circle at 48% 11%,rgba(225,250,255,.27) 0 1px,transparent 1.7px),
+    radial-gradient(circle at 69% 64%,rgba(113,219,255,.23) 0 1px,transparent 1.8px),
+    radial-gradient(circle at 91% 31%,rgba(194,161,255,.27) 0 1px,transparent 1.8px),
+    radial-gradient(ellipse at 50% 120%,rgba(66,31,110,.1),transparent 62%)
+}
+
+/* Active form names keep near-white contrast while their family color supplies identity. */
+.persistent-form-copy.is-active>strong{
+  color:color-mix(in srgb,var(--aura-three) 72%,white);
+  -webkit-text-stroke:.3px color-mix(in srgb,var(--aura-one) 52%,transparent);
+  text-shadow:0 0 4px rgba(255,255,255,.88),0 0 11px color-mix(in srgb,var(--aura-one) 92%,transparent),0 0 25px color-mix(in srgb,var(--aura-two) 72%,transparent)
+}
+.persistent-form-copy.is-active.is-beast>strong{
+  font-family:"Copperplate Gothic Bold","Copperplate Gothic","Palatino Linotype",Georgia,serif;
+  font-size:1.32rem;font-style:italic;font-weight:950;font-variant:small-caps;
+  letter-spacing:.105em;transform:none;
+  animation:feralFormNameGlow 2.15s ease-in-out infinite
+}
+.persistent-form-copy.is-active.is-beast>strong::before,.persistent-form-copy.is-active.is-beast>strong::after{
+  content:"◆";display:inline-block;margin:0 .34em;color:var(--aura-one);font-size:.38em;vertical-align:.38em;text-shadow:0 0 8px var(--aura-one)
+}
+.persistent-form-copy.is-active .persistent-form-kicker{color:color-mix(in srgb,var(--aura-one) 78%,white);text-shadow:0 0 9px color-mix(in srgb,var(--aura-one) 88%,transparent)}
+@keyframes feralFormNameGlow{
+  0%,100%{filter:brightness(1);text-shadow:0 0 4px rgba(255,255,255,.82),0 0 10px color-mix(in srgb,var(--aura-one) 78%,transparent),0 0 22px color-mix(in srgb,var(--aura-two) 55%,transparent)}
+  50%{filter:brightness(1.16);text-shadow:0 0 6px white,0 0 16px color-mix(in srgb,var(--aura-one) 100%,transparent),0 0 34px color-mix(in srgb,var(--aura-two) 82%,transparent)}
+}
+
+/* End Turn becomes the single recommended control only when tracked turn work is complete. */
+.turn-complete-cue{
+  border-color:#72f2ff!important;color:#efffff!important;
+  box-shadow:inset 0 0 0 2px rgba(114,242,255,.48),0 0 16px rgba(76,222,255,.62),0 0 30px rgba(121,116,255,.24)!important;
+  animation:turnCompletePulse 1.7s ease-in-out infinite
+}
+@keyframes turnCompletePulse{
+  0%,100%{filter:brightness(1);box-shadow:inset 0 0 0 2px rgba(114,242,255,.42),0 0 12px rgba(76,222,255,.48),0 0 24px rgba(121,116,255,.18)}
+  50%{filter:brightness(1.15);box-shadow:inset 0 0 0 2px rgba(196,253,255,.82),0 0 27px rgba(76,222,255,.95),0 0 44px rgba(121,116,255,.42)}
+}
+
+/* Semantic state colors reinforce existing labels and icons; inert states never glow. */
+.economy-chip.available,.priority-ready,.badge.priority-ready{color:#d5ffe3;border-color:var(--state-ready);text-shadow:0 0 7px rgba(83,255,153,.46)}
+.ui-status.active,.badge.priority-active{color:#e8feff;border-color:var(--state-active);text-shadow:0 0 7px rgba(121,247,255,.5)}
+.feature-reference-section .badge.active:not(.priority-active){color:#f0e3ff;border-color:var(--state-passive);background:rgba(101,56,145,.24);box-shadow:inset 0 0 0 1px rgba(201,166,255,.16)}
+.ui-status.warning,.ui-status.requirements,.badge.conditional,.badge.warning{color:#fff1b5;border-color:var(--state-warning)}
+.ui-status.error,.ui-status.unavailable,.badge.priority-blocked{color:#ffd7dd;border-color:var(--state-blocked)}
+.ui-status.inactive,.ui-status.locked,.economy-chip.used,.badge.inactive{color:var(--state-inert);border-color:#596372;text-shadow:none;box-shadow:inset 0 0 0 1px rgba(134,145,163,.1)}
+
+/* Both the OS preference and Altered's setting preserve static, high-contrast cues. */
+.app-shell.reduce-motion .turn-complete-cue,
+.app-shell.reduce-motion .persistent-form-copy.is-active>strong{animation:none!important;filter:none!important;transform:none!important}
+@media(prefers-reduced-motion:reduce){
+  .app-shell:not(.motion-forced) .turn-complete-cue,
+  .app-shell:not(.motion-forced) .persistent-form-copy.is-active>strong{animation:none!important;filter:none!important;transform:none!important}
+}
+@media(forced-colors:active){
+  .turn-complete-cue,.persistent-form-copy.is-active{animation:none!important;box-shadow:none!important;border:2px solid Highlight!important}
+  .persistent-form-copy.is-active>strong{color:CanvasText;-webkit-text-stroke:0;text-shadow:none}
+}

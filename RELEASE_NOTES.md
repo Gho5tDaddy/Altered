@@ -1,3 +1,15 @@
+# Altered v0.29.3 release notes
+
+## Moonlit state clarity and form identity
+
+Altered now highlights End Turn only when its tracked turn work is genuinely complete: Action, Surge Action, Bonus Action, remaining Extra Attacks, and required pending resolutions must all be finished. The cue explains that movement or a free interaction may still remain and that a Reaction can still be used off-turn.
+
+Active Beast titles now use a stronger feral treatment with form-family color palettes. Aquatic forms use moonlit blue, lupine forms use icy moon-cyan, feline and ursine forms use nature-and-gold palettes, venomous forms use violet and green, and avian forms use sky-and-silver. Labels and icons still communicate the state, so color is never the only signal.
+
+Carved-stone controls have stronger inset edges, meaningful active controls glow more clearly, and the black workspace carries a sparse static cosmic field. These changes add no new navigation or gameplay concepts. Reduced Motion keeps static high-contrast cues, and forced-colors users retain explicit borders.
+
+All saved characters, combat state, artwork, imports, exports, and private content remain compatible.
+
 # Altered v0.29.2 release notes
 
 ## Windows installer, clearer versions, and verified refresh

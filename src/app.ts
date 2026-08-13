@@ -111,7 +111,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.2';
+const APP_VERSION='0.29.3';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 type UiStatus='available'|'active'|'inactive'|'locked'|'unavailable'|'requirements'|'selected'|'favorite'|'new'|'importing'|'loading'|'success'|'warning'|'error';
 const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
@@ -373,7 +373,16 @@ function auraPaletteClass(){
   const normalizedId=(form?.id??active.id).toLowerCase();
   const normalizedName=(form?.name??active.label).toLowerCase();
   const isMoonDruidWildshape=active.profile==='wildshape'&&character.classes.some(c=>c.name==='Druid'&&c.subclass?.toLowerCase().includes('moon'));
-  if(normalizedType==='beast')return isMoonDruidWildshape?'aura-moon':'aura-beast';
+  if(normalizedType==='beast'){
+    const identity=`${normalizedId} ${normalizedName}`;
+    if(/octopus|shark|eel|fish|crab|seahorse|quipper|dolphin|whale|ray|seal/.test(identity))return 'aura-aquatic';
+    if(/spider|scorpion|centipede|snake|serpent|cobra/.test(identity))return 'aura-venom';
+    if(/lion|tiger|panther|leopard|jaguar|cat/.test(identity))return 'aura-feline';
+    if(/bear/.test(identity))return 'aura-ursine';
+    if(/wolf|dire wolf|dog|jackal|hyena|fox/.test(identity))return 'aura-lupine';
+    if(/eagle|owl|hawk|falcon|raven|vulture|bird/.test(identity))return 'aura-avian';
+    return isMoonDruidWildshape?'aura-moon':'aura-beast';
+  }
   if(normalizedType==='undead')return normalizedName.includes('shadow')||normalizedId.includes('shadow')?'aura-shadow':'aura-undead';
   if(normalizedType==='fey')return 'aura-fey';
   if(normalizedType==='fiend')return 'aura-fiend';
@@ -399,7 +408,7 @@ function scheduleAuraClassRemoval(className:string,duration:number){if(auraTimer
 function syncAuraState(){
   const app=$('#app');const activeTransformId=state.activeTransform?.option.id;const activeId=activeAuraVisual().id;const palette=auraPaletteClass();
   app.classList.toggle('effects-disabled',!magicEffectsEnabled);app.classList.toggle('reduce-motion',reduceMotion);app.classList.toggle('motion-forced',!reduceMotion);app.classList.toggle('form-active',Boolean(activeId));app.classList.toggle('rage-empowered',state.rage.active);
-  for(const value of ['aura-moon','aura-beast','aura-nature','aura-arcane','aura-prismatic','aura-overlay','aura-rage','aura-undead','aura-shadow','aura-fey','aura-fiend','aura-celestial','aura-draconic','aura-plant','aura-ooze','aura-construct','aura-aberrant','aura-elemental','aura-elemental-fire','aura-elemental-water','aura-elemental-air','aura-elemental-earth'])app.classList.toggle(value,value===palette);
+  for(const value of ['aura-moon','aura-beast','aura-aquatic','aura-venom','aura-feline','aura-ursine','aura-lupine','aura-avian','aura-nature','aura-arcane','aura-prismatic','aura-overlay','aura-rage','aura-undead','aura-shadow','aura-fey','aura-fiend','aura-celestial','aura-draconic','aura-plant','aura-ooze','aura-construct','aura-aberrant','aura-elemental','aura-elemental-fire','aura-elemental-water','aura-elemental-air','aura-elemental-earth'])app.classList.toggle(value,value===palette);
   if(!auraInitialized){previousTransformId=activeTransformId;previousAuraId=activeId;auraInitialized=true;return;}
   if(activeId&&activeId!==previousAuraId){app.classList.remove('form-dissipating');app.classList.add('form-transforming');scheduleAuraClassRemoval('form-transforming',1150);}
   else if(!activeId&&previousAuraId){app.classList.remove('form-transforming');app.classList.add('form-dissipating');scheduleAuraClassRemoval('form-dissipating',820);}
@@ -796,11 +805,23 @@ function healthMetric(){
   breakdown.append(hp,temporary);node.append(heading,breakdown);return node;
 }
 function speedText(){return Object.entries(sheet.speeds).filter(([,v])=>v!==undefined).map(([k,v])=>`${k} ${v} ft.`).join(' · ')||'0 ft.'}
+function turnReadyToEnd(){
+  return !state.life.dead&&state.turn.actionsRemaining===0&&state.turn.surgeActionsRemaining===0&&state.turn.bonusRemaining===0&&(state.turn.attackAction?.remaining??0)===0&&!state.pendingRelentlessRage&&!(state.hp===0&&!state.life.stable)&&state.concentrationChecks.length===0;
+}
+function syncTurnCompletionCue(){
+  const ready=turnReadyToEnd();
+  const explanation='Action, Surge Action, Bonus Action, Extra Attack, and required pending resolutions are complete. End the turn when movement and any free interaction are finished; your Reaction can still be used off-turn.';
+  for(const selector of ['#end-turn','#persistent-end-turn']){
+    const control=$<HTMLButtonElement>(selector);control.classList.toggle('turn-complete-cue',ready);
+    if(ready){control.title=explanation;control.setAttribute('aria-label','End Turn — all tracked turn actions are complete');}
+    else{control.removeAttribute('title');control.setAttribute('aria-label','End Turn');}
+  }
+}
 function renderMetrics(){
   const grid=$('#metric-grid');clear(grid);grid.append(healthMetric(),metric('Armor Class',String(sheet.ac),sheet.acSource),metric('Speed',String(sheet.speeds.walk??0)+' ft.',speedText()));
   $('#persistent-hp').textContent=`${state.hp} / ${character.hp.max}`;$('#persistent-temp').textContent=String(state.tempHp);$('#persistent-ac').textContent=String(sheet.ac);$('#persistent-speed').textContent=`${sheet.speeds.walk??0} ft.`;
   const economy=$('#action-economy');clear(economy);const chips:[string,string,number][]=[['Action','Action',state.turn.actionsRemaining],['Surge','Surge Action',state.turn.surgeActionsRemaining],['Bonus','Bonus Action',state.turn.bonusRemaining],['Reaction','Reaction',state.turn.reactionRemaining]];const economySummary:string[]=[];for(const [label,name,count] of chips){const node=text('span',`${label}: ${count}`,'economy-chip '+(count>0?'available':'used'));node.title=`${name}: ${count>0?'available':'used'}`;economy.append(node);economySummary.push(`${name} ${count}`);}if(state.turn.attackAction){const remaining=text('span',`Extra: ${state.turn.attackAction.remaining}`,'economy-chip available');remaining.title=`Extra Attack: ${state.turn.attackAction.remaining} remaining`;economy.append(remaining);economySummary.push(`Extra Attack ${state.turn.attackAction.remaining}`);}const slotSpell=text('span',state.turn.slotSpellCast?'Slot: Used':'Slot: Ready','economy-chip '+(state.turn.slotSpellCast?'used':'available'));slotSpell.title='2024 rule: you can expend only one spell slot to cast a spell on a turn. Cantrips do not use this limit.';economy.append(slotSpell);economySummary.push(`slot spell ${state.turn.slotSpellCast?'used':'available'}`);economy.setAttribute('aria-label',economySummary.join(', '));economy.title=state.turn.actionsRemaining>0&&state.turn.bonusRemaining===0?`Action still available: use it for an attack, another non-spell action, or a cantrip. Rage and Wild Shape require the Bonus Action already used this turn.${state.turn.slotSpellCast?' Another leveled spell is blocked by the one-slot-spell-per-turn rule.':''}`:'Current turn availability.';
-  $('#turn-number').textContent=`Turn ${state.turn.number}`;$('#persistent-turn-number').textContent=`Turn ${state.turn.number}`;
+  $('#turn-number').textContent=`Turn ${state.turn.number}`;$('#persistent-turn-number').textContent=`Turn ${state.turn.number}`;syncTurnCompletionCue();
 }
 function renderResources(){
   const strip=$('#resource-strip');clear(strip);
@@ -1204,7 +1225,7 @@ function recommendNextStep():NextStepSuggestion|null{
     if(!state.activeTransform&&isMoonDruid()&&sheet.ac<17&&state.turn.bonusRemaining>0&&barkskin)return {title:'Consider Barkskin',copy:'It can raise AC to 17 and continue through Wild Shape. Because both use a Bonus Action, transform on a later turn.',target:$<HTMLElement>('#open-spells-view'),reveal:revealTask('spells','Barkskin')};
     const usableBonus=sheet.features.find(feature=>feature.activation==='bonus'&&feature.status!=='inactive'&&!actionCostError(state,'bonus',sheet.conditionImmunities));
     if(state.turn.actionsRemaining===0&&state.turn.bonusRemaining>0&&usableBonus)return {title:`Consider ${usableBonus.name}`,copy:'Your Action is spent, but a Bonus Action remains. This is one currently available option.',target:abilities,reveal:revealTask('features',usableBonus.name)};
-    if(state.turn.actionsRemaining===0&&state.turn.bonusRemaining===0)return {title:'End this turn',copy:'Your Action and Bonus Action are spent. End Turn records completion; New Turn restores the normal choices.',target:$<HTMLElement>('#persistent-end-turn')};
+    if(turnReadyToEnd())return {title:'End this turn',copy:'All tracked turn actions and required resolutions are complete. Finish any movement or free interaction, then End Turn; your Reaction remains available off-turn.',target:$<HTMLElement>('#persistent-end-turn')};
     return {title:'Open Actions',copy:state.activeTransform?'Review the attacks and actions available in your current form.':'Review attacks and other actions available to this character.',target:$<HTMLElement>('#open-actions-view'),reveal:revealTask('actions')};
   }
   return null;

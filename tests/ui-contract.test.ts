@@ -343,6 +343,16 @@ test('active beast identity and conditional form traits remain visually and mech
   assert.match(styles,/html\[data-altered-workspace="forms"\] \.app-shell\.form-active \.workspace\{grid-template-rows:315px/);
 });
 
+test('turn completion and form-family cues stay accurate, semantic, and motion-safe',()=>{
+  const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
+  assert.match(source,/function turnReadyToEnd\(\)/);assert.match(source,/actionsRemaining===0&&state\.turn\.surgeActionsRemaining===0&&state\.turn\.bonusRemaining===0/);
+  assert.match(source,/state\.turn\.attackAction\?\.remaining\?\?0/);assert.match(source,/!state\.pendingRelentlessRage/);assert.match(source,/state\.concentrationChecks\.length===0/);
+  assert.match(source,/\['#end-turn','#persistent-end-turn'\]/);assert.match(source,/classList\.toggle\('turn-complete-cue',ready\)/);
+  for(const family of ['aura-aquatic','aura-venom','aura-feline','aura-ursine','aura-lupine','aura-avian']){assert.match(source,new RegExp(family));assert.match(styles,new RegExp(`\\.app-shell\\.${family}`));}
+  assert.match(styles,/\.turn-complete-cue/);assert.match(styles,/@keyframes turnCompletePulse/);assert.match(styles,/@keyframes feralFormNameGlow/);
+  assert.match(styles,/\.app-shell\.reduce-motion \.turn-complete-cue/);assert.match(styles,/@media\(forced-colors:active\)/);assert.match(styles,/body::after[\s\S]*radial-gradient/);
+});
+
 test('static shell applies a restrictive local-only content policy',()=>{
   const html=readFileSync('public/index.html','utf8');
   const policy=html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1]??'';

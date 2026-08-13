@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.29.3
+
+- Added an accurate End Turn readiness cue only after Action, Surge Action, Bonus Action, remaining Extra Attacks, and required pending resolutions are complete; Reaction correctly remains available off-turn.
+- Added distinct moonlit aura families for aquatic, venomous, feline, ursine, lupine, and avian Beast forms.
+- Strengthened active-form identity, ancient-stone control edges, and semantic ready/active/conditional/blocked/inert colors without adding new controls or navigation.
+- Added a restrained static cosmic backdrop and complete reduced-motion and forced-colors fallbacks.
+- Preserved all character, combat, import/export, private-content, and saved-state formats.
+
 ## v0.29.2
 
 - Added a tested per-user Windows installer with Desktop and Start-menu shortcuts, the full moon/runic A icon, and an uninstaller.
