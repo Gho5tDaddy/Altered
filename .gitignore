@@ -24,6 +24,8 @@ android-wrapper/art/altered-icon-v2.png
 *.log
 *.tmp
 *.temp
+tmp/
+private-content/
 .DS_Store
 Thumbs.db
 
