@@ -1654,6 +1654,27 @@ html[data-altered-workspace="forms"] .persistent-form-copy>strong{font-size:1rem
 }
 @media(max-width:420px){.character-refresh-setting{grid-template-columns:1fr}.character-refresh-setting .button{width:100%}}
 
+/* v0.28.1 use the character header instead of truncating multiclass builds */
+@media(max-width:700px){
+  .character-strip{align-items:stretch}
+  .character-title{min-width:0;align-self:stretch;align-content:start;padding:3px 4px 0}
+  .character-title span{
+    display:-webkit-box;white-space:normal;overflow:hidden;text-overflow:clip;
+    -webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;
+    line-height:1.25;overflow-wrap:anywhere
+  }
+  .task-launcher{min-height:54px}
+  .task-launcher span{
+    display:-webkit-box;white-space:normal;overflow:hidden;text-overflow:clip;
+    -webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;
+    overflow-wrap:anywhere
+  }
+  .play-latest-result small{
+    display:-webkit-box;white-space:normal;overflow:hidden;text-overflow:clip;
+    -webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;line-height:1.2
+  }
+}
+
 /* v0.26.2 arcane glow: luminous text contrast and magical state accents */
 :root{
   --muted:#e4e9ff;
@@ -1942,4 +1963,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 }
 @media(prefers-reduced-motion:reduce){
   .app-shell:not(.motion-forced) .persistent-form-copy.is-preview.is-ready>strong{animation:none!important}
+}
+
+/* v0.28.1 final responsive overrides: keep useful summaries readable on phones. */
+@media(max-width:700px){
+  .next-step-guide p{
+    display:-webkit-box;max-width:none;white-space:normal;overflow:hidden;text-overflow:clip;
+    -webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;line-height:1.2
+  }
+  .task-view .tab-help{overflow:visible;text-overflow:clip;white-space:normal}
+}
+@media(max-width:340px){
+  .workspace,html[data-altered-workspace="forms"] .workspace{grid-template-rows:176px minmax(0,1fr)}
+  .persistent-action-economy{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #play-resource-summary{-webkit-line-clamp:3;line-clamp:3}
 }

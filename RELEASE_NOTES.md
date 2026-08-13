@@ -1,3 +1,13 @@
+# Altered v0.28.1 release notes
+
+## Responsive readability audit
+
+Character species, class, subclass, and multiclass details now wrap into the available mobile header space instead of ending in an ellipsis. Compact resource summaries, result explanations, recommendation text, and tool instructions also use their available phone space before clipping.
+
+The responsive audit exercised Play, Forms, Actions, Checks, Spells, Features, Equipment, Rules, and Manage at 320px phone, standard phone, unfolded Fold/tablet, laptop, and desktop widths. No main workspace now produces horizontal page overflow or hidden visible text at the tested widths.
+
+This release changes presentation only. Rules-engine behavior, saved characters, combat state, imports, exports, private content, artwork, and hosted/standalone formats remain compatible.
+
 # Altered v0.28.0 release notes
 
 ## Current-character sync and unified A menu

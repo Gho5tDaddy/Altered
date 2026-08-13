@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.28.1
+
+- Let long species, class, subclass, and multiclass descriptions wrap within the mobile character header.
+- Expanded compact resource, roll, recommendation, and instructional summaries on phones without adding page-level overflow.
+- Improved the 320px action-economy layout while preserving the persistent form artwork and controls.
+- Verified every primary workspace and Character tool at compact phone, phone, Fold/tablet, and desktop sizes.
+- Preserved all rules, state, import/export, private-content, and artwork behavior.
+
 ## v0.28.0
 
 - Added safe default-on synchronization for linked public D&D Beyond characters.
