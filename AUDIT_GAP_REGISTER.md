@@ -1,4 +1,17 @@
-# Altered v0.27.3 audit gap register
+# Altered v0.27.4 audit gap register
+
+## Resolved in v0.27.4
+
+| Finding | Severity | Resolution | Regression evidence |
+|---|---:|---|---|
+| Early bundled Ferocitus saves used local provenance and bypassed the v0.27.3 repair | High | Match the stable canonical character ID while retaining the verified-import safeguard | local-provenance case in `repairs the known unfinished feat in an older saved Ferocitus import` |
+| Imported equipment was visible only as reference data, leaving Base Form with generic unarmed actions | High | Parse equipped weapon mechanics into validated attack actions and migrate known older Ferocitus weapon records | D&D Beyond import, engine weapon-action, migration, and UI gear regressions |
+| Unarmored Defense was marked unavailable merely because the character was in Base Form | High | Determine armor and shield activity from retained equipment state, not transform profile | armor-state engine regression |
+| Feature cards did not clearly distinguish explanation, usage, and supported activation | Medium | Group feature states and colocate plain-language effect/usage text with available controls | feature-state engine and UI-contract regressions |
+
+## Safe follow-up
+
+An optional AI-assisted private-mechanic completion flow is not bundled into this bug-fix release. It requires a server-held API credential, authoritative public-source retrieval for distributable 2024 rules, user-provided authorized excerpts for paid rules, schema validation, and a user review before a mechanic is attached to a character. Adding it without those boundaries would risk incorrect rules, exposing credentials, and silently changing combat behavior.
 
 ## Resolved in v0.27.3
 

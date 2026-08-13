@@ -195,6 +195,14 @@ test('ignores unfinished D&D Beyond feat choosers without dropping selected or g
   assert.ok(report.character.provenance.rulesetEvidence.includes('Altered verified D&D Beyond feat selections'));
 });
 
+test('imports equipped weapon structure into executable base-form attacks',()=>{
+  const payload=structuredClone(ferocitusPayload);
+  payload.data.modifiers.class.push({type:'proficiency',subType:'martial-weapons',componentId:111,isGranted:true} as any);
+  payload.data.inventory.push({id:501,equipped:true,isAttuned:false,definition:{id:201,name:'Greataxe',type:'Greataxe',filterType:'Weapon',categoryId:2,attackType:1,damage:{diceString:'1d12'},damageType:'Slashing',range:5,longRange:5,properties:[{name:'Heavy'},{name:'Two-Handed'},{name:'Cleave'}]}} as any);
+  const report=importDdbCharacter(payload,'152187683');const item=report.character.items.find(entry=>entry.name==='Greataxe');
+  assert.ok(item?.attack);assert.equal(item.attack.damage,'1d12');assert.equal(item.attack.damageType,'Slashing');assert.equal(item.attack.proficient,true);
+});
+
 test('identifies unsupported paid subclass features without copying descriptions',()=>{
   const payload=JSON.parse(JSON.stringify(ferocitusPayload)) as any;const druid=payload.data.classes[1];assert.ok(druid);
   druid.subclassDefinition={name:'Circle of Stars',classFeatures:[{name:'Starry Form',requiredLevel:3},{name:'Cosmic Omen',requiredLevel:6}]};

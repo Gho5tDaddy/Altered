@@ -1,4 +1,14 @@
-# Altered v0.27.3 release notes
+# Altered v0.27.4 release notes
+
+## Equipment and understandable abilities
+
+Equipped weapons imported from a public D&D Beyond character now become ordinary attack cards. Their ability, proficiency, attack bonus, damage dice, damage type, range, weapon properties, and magic bonus are represented structurally; other equipped gear remains visible in a compact reference drawer. Existing Ferocitus saves are upgraded locally with the known Handaxe and Greataxe actions, so no reset is required.
+
+Unarmored Defense now checks whether armor is actually worn. Being in Base Form no longer incorrectly marks the feature unavailable. The Features view separates abilities the player can use or confirm, automatic benefits, owned references, and currently unavailable mechanics. Each card states what it does and how it is used, with supported activation controls placed on the card.
+
+## Early Ferocitus save repair
+
+The automatic `Dark Bargain` cleanup now recognizes early bundled Ferocitus saves by their stable character ID even when those saves predate D&D Beyond provenance metadata. Only the stale feat name is removed; portrait overrides, AC, current HP, turn state, and all other imported data remain intact.
 
 ## Saved-character repair
 

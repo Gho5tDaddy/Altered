@@ -96,6 +96,7 @@ export interface CharacterProvenance {provider:'local'|'dndbeyond';sourceId?:str
 export interface CharacterItem {
   id:string;name:string;type:string;equipped:boolean;attuned:boolean;requiresAttunement:boolean;
   ruleset:CharacterRuleset;sourceIds:string[];mechanics:'included-in-imported-totals'|'reference-only'|'review-required';
+  attack?:{ability:Ability;damage:string;damageType:DamageType;proficient:boolean;range?:number;longRange?:number;properties:string[];magicBonus:number};
 }
 
 export interface Character {

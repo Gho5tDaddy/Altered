@@ -446,13 +446,15 @@ function rulesetAssessment(data:JsonObject):{ruleset:CharacterRuleset;evidence:s
     reviewRequired:ruleset!=='2024'||unknown>0,
   };
 }
-function parseItems(data:JsonObject):CharacterItem[]{
+function weaponProficiencies(data:JsonObject){const result=new Set<string>();for(const rawGroup of Object.values(object(data.modifiers)))for(const raw of array(rawGroup)){const entry=object(raw);if(string(entry.type).toLowerCase()==='proficiency'){const subtype=string(entry.subType).toLowerCase();if(subtype)result.add(subtype);}}return result;}
+function parseItems(data:JsonObject,abilities:Character['abilities']):CharacterItem[]{
+  const proficiencies=weaponProficiencies(data);
   return array(data.inventory).slice(0,300).flatMap((raw,index)=>{
     const item=object(raw),definition=object(item.definition);const name=string(definition.name);if(!name)return [];
-    const id=String(whole(definition.id)||whole(item.id)||slug(`${name}-${index}`));const requiresAttunement=whole(definition.canAttune)===1||Boolean(definition.requiresAttunement);const equipped=Boolean(item.equipped),attuned=Boolean(item.isAttuned);
+    const id=String(whole(item.id)||whole(definition.id)||slug(`${name}-${index}`));const requiresAttunement=whole(definition.canAttune)===1||Boolean(definition.requiresAttunement);const equipped=Boolean(item.equipped),attuned=Boolean(item.isAttuned);
     const sourceIds=[finite(definition.sourceId),...array(definition.sources).flatMap(source=>[finite(object(source).sourceId),finite(object(source).id)])].filter((value):value is number=>value!==undefined).map(String);
-    const ruleset=definitionRuleset(definition);const included=equipped&&(!requiresAttunement||attuned);
-    return [{id:`ddb-item-${id}`,name,type:string(definition.type)||'Item',equipped,attuned,requiresAttunement,ruleset,sourceIds:[...new Set(sourceIds)].slice(0,20),mechanics:included?'included-in-imported-totals':ruleset==='legacy'||ruleset==='mixed'?'review-required':'reference-only'} satisfies CharacterItem];
+    const ruleset=definitionRuleset(definition);const included=equipped&&(!requiresAttunement||attuned);const properties=array(definition.properties).map(rawProperty=>string(object(rawProperty).name)).filter(Boolean).slice(0,20);const damage=string(object(definition.damage).diceString);const damageType=DAMAGE_TYPES[string(definition.damageType).toLowerCase()];const category=whole(definition.categoryId);const weapon=string(definition.filterType).toLowerCase()==='weapon'&&Boolean(damage)&&Boolean(damageType);const weaponSlug=slug(name);const proficient=category===1?proficiencies.has('simple-weapons'):category===2?proficiencies.has('martial-weapons'):proficiencies.has(weaponSlug)||proficiencies.has(`${weaponSlug}s`);const ranged=whole(definition.attackType)===2;const finesse=properties.some(property=>property.toLowerCase()==='finesse');const ability:Ability=ranged?'dex':finesse&&abilities.dex>abilities.str?'dex':'str';const magicBonus=Math.max(-5,Math.min(10,whole(definition.magicBonus,whole(definition.attackBonus))));
+    return [{id:`ddb-item-${id}`,name,type:string(definition.type)||'Item',equipped,attuned,requiresAttunement,ruleset,sourceIds:[...new Set(sourceIds)].slice(0,20),mechanics:included?'included-in-imported-totals':ruleset==='legacy'||ruleset==='mixed'?'review-required':'reference-only',...(weapon&&damageType?{attack:{ability,damage,damageType,proficient,properties,magicBonus,...(finite(definition.range)!==undefined?{range:whole(definition.range)}:{}),...(finite(definition.longRange)!==undefined?{longRange:whole(definition.longRange)}:{})}}:{})} satisfies CharacterItem];
   });
 }
 
@@ -570,7 +572,7 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
   const defense=parseEquipmentAndAc(data,abilities,classes,modifiers);const formSelection=legalKnownForms(data,classes,warnings);const knownForms=formSelection.knownForms;
   const druid=classes.find(entry=>entry.name.toLowerCase()==='druid');
   if(druid&&druid.level>=2&&knownForms.length===0)warnings.push({code:'wild-shape-not-provided',severity:'warning',message:'D&D Beyond did not provide recognizable Wild Shape selections. No forms were guessed; add or review known forms in Altered before transforming.'});
-  const parsedSpells=parseSpells(data,abilities,totalLevel);const moonSpells=restoreMoonCircleSpells(parsedSpells,classes,abilities,totalLevel);const spells=moonSpells.spells;const featSelection=parseFeats(data);const feats=featSelection.feats;const resources=parseResources(data,totalLevel);const items=parseItems(data);
+  const parsedSpells=parseSpells(data,abilities,totalLevel);const moonSpells=restoreMoonCircleSpells(parsedSpells,classes,abilities,totalLevel);const spells=moonSpells.spells;const featSelection=parseFeats(data);const feats=featSelection.feats;const resources=parseResources(data,totalLevel);const items=parseItems(data,abilities);
   if(featSelection.ignored.length)warnings.push({code:'incomplete-feat-choice',severity:'info',message:`Altered ignored ${featSelection.ignored.join(', ')} because D&D Beyond returned ${featSelection.ignored.length===1?'it as an unfinished feat choice':'them as unfinished feat choices'}, not selected character features.`});
   if(moonSpells.added)warnings.push({code:'circle-moon-spells-restored',severity:'info',message:`D&D Beyond omitted ${moonSpells.added} always-prepared Circle of the Moon spell${moonSpells.added===1?'':'s'} from its character payload. Altered restored the current 2024 Circle spell list for this Druid level.`});
   const activeItems=array(data.inventory).filter(raw=>Boolean(object(raw).equipped));

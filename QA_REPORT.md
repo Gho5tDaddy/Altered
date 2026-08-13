@@ -1,4 +1,14 @@
-# Altered v0.27.3 QA report
+# Altered v0.27.4 QA report
+
+## v0.27.4 early-save verification
+
+- Verified both D&D Beyond-provenance and early local-provenance Ferocitus saves are repaired.
+- Verified stale feat removal preserves unrelated character data and older named Handaxe/Greataxe records gain structured attacks.
+- Verified public imports create weapon actions, while equipped non-weapon items remain visible as reference gear.
+- Verified Base Form does not falsely count as worn armor and Unarmored Defense reports its real current state.
+- Verified feature cards include effect, usage, state, and colocated controls for supported activations.
+- Full release audit passes: strict TypeScript, clean build, **173/173 automated tests**, hosted-worker desktop/phone browser audit, and 48-rule/16-function evidence generation.
+- Live public Ferocitus validation returns no unfinished feat, three unique equipped weapon attacks, and active Unarmored Defense.
 
 ## v0.27.3 persisted-import repair
 

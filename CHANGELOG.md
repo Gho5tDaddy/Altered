@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.27.4
+
+- Extends the stale Ferocitus feat repair to early bundled saves whose canonical D&D Beyond character ID was stored with local provenance.
+- Preserves the character portrait, armor class, combat state, and every unrelated character field during repair.
+- Imports equipped weapons as structured attacks with proficiency, ability, damage, range, properties, and magic bonus instead of showing only generic unarmed options.
+- Restores Handaxe and Greataxe actions in older saved Ferocitus imports without requiring a character reset.
+- Corrects Unarmored Defense availability by checking actual worn armor instead of treating every Base Form as armored.
+- Reorganizes Features into plain-language groups with `What it does`, `How to use it`, and controls beside activatable abilities.
+
 ## v0.27.3
 
 - Repairs older saved Ferocitus imports that still contain D&D Beyond's unfinished `Dark Bargain` feat-choice placeholder.

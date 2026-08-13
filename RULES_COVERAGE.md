@@ -1,4 +1,4 @@
-# Rules coverage — v0.27.3
+# Rules coverage — v0.27.4
 
 ## Fully calculated in the bundled rules pack
 
@@ -34,7 +34,7 @@
 ## Calculated only when the imported sheet declares the feature
 
 - Public D&D Beyond character data is normalized into Altered's schema for identity, classes, abilities, HP, AC, speed, proficiencies, exact save/skill totals, equipped numeric modifiers, spell slots, prepared/known spells, selected or granted feats, limited-use resources, and recognizable legal forms. Unfinished feat choosers with no selected value are excluded and reported.
-- Imported D&D Beyond items retain private identity, equipped/attuned state, source IDs, ruleset markers, and whether their numeric effects are already included. Legacy and mixed-rules characters are blocked from the 2024-only engine.
+- Imported D&D Beyond items retain private identity, equipped/attuned state, source IDs, ruleset markers, and whether their numeric effects are already included. Equipped weapons additionally expose validated ability, proficiency, damage, range, properties, and magic bonus as executable Base Form attacks. Legacy and mixed-rules characters are blocked from the 2024-only engine.
 - Primal Strike and similar selected class options.
 - Imported structured speed bonuses, resistances, immunities, save bonuses, and Armor Class formulas.
 - War Caster, Eldritch Mind, and other named features that require presence on the character.
@@ -46,7 +46,7 @@ These remain visible and receive active, conditional, inactive, or table-ruling 
 
 - Bardic Inspiration and communication-dependent features.
 - Cleric and Paladin Channel Divinity options involving symbols, weapons, or option-specific wording.
-- Fighting Styles, Weapon Mastery, Sneak Attack, Blessed Strikes, Martial Arts, Extra Attack versus Multiattack, and equipment-dependent attacks.
+- Fighting Styles, Weapon Mastery riders, Sneak Attack, Blessed Strikes, Martial Arts, and Extra Attack sequencing. Basic imported weapon attacks are calculated, while private or conditional additions remain explicit rather than guessed.
 - Species body traits during replacement transformations; already-active timed effects can persist as overlays when declared.
 - Imported feats, subclasses, magic items, legacy content, and homebrew features without a structured grant definition.
 - Every SRD 5.2.1 subclass is listed feature-by-feature with an explicit calculated, conditional, or reference-only classification. Paid non-SRD subclass mechanics still require imported structured data.

@@ -279,6 +279,22 @@ test('owned imported feats are references, not falsely reported as missing requi
   assert.equal(transformedFeat.status,'inactive');assert.match(transformedFeat.reason,/does not retain feats/);
 });
 
+test('activatable features are not labeled as already applied before activation',()=>{
+  const c=character({species:'Goliath'});const state=createInitialState(c);const features=resolveSheet(c,state).features;
+  assert.equal(must(features.find(feature=>feature.id==='rage')).status,'conditional');
+  assert.equal(must(features.find(feature=>feature.id==='wild-shape')).status,'conditional');
+  assert.equal(must(features.find(feature=>feature.id==='wild-resurgence')).status,'conditional');
+  assert.equal(must(features.find(feature=>feature.id==='large-form')).status,'conditional');
+  startRage(c,state);assert.equal(must(resolveSheet(c,state).features.find(feature=>feature.id==='rage')).status,'active');
+});
+
+test('unarmored defense eligibility uses actual armor and equipped weapons become attacks',()=>{
+  const c=character({items:[{id:'axe',name:'Greataxe',type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d12',damageType:'Slashing',proficient:true,properties:['Heavy','Two-Handed'],magicBonus:0}}]});const state=createInitialState(c);const sheet=resolveSheet(c,state);
+  assert.equal(must(sheet.acCandidates.find(candidate=>candidate.name==='Barbarian Unarmored Defense')).legal,true);
+  assert.equal(must(sheet.features.find(feature=>feature.id==='barbarian-unarmored-defense')).status,'active');
+  const axe=must(sheet.actions.find(action=>action.id==='item-attack-axe'));assert.equal(axe.type,'attack');if(axe.type==='attack'){assert.equal(axe.attackBonus,4);assert.equal(axe.damage[0]?.expression,'1d12+1');}
+});
+
 test('Beast Spells does not make an unprepared spell available',()=>{
   const c=character({classes:[{name:'Druid',level:18,subclass:'Circle of the Land'}],totalLevel:18,knownForms:['dire-wolf'],spells:[{name:'Cure Wounds',level:1,sourceClass:'Druid',ability:'wis',prepared:false,castingTime:'magic-action'}]});const state=createInitialState(c);const wolf=availableTransformations(c,state).find(o=>o.profile==='wildshape');assert.ok(wolf);startTransformation(c,state,wolf);assert.equal(resolveSheet(c,state).spells[0]?.available,false);
 });

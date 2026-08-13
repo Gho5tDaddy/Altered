@@ -214,7 +214,7 @@ test('the focused workspace uses form-panel space for live stats and explains ab
   assert.match(styles,/\.play-view \.metric-grid\{display:none\}/);
   assert.match(html,/id="ability-actions-title">Use now/);
   assert.match(html,/id="ability-resources-title">Resources left/);
-  assert.match(source,/What happens automatically\?/);
+  assert.match(source,/Abilities, explained/);
   assert.match(source,/featureReferenceSection/);
   assert.match(source,/Applied automatically/);
 });
@@ -283,8 +283,19 @@ test('More exposes local artwork and homebrew creation without requiring JSON',(
 test('imported feats use accurate ownership language and can be corrected without JSON',()=>{
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const engine=readFileSync('src/engine.ts','utf8');
   for(const id of ['imported-feat-summary','imported-feat-list'])assert.match(html,new RegExp(`id="${id}"`));
-  assert.match(source,/function renderImportedFeatManagement/);assert.match(source,/Remove from Altered/);assert.match(source,/Owned · reference/);assert.match(source,/Conditional · use when triggered/);
+  assert.match(source,/function renderImportedFeatManagement/);assert.match(source,/Remove from Altered/);assert.match(source,/Owned · reference/);assert.match(source,/Use or confirm/);
   assert.equal(/feature\.status==='conditional'\?'requirements'/.test(source),false);assert.match(engine,/Owned by this character and retained in the current form/);
+});
+
+test('feature view explains effects and places activation controls with the feature',()=>{
+  const source=readFileSync('src/app.ts','utf8');
+  assert.match(source,/Abilities, explained/);assert.match(source,/What it does/);assert.match(source,/How to use it/);
+  assert.match(source,/function appendFeatureControls/);assert.match(source,/Use or confirm/);assert.match(source,/Applied automatically/);assert.match(source,/Owned references/);assert.match(source,/Unavailable now/);
+});
+
+test('actions surface equipped gear and usable imported weapons',()=>{
+  const source=readFileSync('src/app.ts','utf8');
+  assert.match(source,/Equipped gear/);assert.match(source,/usable weapon/);assert.match(source,/imported bonuses are not applied twice/);
 });
 
 test('spent turn economy is unavailable now, not a missing character requirement',()=>{
