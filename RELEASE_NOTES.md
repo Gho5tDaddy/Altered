@@ -1,3 +1,15 @@
+# Altered v0.29.0 release notes
+
+## Stability-first usability and accessibility polish
+
+Suggested Next now stays synchronized after form selection, transformation, and Character-tab changes, and its Show me target is never left pointing at a removed control. The walkthrough uses the current Play, Forms, Character, Manage, and A-menu navigation. Latest Result returns to the tool that produced the roll.
+
+The persistent portrait remains the visual anchor in every workspace. Active-form layouts reserve enough room for the form name, live statistics, action economy, End Form, and turn controls. Preview statistics are explicitly identified as the current values until transformation.
+
+Focused pages reach useful controls sooner: common actions precede one collapsed unavailable group, situational roll settings use a compact Roll options disclosure, active effects expand only from Abilities, core abilities stay ahead of a collapsed resource summary, and developer-facing rules diagnostics are collapsed in Settings. Blocked ability reasons are visible, not tooltip-only.
+
+Keyboard focus is restored safely when leaving a workspace, scroll regions are focusable, file uploads have a visible focus state, touch layouts enforce 44-pixel interactive targets, small combat labels are more legible, and modal Escape handling no longer changes the hidden workspace. Rules, calculations, saved characters, combat state, imports/exports, private content, artwork, and standalone/hosted formats remain compatible.
+
 # Altered v0.28.1 release notes
 
 ## Responsive readability audit

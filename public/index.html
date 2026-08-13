@@ -12,7 +12,7 @@
 <body>
   <div id="app" class="app-shell">
     <header class="topbar">
-      <button id="toggle-app-menu" class="brand-mark" type="button" aria-label="Open Altered menu" aria-expanded="false" aria-controls="top-actions"><img src="icon-192.png" alt=""></button>
+      <button id="toggle-app-menu" class="brand-mark" type="button" aria-label="Open Altered menu" aria-expanded="false" aria-controls="top-actions"><img src="icon-192.png" alt=""><span class="brand-menu-cue" aria-hidden="true">⌄</span></button>
       <div class="brand-copy"><h1>ALTERED</h1><p>Rules-aware transformation character sheet</p></div>
       <div id="top-actions" class="top-actions" aria-label="Application controls">
         <div id="account-status" class="account-status" hidden>
@@ -43,6 +43,7 @@
         <button id="open-persistent-form" class="persistent-form-copy" type="button">
           <span id="persistent-form-state" class="persistent-form-kicker">Base Form</span>
           <strong id="persistent-form-name">Base Form</strong>
+          <small id="persistent-stat-context" class="persistent-stat-context" hidden>Current stats until transformed</small>
           <span class="persistent-form-stats" aria-label="Live current form statistics">
             <span><small>HP</small><b id="persistent-hp">0 / 0</b></span>
             <span><small>Temp</small><b id="persistent-temp">0</b></span>
@@ -61,8 +62,8 @@
         </div>
       </aside>
       <div class="workspace-stage">
-      <section id="workspace-play" class="workspace-view play-view panel" data-workspace-view="play" aria-labelledby="play-view-title">
-        <h2 id="play-view-title" class="sr-only">Play</h2>
+      <section id="workspace-play" class="workspace-view play-view panel" data-workspace-view="play" aria-labelledby="play-view-title" tabindex="0">
+        <h2 id="play-view-title" class="sr-only" tabindex="-1">Play</h2>
         <span id="play-form-detail" hidden>Character sheet</span>
         <div id="metric-grid" class="metric-grid" hidden aria-hidden="true"></div>
         <button id="open-active-effects" class="play-summary-button" type="button" hidden>
@@ -94,8 +95,8 @@
         </div>
       </section>
 
-      <section id="workspace-forms" class="workspace-view forms-view panel" data-workspace-view="forms" aria-labelledby="forms-view-title" hidden>
-        <div class="workspace-heading"><div><span>Transformation</span><h2 id="forms-view-title">Choose a form</h2></div><button class="text-button workspace-home" type="button">Back to Play</button></div>
+      <section id="workspace-forms" class="workspace-view forms-view panel" data-workspace-view="forms" aria-labelledby="forms-view-title" tabindex="0" hidden>
+        <div class="workspace-heading"><div><span>Transformation</span><h2 id="forms-view-title" tabindex="-1">Choose a form</h2></div><button class="text-button workspace-home" type="button">Back to Play</button></div>
         <details id="character-form-drawer" class="character-form-drawer" open>
           <summary><span><strong>Character &amp; Form</strong><small id="character-form-summary">Base Form selected</small></span><span class="drawer-hint" aria-hidden="true"></span></summary>
           <div class="hero-grid">
@@ -142,20 +143,19 @@
         </details>
       </section>
 
-      <section id="workspace-task" class="workspace-view task-view panel" data-workspace-view="task" aria-labelledby="task-view-title" hidden>
+      <section id="workspace-task" class="workspace-view task-view panel" data-workspace-view="task" aria-labelledby="task-view-title" tabindex="0" hidden>
         <div class="workspace-heading"><div><span>Focused tool</span><h2 id="task-view-title" tabindex="-1">Actions</h2></div><button id="close-task-view" class="text-button" type="button">Back to Play</button></div>
         <section id="task-abilities" class="task-abilities" hidden>
-          <div class="ability-guide"><strong>Abilities &amp; resources</strong><span>Resource counts stay visible here. Use each ability from its explained card below; disabled controls say what is missing.</span></div>
           <section id="ability-use-now" class="ability-control-group" aria-labelledby="ability-actions-title" hidden>
             <div class="ability-group-heading"><h3 id="ability-actions-title">Use now</h3><span>Tap an available ability</span></div>
             <div id="quick-features" class="quick-features"></div>
           </section>
-          <section class="ability-control-group" aria-labelledby="ability-resources-title">
-            <div class="ability-group-heading"><h3 id="ability-resources-title">Resources left</h3><span>Current / maximum</span></div>
+          <details class="ability-resource-details">
+            <summary><span><strong id="ability-resources-title">Resources left</strong><small id="ability-resource-summary">Open current counts</small></span></summary>
             <div id="resource-strip" class="resource-strip"></div>
-          </section>
+          </details>
         </section>
-        <section id="active-effects" class="active-effects" aria-live="polite" hidden></section>
+        <details id="active-effects" class="active-effects" aria-live="polite" hidden></details>
         <nav class="tabs" role="tablist" aria-label="Character sheet sections">
           <button id="tab-actions" class="tab active" data-tab="actions" type="button" role="tab" aria-selected="true" aria-controls="tab-content" tabindex="0">Actions</button>
           <button id="tab-rolls" class="tab" data-tab="rolls" type="button" role="tab" aria-selected="false" aria-controls="tab-content" aria-label="Checks: saves, skills, and initiative" tabindex="-1">Checks</button>
@@ -171,8 +171,8 @@
         <section id="tab-content" class="tab-content" role="tabpanel" aria-labelledby="tab-actions" tabindex="0"></section>
       </section>
 
-      <section id="workspace-more" class="workspace-view more-view" data-workspace-view="more" aria-labelledby="more-view-title" hidden>
-        <div class="workspace-heading panel"><div><span>Management</span><h2 id="more-view-title">Character &amp; Session</h2></div><button class="text-button workspace-home" type="button">Back to Play</button></div>
+      <section id="workspace-more" class="workspace-view more-view" data-workspace-view="more" aria-labelledby="more-view-title" tabindex="0" hidden>
+        <div class="workspace-heading panel"><div><span>Management</span><h2 id="more-view-title" tabindex="-1">Character &amp; Session</h2></div><button class="text-button workspace-home" type="button">Back to Play</button></div>
         <div class="more-links panel" aria-label="Character management">
           <button id="more-resume-setup" class="button secondary resume-setup-button" type="button" hidden>Resume Content Setup</button>
           <button id="more-customize" class="button secondary more-link" type="button"><strong>Customize</strong><small>Art &amp; homebrew</small></button>
@@ -578,7 +578,9 @@
       <label class="setting-row" for="guided-next-step"><span><strong>Suggested next step</strong><small>Show one optional, rules-valid place to go next. It never chooses tactics, targets, or spends resources.</small></span><input id="guided-next-step" type="checkbox"></label>
       <label class="setting-row" for="auto-refresh-character"><span><strong>Keep linked character current</strong><small>Check the selected public D&amp;D Beyond character on startup and whenever Altered returns to the foreground. Turn this off to keep the saved version.</small></span><input id="auto-refresh-character" type="checkbox"></label>
       <div class="character-refresh-setting"><p id="character-refresh-status" role="status" aria-live="polite">No linked character has been checked yet.</p><button id="settings-refresh-character" class="button compact secondary" type="button">Check Character Now</button></div>
-      <div class="settings-data">
+      <details class="settings-data">
+        <summary><span><strong>Rules data &amp; diagnostics</strong><small>Verified packs and live SRD status</small></span></summary>
+        <div class="settings-data-content">
         <h3>Rules databank</h3>
         <p id="content-registry-summary"></p>
         <div id="content-pack-list" class="content-pack-list"></div>
@@ -586,7 +588,8 @@
           <div class="section-title"><h3>Legal SRD support catalog</h3><button id="refresh-srd-catalog" class="button compact secondary" type="button">Check now</button></div>
           <p id="srd-catalog-status" class="catalog-check-result checking" role="status" aria-live="polite">Checking the live legal SRD support catalog...</p>
         </div>
-      </div>
+        </div>
+      </details>
     </div>
   </dialog>
 

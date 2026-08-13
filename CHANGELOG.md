@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.29.0
+
+- Synchronized Suggested Next after form selection, transformation, and Character-tab changes.
+- Updated the walkthrough to the current workspaces and discoverable A menu.
+- Kept active-form identity and live cockpit data fully visible on phone layouts.
+- Prioritized executable actions and core abilities with compact disclosures for optional, unavailable, and diagnostic content.
+- Preserved complete roll explanations and returns Latest Result to the originating tool.
+- Added visible blocked-control reasons, safe focus restoration, focusable scroll regions, file-input focus cues, and 44-pixel coarse-pointer targets.
+- Verified unchanged rules, persistence, import/export, private-content, artwork, and build compatibility.
+
 ## v0.28.1
 
 - Let long species, class, subclass, and multiclass descriptions wrap within the mobile character header.

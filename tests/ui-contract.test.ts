@@ -49,6 +49,7 @@ test('help and first-launch walkthrough remain optional, searchable, and restart
   assert.match(source,/availableWalkthroughSteps\(\)/);
   assert.match(source,/if\(!walkthroughCompleted\)startWalkthrough\(\)/);
   assert.match(source,/saveBooleanSetting\(WALKTHROUGH_SETTING,true\)/);
+  assert.match(source,/selector:'\.persistent-form-visual'/);assert.match(source,/Play, Forms, Character, and Manage/);assert.match(source,/selector:'#toggle-app-menu'/);
   assert.match(source,/setTimeout\(\(\)=>focusTarget\.focus\(\{preventScroll:true\}\),0\)/);
   assert.match(styles,/\.walkthrough-target\{/);
   assert.match(styles,/@media\(prefers-reduced-motion:reduce\)/);
@@ -245,6 +246,7 @@ test('the focused workspace uses form-panel space for live stats and explains ab
   assert.match(styles,/@keyframes availableFormNamePulse/);assert.match(styles,/@media\(prefers-reduced-motion:reduce\)[\s\S]*availableFormNamePulse|animation:none!important/);
   assert.match(html,/id="ability-actions-title">Use now/);assert.match(html,/aria-labelledby="ability-actions-title" hidden/);
   assert.match(html,/id="ability-resources-title">Resources left/);
+  assert.match(html,/class="ability-resource-details"/);assert.match(html,/id="ability-resource-summary"/);assert.match(html,/id="persistent-stat-context"/);
   assert.match(source,/Abilities, explained/);
   assert.match(source,/featureReferenceSection/);
   assert.match(source,/Applied automatically/);
@@ -317,6 +319,8 @@ test('optional next-step guidance stays contextual, non-tactical, and persistent
   assert.match(html,/never chooses tactics, targets, or spends resources/i);
   assert.match(source,/loadBooleanSetting\('guided-next-step-v1',true\)/);assert.match(source,/saveBooleanSetting\('guided-next-step-v1'/);
   assert.match(source,/function recommendNextStep/);assert.match(source,/function renderNextStepGuide/);assert.match(source,/function revealNextStep/);
+  assert.match(source,/function activateTab[\s\S]*renderNextStepGuide\(\)/);assert.match(source,/#form-select'\)\.addEventListener\('change',[\s\S]*renderNextStepGuide\(\)/);
+  assert.match(source,/Your form is active\. Return to Play/);assert.match(source,/latestRollTab=currentTab/);assert.match(source,/openTask\(latestRollTab,'play'\)/);
   for(const guidance of ['Resolve Relentless Rage','Roll a death save','Resolve Concentration','Complete Extra Attack','Consider Rage, then attack','Consider Barkskin','End this turn'])assert.match(source,new RegExp(guidance));
   assert.match(source,/You can still choose any other legal action/);assert.match(styles,/\.next-step-target/);assert.match(styles,/prefers-reduced-motion:reduce[\s\S]*\.next-step-target/);
 });
@@ -419,6 +423,15 @@ test('every primary workspace uses consistent names and phone-safe controls',()=
   assert.match(html,/id="tab-rolls"[^>]*aria-label="Checks: saves, skills, and initiative"[^>]*>Checks<\/button>/);assert.match(html,/id="tab-features"[^>]*>Abilities<\/button>/);
   assert.match(html,/id="more-customize"/);assert.match(source,/#more-customize'\)\.addEventListener/);assert.equal(/customize-drawer" name="more-controls" open/.test(html),false);
   assert.match(styles,/navigation clarity, touch safety, and active-overlay escape paths/);assert.match(styles,/\.persistent-turn-controls \.button[^}]*min-height:44px/);assert.match(styles,/\.app-shell\.form-active:not\(\.effects-disabled\) \.workspace-view\{overflow:auto\}/);
+  assert.equal((html.match(/data-workspace-view="[^\"]+"[^>]*tabindex="0"/g)??[]).length,4);assert.match(styles,/@media\(pointer:coarse\)[\s\S]*min-block-size:44px/);
+  assert.match(html,/class="brand-menu-cue"/);assert.match(styles,/\.file-button:focus-within/);assert.match(source,/document\.querySelector\('dialog\[open\]'\)/);
+});
+
+test('focused action pages prioritize executable controls without losing advanced choices',()=>{
+  const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
+  assert.match(source,/function collapseActionOptions/);assert.match(source,/Unavailable right now \(\$\{unavailableCount\}\)/);
+  assert.match(source,/c\.options\.append\(conditionalRollToggle/);assert.match(styles,/\.action-options-disclosure/);assert.match(styles,/\.unavailable-actions/);
+  assert.match(source,/Applied automatically'[\s\S]*open:false/);assert.match(source,/appendControlReason\(actions,toShape/);assert.match(styles,/\.control-block-reason/);
 });
 
 test('private transformation builder supports guided ability substitutions and activation saves',()=>{
