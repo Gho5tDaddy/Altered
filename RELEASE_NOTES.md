@@ -1,3 +1,11 @@
+# Altered v0.27.8 release notes
+
+## Clearer enhancements and forms
+
+The private transformation builder now begins by distinguishing an **Enhancement**—such as a stance, summoned limbs, aura, or wings—from a **Replacement form** that supplies another body or stat block. A compact quick setup can fill the existing validated fields for ability substitution, movement, or replacement mechanics. The live summary states exactly which sheet, check, save, attack, damage, and movement rules will change before the pack is installed.
+
+For an Astral-style enhancement, the starting point configures Strength checks and saves to use Wisdom and unarmed attack and damage rolls to use Wisdom. The user remains responsible for adjusting activation, duration, save DC, damage, and resources to match content they own. This release changes no transformation architecture or saved-data format.
+
 # Altered v0.27.7 release notes
 
 ## Guided visual next steps

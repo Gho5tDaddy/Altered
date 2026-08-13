@@ -1,3 +1,14 @@
+# Altered v0.27.8 QA report
+
+## Enhancement-builder stability verification
+
+- Verified the ability-substitution starting point uses the existing overlay profile and validated effect fields.
+- Verified Strength-to-Wisdom checks, saves, and unarmed attack/damage substitutions remain executable through the existing rules engine.
+- Verified movement and replacement starting points do not modify saved characters until Create & Install Pack is submitted.
+- Verified the live summary updates without writing state, spending resources, or changing the active form.
+- Verified legacy private packs and character saves require no migration.
+- Final release gates pass with **190/190 automated tests**, desktop/phone hosted-worker audits, and the 48-rule/16-function evidence audit.
+
 # Altered v0.27.7 QA report
 
 ## v0.27.7 guided-cue verification

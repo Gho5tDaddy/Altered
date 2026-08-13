@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.27.8
+
+- Reframed private setup as Enhancement versus Replacement so additive states no longer read like creature forms.
+- Added compact quick-start presets for ability substitution, movement enhancements, and replacement forms.
+- Added a live plain-language mechanics summary before installation.
+- Preserved the existing overlay engine, schema, saved packs, and Wild Shape behavior.
+
 ## v0.27.7
 
 - Added bright green ready and bright red blocked pulses to the Transform button, with written and screen-reader state labels.

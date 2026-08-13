@@ -488,13 +488,22 @@
 
   <dialog id="transform-builder-dialog" class="wide-dialog" aria-labelledby="transform-builder-title">
     <form id="transform-builder-form" class="dialog-card builder-card">
-      <div class="section-title"><h2 id="transform-builder-title">Create Private Transformation</h2><button id="close-transform-builder" class="text-button" type="button">Close</button></div>
-      <p class="import-intro">Enter only the mechanical values from content you own. The resulting pack remains local and can be exported as your private backup.</p>
+      <div class="section-title"><h2 id="transform-builder-title">Create an Enhancement or Form</h2><button id="close-transform-builder" class="text-button" type="button">Close</button></div>
+      <p class="import-intro">Start with what happens to the character. An enhancement keeps the current sheet and changes only the rules you select; a replacement form supplies a different body or stat block.</p>
+      <section class="builder-start" aria-labelledby="builder-start-title">
+        <div><strong id="builder-start-title">Quick setup</strong><small>Optional presets fill ordinary mechanical fields only. Review them against content you own before saving.</small></div>
+        <div class="builder-start-controls">
+          <label for="builder-template">What are you creating?</label>
+          <select id="builder-template"><option value="blank">Choose a starting point</option><option value="ability-substitution">Enhancement: use one ability instead of another</option><option value="movement">Enhancement: wings or movement</option><option value="replacement">Replacement body or stat block</option></select>
+          <button id="apply-builder-template" class="button secondary compact" type="button">Apply starting point</button>
+        </div>
+        <p id="builder-mechanics-summary" class="builder-mechanics-summary" aria-live="polite">Enhancement selected: the current character sheet stays active and only entered mechanics change.</p>
+      </section>
       <div class="builder-grid">
         <div><label for="builder-pack-name">Pack name</label><input id="builder-pack-name" value="My Private Transformations" required></div>
         <div><label for="builder-source">Source reference</label><input id="builder-source" value="Content I own" required></div>
         <div><label for="builder-label">Transformation name</label><input id="builder-label" required placeholder="Example: Starry Form — Dragon"></div>
-        <div><label for="builder-profile">Rules profile</label><select id="builder-profile"><option value="overlay">Modify current statistics</option><option value="custom">Custom replacement or special form</option><option value="wildshape">Wild Shape replacement</option><option value="polymorph">Polymorph replacement</option><option value="true-polymorph">True Polymorph replacement</option><option value="shapechange">Shapechange replacement</option><option value="animal-shapes">Animal Shapes replacement</option></select></div>
+        <div><label for="builder-profile">How it changes the character</label><select id="builder-profile"><option value="overlay">Enhancement — keep the current sheet</option><option value="custom">Special or replacement form</option><option value="wildshape">Wild Shape replacement</option><option value="polymorph">Polymorph replacement</option><option value="true-polymorph">True Polymorph replacement</option><option value="shapechange">Shapechange replacement</option><option value="animal-shapes">Animal Shapes replacement</option></select><small id="builder-profile-help">Best for stances, summoned limbs, auras, wings, and other effects that modify rather than replace.</small></div>
         <div><label for="builder-retention">Custom form retention</label><select id="builder-retention"><option value="class-form">Retain character and class capabilities</option><option value="wildshape-like">Wild Shape-like; spellcasting blocked</option><option value="full-replacement">Full replacement; retain HP and Hit Dice only</option><option value="shapechange-like">Shapechange-like</option></select></div>
         <div><label for="builder-action">Activation</label><select id="builder-action"><option value="bonus">Bonus Action</option><option value="action">Action</option><option value="magic-action">Magic action</option><option value="reaction">Reaction</option><option value="free">No action</option></select></div>
         <div><label for="builder-end-action">End form</label><select id="builder-end-action"><option value="bonus">Bonus Action</option><option value="action">Action</option><option value="none">No action</option></select></div>

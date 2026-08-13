@@ -381,8 +381,9 @@ test('every primary workspace uses consistent names and phone-safe controls',()=
 
 test('private transformation builder supports guided ability substitutions and activation saves',()=>{
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const types=readFileSync('src/types.ts','utf8');const schema=readFileSync('src/schema.ts','utf8');
-  for(const id of ['builder-substitute-from','builder-substitute-to','builder-substitute-checks','builder-substitute-saves','builder-attack-ability','builder-attack-scope','builder-trigger-name','builder-trigger-save','builder-trigger-dc','builder-trigger-damage','builder-trigger-damage-type','builder-trigger-half'])assert.match(html,new RegExp(`id="${id}"`));
+  for(const id of ['builder-template','apply-builder-template','builder-mechanics-summary','builder-profile-help','builder-substitute-from','builder-substitute-to','builder-substitute-checks','builder-substitute-saves','builder-attack-ability','builder-attack-scope','builder-trigger-name','builder-trigger-save','builder-trigger-dc','builder-trigger-damage','builder-trigger-damage-type','builder-trigger-half'])assert.match(html,new RegExp(`id="${id}"`));
   assert.match(types,/checkAbilitySubstitution/);assert.match(types,/saveAbilitySubstitution/);assert.match(types,/attackAbilityOverride/);assert.match(schema,/attackAbilityOverride\.appliesTo/);assert.match(source,/Resolve this once when the transformation is activated/);
+  assert.match(source,/function syncBuilderGuidance/);assert.match(source,/function applyBuilderTemplate/);assert.match(source,/ability-substitution/);assert.match(html,/Enhancement — keep the current sheet/);
 });
 
 test('additive forms always expose an end path while preserving workspace scrolling',()=>{
