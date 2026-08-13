@@ -5,7 +5,7 @@ import {CLASS_FEATURES,CREATURES,SPECIES_FEATURES,SUBCLASS_FEATURES} from '../sr
 import {parseCharacter} from '../src/schema.js';
 import {
   applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,criticalDiceExpression,criticalHitThreshold,deathSaveMode,declareRecklessAttack,
-  actionExecutionError,clearConditions,endConcentration,endSpellEffect,endTransformation,endTurn,extendRage,extraAttackCount,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,removeCondition,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,spendActionExecution,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
+  actionExecutionError,clearConditions,declareAttack,endConcentration,endSpellEffect,endTransformation,endTurn,extendRage,extraAttackCount,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,removeCondition,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,spendActionExecution,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
 } from '../src/engine.js';
 
 function must<T>(value:T|undefined):T{if(value===undefined)throw new Error('Expected value was missing.');return value}
@@ -565,6 +565,16 @@ test('attack d20 resolution is deterministic for Advantage, Disadvantage, natura
 test('conditional attack modifiers for Grappled and Pack Tactics are surfaced without guessing the target',()=>{
   const c=character();const state=createInitialState(c);state.conditions.push('Grappled');let sheet=resolveSheet(c,state);let attack=sheet.actions.find(action=>action.type==='attack');assert.ok(attack);assert.match(attackRollSources(c,state,must(attack),sheet).conditional.join(' '),/other than the grappler/);
   state.conditions=[];const wolf=availableTransformations(c,state).find(option=>option.formId==='dire-wolf'&&option.profile==='wildshape');assert.ok(wolf);startTransformation(c,state,must(wolf));sheet=resolveSheet(c,state);attack=sheet.actions.find(action=>action.type==='attack');assert.ok(attack);assert.match(attackRollSources(c,state,must(attack),sheet).conditional.join(' '),/Pack Tactics/);
+});
+
+test('choice-bearing actions are structured for beasts, rogues, multiclass characters, and Thief Fast Hands',()=>{
+  const tiger=must(CREATURES.tiger).actions.find(action=>action.id==='nimble-escape');assert.equal(tiger?.type,'automatic');if(tiger?.type==='automatic')assert.deepEqual(tiger.choices?.map(choice=>choice.resolution),['disengage','hide']);
+  const rogue=character({classes:[{name:'Rogue',level:3,subclass:'Thief'},{name:'Druid',level:2}],totalLevel:5,knownForms:['panther'],seenForms:['panther']});const state=createInitialState(rogue);const baseAction=resolveSheet(rogue,state).actions.find(action=>action.id==='cunning-action');assert.equal(baseAction?.type,'automatic');if(baseAction?.type==='automatic')assert.deepEqual(baseAction.choices?.map(choice=>choice.resolution),['dash','disengage','hide','skill-check','utilize','magic-item']);
+  const panther=availableTransformations(rogue,state).find(option=>option.formId==='panther'&&option.profile==='wildshape');assert.ok(panther);startTransformation(rogue,state,must(panther));assert.ok(resolveSheet(rogue,state).actions.some(action=>action.id==='cunning-action'),'retained multiclass choice action remains available in Wild Shape');
+});
+
+test('Hidden grants attack Advantage and ends immediately after the attack roll is made',()=>{
+  const c=character({classes:[{name:'Rogue',level:2}],totalLevel:2,knownForms:[],seenForms:[]});const state=createInitialState(c);state.conditions.push('Hidden');const attack=must(resolveSheet(c,state).actions.find(action=>action.type==='attack'));assert.ok(attackRollSources(c,state,attack).sources.advantage.includes('Hidden'));declareAttack(state,attack);assert.equal(state.conditions.includes('Hidden'),false);
 });
 
 test('Invisible grants attack Advantage and transformed condition immunity can suppress an existing incapacitating condition',()=>{

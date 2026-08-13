@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.29.4
+
+- Rebuilt Tiger and Panther Nimble Escape as explicit Disengage or Hide choices instead of an ambiguous one-click action.
+- Added the complete 2024 Hide flow: visible battlefield confirmation, current-form Stealth roll against DC 15, persistent Hidden status, attack Advantage, and automatic ending after an attack roll or a spell with a Verbal component.
+- Added tracked Dash and Disengage turn effects with clear active-state explanations.
+- Added executable Cunning Action choices for Rogue multiclasses and the verified Sleight of Hand, Utilize, and Magic Item Fast Hands choices for Thief characters.
+- Required visible prerequisite confirmation before any bundled or structured imported automatic action can spend an Action, Bonus Action, or Reaction.
+- Extended the safe JSON schema with bounded, enumerated automatic-action choices while preserving all older imports and saves.
+
 ## v0.29.3
 
 - Added an accurate End Turn readiness cue only after Action, Surge Action, Bonus Action, remaining Extra Attacks, and required pending resolutions are complete; Reaction correctly remains available off-turn.

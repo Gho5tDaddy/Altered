@@ -16,6 +16,10 @@ export interface AttackRider {
   id:string;label:string;prerequisite:string;damage?:DamagePacket[];effects?:ConditionEffect[];
 }
 export interface ActionUseLimit {max:number;recovery:'long'}
+export type AutomaticActionChoiceResolution='dash'|'disengage'|'hide'|'skill-check'|'utilize'|'magic-item'|'activate';
+export interface AutomaticActionChoice {
+  id:string;label:string;resolution:AutomaticActionChoiceResolution;prerequisite?:string;skill?:string;notes?:string;
+}
 
 export interface AttackAction {
   id:string;name:string;type:'attack';cost:ActionCost;attackBonus:number;ability:Ability;
@@ -30,7 +34,7 @@ export interface SaveAction {
 }
 export interface AutomaticAction {
   id:string;name:string;type:'automatic';cost:ActionCost;damage?:DamagePacket[];
-  damageTiming?:string;effects?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;prerequisite?:string;notes?:string;
+  damageTiming?:string;effects?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;prerequisite?:string;choices?:AutomaticActionChoice[];notes?:string;
 }
 export interface MultiattackVariant {id:string;label:string;sequence:string[]}
 export interface MultiattackAction {id:string;name:string;type:'multiattack';cost:'action';sequence:string[];variants?:MultiattackVariant[];notes?:string}

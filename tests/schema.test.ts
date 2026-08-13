@@ -10,6 +10,12 @@ test('rejects unsafe damage expressions',()=>assert.throws(()=>parseCharacter({.
 test('rejects unknown damage types',()=>assert.throws(()=>parseCharacter({...base,spells:[{name:'Bad',level:1,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',damage:[{expression:'1d6',type:'Laser'}]}]}),/supported damage type/));
 test('safeJsonParse enforces size limit',()=>assert.throws(()=>safeJsonParse(' '.repeat(1_000_001)),/1 MB/));
 
+test('preserves validated automatic-action choices and rejects invented resolution modes',()=>{
+  const form={id:'choice-form',name:'Choice Form',type:'Beast',cr:1,size:'Medium',ac:12,hp:10,hitDice:'2d8',abilities:{str:10,dex:14,con:10,int:3,wis:12,cha:6},saves:{},skills:{Stealth:4},speeds:{walk:30},senses:[],resistances:[],immunities:[],vulnerabilities:[],traits:[],actions:[{id:'escape',name:'Escape',type:'automatic',cost:'bonus',choices:[{id:'hide',label:'Hide',resolution:'hide',skill:'Stealth',prerequisite:'Out of sight.'}]}],source:{ruleset:'Private',page:'Fixture',verified:'Test'}};
+  const parsed=parseCharacter({...base,customForms:[form]});const action=parsed.customForms['choice-form']?.actions[0];assert.equal(action?.type,'automatic');if(action?.type==='automatic')assert.equal(action.choices?.[0]?.resolution,'hide');
+  assert.throws(()=>parseCharacter({...base,customForms:[{...form,actions:[{...form.actions[0],choices:[{id:'bad',label:'Bad',resolution:'teleport-anywhere'}]}]}]}),/resolution is unsupported/);
+});
+
 test('preserves structured item effects without accepting arbitrary effect kinds',()=>{
   const c=parseCharacter({...base,items:[{id:'cloak',name:'Cloak',type:'Wondrous item',equipped:true,attuned:true,requiresAttunement:true,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',effects:[{kind:'armor-class',value:1,includedInImportedTotals:true}]}]});
   assert.deepEqual(c.items[0]?.effects,[{kind:'armor-class',value:1,includedInImportedTotals:true}]);

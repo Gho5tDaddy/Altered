@@ -33,6 +33,8 @@ test('every static button is connected to an application control path',()=>{
   }
 });
 
+test('conditional automatic actions require visible confirmation or an explicit structured choice',()=>{const source=readFileSync('src/app.ts','utf8');assert.match(source,/Confirm prerequisite:/);assert.match(source,/Confirm \$\{choice\.label\}/);assert.match(source,/Use \$\{action\.name\}: \$\{choice\.label\}/);assert.match(source,/Confirm the visible prerequisite before using this option/);});
+
 test('help and first-launch walkthrough remain optional, searchable, and restartable',()=>{
   const html=readFileSync('public/index.html','utf8');
   const source=readFileSync('src/app.ts','utf8');
