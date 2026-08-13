@@ -1869,3 +1869,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .persistent-action-economy .economy-chip{font-size:.51rem;padding-inline:2px}
   .persistent-form-open{display:none}
 }
+
+/* Unfolded phones and compact tablets need a wider cockpit than laptops. */
+@media(min-width:820px) and (max-width:1180px){
+  .workspace{grid-template-columns:minmax(240px,260px) minmax(0,1fr);gap:10px}
+  html[data-altered-workspace="forms"] .workspace{grid-template-columns:minmax(270px,300px) minmax(0,1fr)}
+  .persistent-action-economy{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:6px 8px}
+  .persistent-action-economy .economy-chip{font-size:.58rem;padding:4px 5px}
+  .persistent-form-copy{padding-inline:11px}
+}
