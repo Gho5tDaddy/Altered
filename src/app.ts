@@ -111,6 +111,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
+const APP_VERSION='0.29.2';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 type UiStatus='available'|'active'|'inactive'|'locked'|'unavailable'|'requirements'|'selected'|'favorite'|'new'|'importing'|'loading'|'success'|'warning'|'error';
 const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
@@ -745,7 +746,7 @@ function renderCharacterStrip(){
   for(const c of characters){const option=document.createElement('option');option.value=c.id;option.textContent=c.name;select.append(option);}select.value=character.id;
   $('#character-name').textContent=character.name;
   $('#character-build').textContent=`${character.species} · ${character.classes.map(c=>`${c.subclass?`${c.subclass} `:''}${c.name} ${c.level}`).join(' / ')}`;
-  const meta=rulesMetadata();$('#rules-badge').textContent=`${meta.srd} · ${auditSnapshot.rules} audited rules · verified ${meta.reviewed}`;
+  const meta=rulesMetadata();$('#rules-badge').textContent=`App ${APP_VERSION} · Rules SRD ${meta.srd} · ${auditSnapshot.rules} audited · verified ${meta.reviewed}`;
   $<HTMLButtonElement>('#more-delete-character').disabled=baseCharacters.length<=1;
   renderImportedFeatManagement();
 }
@@ -1323,7 +1324,14 @@ function initializeControls(){
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshLinkedCharacter(false,false);});
   window.addEventListener('online',()=>void refreshLinkedCharacter(false,true));
   window.addEventListener('beforeunload',persist);
-  if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
+    const hadController=Boolean(navigator.serviceWorker.controller);
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if(!hadController||sessionStorage.getItem('altered-update-reload')==='1')return;
+      sessionStorage.setItem('altered-update-reload','1');location.reload();
+    });
+    navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});
+  }
 }
 
 async function boot(){

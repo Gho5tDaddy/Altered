@@ -1,7 +1,7 @@
 {
   "artifact": "Altered D&D 5e 2024 rules audit evidence",
-  "version": "0.29.1",
-  "generatedAt": "2026-08-13T19:39:25.156Z",
+  "version": "0.29.2",
+  "generatedAt": "2026-08-13T20:31:33.908Z",
   "rules": {
     "rules": 48,
     "functions": 16,
@@ -30,7 +30,7 @@
       {
         "id": "altered-srd-creatures",
         "domain": "creatures",
-        "version": "0.29.1",
+        "version": "0.29.2",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 16,
@@ -39,7 +39,7 @@
       {
         "id": "altered-core-class-features",
         "domain": "class-features",
-        "version": "0.29.1",
+        "version": "0.29.2",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 96,
@@ -48,7 +48,7 @@
       {
         "id": "altered-core-species-features",
         "domain": "species-features",
-        "version": "0.29.1",
+        "version": "0.29.2",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 11,
@@ -57,7 +57,7 @@
       {
         "id": "altered-core-feat-hooks",
         "domain": "feats",
-        "version": "0.29.1",
+        "version": "0.29.2",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 1,
@@ -66,7 +66,7 @@
       {
         "id": "altered-spell-hooks",
         "domain": "spells",
-        "version": "0.29.1",
+        "version": "0.29.2",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 13,
@@ -75,7 +75,7 @@
       {
         "id": "altered-item-hooks",
         "domain": "items",
-        "version": "0.29.1",
+        "version": "0.29.2",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 0,
@@ -84,7 +84,7 @@
       {
         "id": "altered-core-conditions",
         "domain": "conditions",
-        "version": "0.29.1",
+        "version": "0.29.2",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 15,
@@ -93,7 +93,7 @@
       {
         "id": "altered-transformation-profiles",
         "domain": "transformation-profiles",
-        "version": "0.29.1",
+        "version": "0.29.2",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 8,
@@ -101,7 +101,7 @@
       }
     ],
     "totalRecords": 160,
-    "manifestSha256": "d0595362cff8f62b0b4b4e777990509273fafc2d038c12b8322a86ddedd57c8a"
+    "manifestSha256": "cfe0c5611a189e8414a0a87f5f0de3ce1f6444f26542cbf1d3d9af15ae96cdd5"
   },
   "interactionMatrix": [
     {

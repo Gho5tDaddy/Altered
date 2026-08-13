@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.29.2
+
+- Added a tested per-user Windows installer with Desktop and Start-menu shortcuts, the full moon/runic A icon, and an uninstaller.
+- Separated the Altered app version from the SRD rules-data version in the dashboard badge.
+- Made service-worker update checks bypass browser cache and reload once after a new release takes control.
+- Re-tested linked-character Refresh live against Ferocitus and confirmed its explicit current/updated/fallback status paths.
+
 ## v0.29.1
 
 - Made every Suggested Next Show me action navigate to or expose its actual focused control.

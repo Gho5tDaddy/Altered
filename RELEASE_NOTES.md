@@ -1,3 +1,13 @@
+# Altered v0.29.2 release notes
+
+## Windows installer, clearer versions, and verified refresh
+
+Windows now has a one-file installer that places Altered in the current user's local application folder, creates Desktop and Start-menu shortcuts with the moon/runic A icon, and registers an uninstaller. The portable Windows/macOS archive remains available.
+
+The dashboard now labels the application release separately from the SRD rules-data version, so `App 0.29.2` and `Rules SRD 5.2.1` cannot be mistaken for the same version. Service-worker updates bypass the browser's HTTP cache and reload an already-installed app once when a newer worker takes control.
+
+The linked-character Refresh path was tested against Ferocitus on the hosted app: it made a no-cache request, confirmed the public character was current, retained combat state, and displayed the check time. A failed refresh continues using the validated saved character.
+
 # Altered v0.29.1 release notes
 
 ## Guidance, active-form identity, and conditional trait correction

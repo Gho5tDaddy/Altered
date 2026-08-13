@@ -70,7 +70,8 @@ const toolAssets=Object.fromEntries(await Promise.all(['pdf.bundle.js','tesserac
 ])));
 const downloadAssets=Object.fromEntries(await Promise.all([
   ['Altered-Android-v0.29.1.apk','application/vnd.android.package-archive'],
-  ['Altered-Desktop-Mac-v0.29.1.zip','application/zip'],
+  ['Altered-Desktop-Mac-v0.29.2.zip','application/zip'],
+  ['Altered-Windows-Setup-v0.29.2.exe','application/octet-stream'],
 ].map(async([name,type])=>[
   `/downloads/${name}`,
   {name,type,data:(await readFile(path.join(root,'public','downloads',name))).toString('base64')},
