@@ -184,6 +184,16 @@ test('normalizes a Ferocitus-shaped multiclass character without guessing core v
   assert.equal(ddbSetupPackId(report.sourceId,report.setupNeeds[0]!.id),'ddb-152187683-feat-sentinel');
 });
 
+test('ignores unfinished D&D Beyond feat choosers without dropping selected or granted feats',()=>{
+  const payload=structuredClone(ferocitusPayload);
+  payload.data.feats.push({definition:{id:2048517,name:'Dark Bargain',isHomebrew:false,isLegacy:false}} as any);
+  payload.data.choices.feat.push({componentId:2048517,componentTypeId:1088085227,optionValue:null} as any);
+  const report=importDdbCharacter(payload,'152187683');
+  assert.deepEqual(report.character.feats,['Sentinel','Tough']);
+  assert.equal(report.setupNeeds.some(need=>need.label==='Dark Bargain'),false);
+  assert.ok(report.warnings.some(warning=>warning.code==='incomplete-feat-choice'&&warning.message.includes('Dark Bargain')));
+});
+
 test('identifies unsupported paid subclass features without copying descriptions',()=>{
   const payload=JSON.parse(JSON.stringify(ferocitusPayload)) as any;const druid=payload.data.classes[1];assert.ok(druid);
   druid.subclassDefinition={name:'Circle of Stars',classFeatures:[{name:'Starry Form',requiredLevel:3},{name:'Cosmic Omen',requiredLevel:6}]};

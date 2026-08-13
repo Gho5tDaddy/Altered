@@ -270,6 +270,15 @@ test('War Caster and imported Eldritch Mind affect Concentration roll mode',()=>
   assert.equal(concentrationSaveMode(c,state).mode,'advantage');state.conditions.push('Poisoned');assert.equal(concentrationSaveMode(c,state).mode,'advantage');
 });
 
+test('owned imported feats are references, not falsely reported as missing requirements',()=>{
+  const c=character({feats:['Magic Initiate (Druid)']});const state=createInitialState(c);
+  const baseFeat=must(resolveSheet(c,state).features.find(feature=>feature.id==='feat:Magic Initiate (Druid)'));
+  assert.equal(baseFeat.status,'ruling');assert.match(baseFeat.reason,/Owned by this character/);
+  const polymorph=must(availableTransformations(c,state).find(option=>option.profile==='polymorph'));
+  startTransformation(c,state,polymorph);const transformedFeat=must(resolveSheet(c,state).features.find(feature=>feature.id==='feat:Magic Initiate (Druid)'));
+  assert.equal(transformedFeat.status,'inactive');assert.match(transformedFeat.reason,/does not retain feats/);
+});
+
 test('Beast Spells does not make an unprepared spell available',()=>{
   const c=character({classes:[{name:'Druid',level:18,subclass:'Circle of the Land'}],totalLevel:18,knownForms:['dire-wolf'],spells:[{name:'Cure Wounds',level:1,sourceClass:'Druid',ability:'wis',prepared:false,castingTime:'magic-action'}]});const state=createInitialState(c);const wolf=availableTransformations(c,state).find(o=>o.profile==='wildshape');assert.ok(wolf);startTransformation(c,state,wolf);assert.equal(resolveSheet(c,state).spells[0]?.available,false);
 });

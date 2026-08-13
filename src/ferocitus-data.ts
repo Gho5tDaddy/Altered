@@ -107,7 +107,7 @@ export const FEROCITUS_CHARACTER:unknown={
     },
   ],
   spellSlots:{1:{max:4,current:4},2:{max:3,current:3},3:{max:2,current:2}},
-  feats:['Sentinel','Weapon Mastery','Farmer Ability Score Improvements','Tough','Dark Bargain'],
+  feats:['Sentinel','Weapon Mastery','Farmer Ability Score Improvements','Tough'],
   features:[],
   resources:[
     {id:'wild-shape',name:'Wild Shape',current:2,max:2,recovery:'short-one'},

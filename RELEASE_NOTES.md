@@ -1,3 +1,13 @@
+# Altered v0.27.2 release notes
+
+## Import integrity and honest feature states
+
+Altered now distinguishes a selected D&D Beyond feat from an unfinished feat chooser. D&D Beyond can return a placeholder feat entry whose matching choice has no selected value; Altered excludes that entry, records an explanatory import notice, and never creates a private-content setup task for it. The bundled Ferocitus data was corrected through the same rule.
+
+Owned imported feats are now labeled `Owned · reference`, while class mechanics that depend on a trigger or selected attack are labeled `Conditional`. A true runtime blocker is labeled `Unavailable now`. None of these states are presented as `Requirements missing` merely because Altered does not automate the complete effect.
+
+Previously saved characters can be corrected without editing JSON: open **More → Customize → Imported character details** and remove a feat name that is absent from the source sheet. Re-importing the public source character restores any intentionally removed feat. Character schema v1, saved combat state, artwork, imports/exports, private packs, standalone builds, and hosted account behavior remain compatible.
+
 # Altered v0.27.1 release notes
 
 ## Visible customization and verifiable SRD checks

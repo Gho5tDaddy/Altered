@@ -195,19 +195,19 @@ function evaluateFeatures(character:Character,state:GameState,option:Transformat
   for(const feature of getClassFeatureRules(character)){
     const automation=feature.automation??(fullyCalculated.has(feature.id)?'calculated':'conditional');let status:EvaluatedFeature['status']=automation==='calculated'?'active':automation==='conditional'?'conditional':'ruling';let reason=automation==='calculated'?'Calculated from the current sheet and state.':automation==='conditional'?'Available when its target, equipment, or battlefield prerequisites are met.':automation==='reference'?'Reference only; Altered does not execute this feature.':'Unsupported automation; resolve this feature from its source.';
     if(!retentionAllows(feature,option)){status='inactive';reason=`Not retained by the ${profile} transformation policy.`;}
-    if(status==='active'&&feature.requires?.spellcasting&&!canCast){status='inactive';reason='Requires spellcasting, which the current state blocks.';}
-    if(status==='active'&&feature.requires?.concentration&&!state.concentration){status='inactive';reason='Requires an active Concentration effect.';}
-    if(status==='active'&&feature.requires?.speech&&!policyFor(option).speech){status='inactive';reason='The current transformation does not retain speech.';}
-    if(status==='active'&&feature.requires?.noArmor&&armorActive(state,option)){status='inactive';reason='Requires no armor.';}
-    if(status==='active'&&feature.requires?.noShield&&shieldActive(state,option)){status='inactive';reason='Requires no Shield.';}
-    if(status==='active'&&(feature.requires?.weapon||feature.requires?.unarmed||feature.requires?.strengthAttack)){status='conditional';reason='Availability depends on the specific attack or action selected.';}
-    if(status==='active'&&['sneak-attack','radiant-strikes','blessed-strikes','martial-arts','extra-attack-fighter','extra-attack-monk'].includes(feature.id)){status='conditional';reason=feature.summary;}
+    if(status!=='inactive'&&status!=='ruling'&&feature.requires?.spellcasting&&!canCast){status='inactive';reason='Unavailable now because the current state blocks spellcasting.';}
+    if(status!=='inactive'&&status!=='ruling'&&feature.requires?.concentration&&!state.concentration){status='inactive';reason='Unavailable now because no Concentration effect is active.';}
+    if(status!=='inactive'&&status!=='ruling'&&feature.requires?.speech&&!policyFor(option).speech){status='inactive';reason='Unavailable now because the current transformation does not retain speech.';}
+    if(status!=='inactive'&&status!=='ruling'&&feature.requires?.noArmor&&armorActive(state,option)){status='inactive';reason='Unavailable while armor is active.';}
+    if(status!=='inactive'&&status!=='ruling'&&feature.requires?.noShield&&shieldActive(state,option)){status='inactive';reason='Unavailable while a Shield is active.';}
+    if(status!=='inactive'&&status!=='ruling'&&(feature.requires?.weapon||feature.requires?.unarmed||feature.requires?.strengthAttack)){status='conditional';reason='Use when the selected attack meets this feature’s conditions.';}
+    if(status!=='inactive'&&status!=='ruling'&&['sneak-attack','radiant-strikes','blessed-strikes','martial-arts','extra-attack-fighter','extra-attack-monk'].includes(feature.id)){status='conditional';reason=feature.summary;}
     if(feature.id==='rage')reason=state.rage.active?'Active. Concentration and spellcasting are blocked.':'Available if a Rage use and Bonus Action remain.';
     if(feature.id==='reckless-attack')reason=state.turn.attackRollsMade===0?'May be declared before the first attack roll of this turn.':'The first attack-roll decision has passed this turn.';
     result.push({id:feature.id,name:feature.name,source:feature.source,status,reason,summary:feature.summary,...(feature.activation?{activation:feature.activation}:{})});
   }
   for(const feature of getSpeciesRules(character)){const ongoing=state.overlays.includes(feature.id);const active=profile==='base'||profile==='overlay'||ongoing;result.push({id:feature.id,name:feature.name,source:feature.source,status:active?'active':'inactive',reason:active?(ongoing?'An already-active effect continues through shape-shifting.':'Available in the current form.'):'Species traits are not generally retained by replacement transformations.',summary:feature.summary,...(feature.activation?{activation:feature.activation}:{})});}
-  for(const feat of character.feats){const active=policyFor(option).feats;result.push({id:`feat:${feat}`,name:feat,source:'Feat',status:active?'conditional':'inactive',reason:active?'The transformation retains feats; exact prerequisites still apply.':'This transformation does not retain feats.',summary:'Imported feat.'});}
+  for(const feat of character.feats){const retained=policyFor(option).feats;result.push({id:`feat:${feat}`,name:feat,source:'Feat',status:retained?'ruling':'inactive',reason:retained?'Owned by this character and retained in the current form. Altered keeps imported totals but does not guess unstructured feat choices or triggers.':'This transformation does not retain feats.',summary:'Imported character feat.'});}
   return result;
 }
 function moonSpellAllowed(character:Character,spell:Spell){const level=recordValue(MOON_FORM_SPELL_LEVELS,spell.name);return sameText(subclass(character,'Druid'),'Circle of the Moon')&&level!==undefined&&classLevel(character,'Druid')>=level&&sameText(spell.sourceClass,'Druid')}

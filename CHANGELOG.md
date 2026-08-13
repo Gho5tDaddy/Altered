@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.27.2
+
+- Excluded unfinished D&D Beyond feat choosers so unselected placeholders such as `Dark Bargain` do not become character feats.
+- Replaced false `Requirements missing` labels on owned feats and conditional class features with accurate `Owned · reference`, `Conditional`, and `Unavailable now` states.
+- Labeled spent Action, Bonus Action, and Reaction controls `Unavailable now` instead of implying the character lacks a prerequisite.
+- Added a no-JSON imported-feat review under `More → Customize`, including a local remove-and-reimport recovery path for previously saved characters.
+- Rechecked Monk level/Extra Attack ownership and feat terminology against the current official 2024 Basic Rules while preserving schema-v1 saves, imports, exports, and private packs.
+
 ## v0.27.1
 
 - Added an obvious `More → Customize` workspace for character artwork, current-form artwork, private abilities, and private transformations.

@@ -15,6 +15,7 @@ test('fresh standalone data opens with a complete Ferocitus character',()=>{
   ]);
   assert.equal(character.resources.find(resource=>resource.id==='wild-shape')?.current,2);
   assert.equal(character.resources.find(resource=>resource.id==='rage')?.current,2);
+  assert.equal(character.feats.includes('Dark Bargain'),false);
   assert.deepEqual(character.knownForms,[
     'brown-bear','dire-wolf','giant-octopus','giant-spider','lion','tiger',
   ]);

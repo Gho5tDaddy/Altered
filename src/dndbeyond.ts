@@ -401,8 +401,25 @@ function restoreMoonCircleSpells(spells:Spell[],classes:Character['classes'],abi
   return {spells:result.slice(0,200),added};
 }
 
-function parseFeats(data:JsonObject):string[]{
-  return [...new Set(array(data.feats).map(raw=>string(object(object(raw).definition).name)).filter(Boolean))].slice(0,100);
+function selectedFeatEntries(data:JsonObject):{entries:JsonObject[];ignored:string[]}{
+  const choices=array(object(data.choices).feat).map(object);const entries:JsonObject[]=[];const ignored:string[]=[];
+  for(const raw of array(data.feats)){
+    const entry=object(raw),definition=object(entry.definition),name=string(definition.name),definitionId=finite(definition.id);
+    // D&D Beyond can include a feat chooser before its option is selected. Such
+    // placeholders are not owned feats and must not appear on the character.
+    const ownChoices=definitionId===undefined?[]:choices.filter(choice=>finite(choice.componentId)===definitionId);
+    if(ownChoices.length&&ownChoices.every(choice=>choice.optionValue===null||choice.optionValue===undefined)){
+      if(name)ignored.push(name);continue;
+    }
+    entries.push(entry);
+  }
+  return {entries,ignored:[...new Set(ignored)]};
+}
+
+function parseFeats(data:JsonObject):{feats:string[];ignored:string[]}{
+  const selected=selectedFeatEntries(data);const feats:string[]=[];const seen=new Set<string>();
+  for(const entry of selected.entries){const name=string(object(entry.definition).name),key=name.toLowerCase();if(!name||seen.has(key))continue;seen.add(key);feats.push(name);}
+  return {feats:feats.slice(0,100),ignored:selected.ignored};
 }
 
 function definitionRuleset(definition:JsonObject):CharacterRuleset{
@@ -415,7 +432,7 @@ function definitionRuleset(definition:JsonObject):CharacterRuleset{
 function rulesetAssessment(data:JsonObject):{ruleset:CharacterRuleset;evidence:string[];reviewRequired:boolean}{
   const definitions:JsonObject[]=[];
   const add=(raw:unknown)=>{const entry=object(raw),definition=object(entry.definition);if(Object.keys(definition).length)definitions.push(definition);const subclass=object(entry.subclassDefinition);if(Object.keys(subclass).length)definitions.push(subclass);};
-  array(data.classes).forEach(add);array(data.feats).forEach(add);array(data.inventory).forEach(add);add({definition:data.race});
+  array(data.classes).forEach(add);selectedFeatEntries(data).entries.forEach(add);array(data.inventory).forEach(add);add({definition:data.race});
   for(const group of Object.values(object(data.spells)))array(group).forEach(add);
   for(const parent of array(data.classSpells))array(object(parent).spells).forEach(add);
   const states=definitions.map(definitionRuleset);const current=states.filter(value=>value==='2024').length,legacy=states.filter(value=>value==='legacy').length,unknown=states.filter(value=>value==='unknown').length;
@@ -509,7 +526,7 @@ function parseResources(data:JsonObject,level:number):ResourcePool[]{
 
 function homebrewCount(data:JsonObject):number{
   let count=0;const consider=(raw:unknown)=>{const definition=object(object(raw).definition);if(Boolean(definition.isHomebrew))count++;};
-  array(data.classes).forEach(consider);array(data.feats).forEach(consider);array(data.inventory).forEach(consider);
+  array(data.classes).forEach(consider);selectedFeatEntries(data).entries.forEach(consider);array(data.inventory).forEach(consider);
   for(const rawGroup of Object.values(object(data.spells)))array(rawGroup).forEach(consider);
   for(const parent of array(data.classSpells))array(object(parent).spells).forEach(consider);
   return count;
@@ -552,7 +569,8 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
   const defense=parseEquipmentAndAc(data,abilities,classes,modifiers);const formSelection=legalKnownForms(data,classes,warnings);const knownForms=formSelection.knownForms;
   const druid=classes.find(entry=>entry.name.toLowerCase()==='druid');
   if(druid&&druid.level>=2&&knownForms.length===0)warnings.push({code:'wild-shape-not-provided',severity:'warning',message:'D&D Beyond did not provide recognizable Wild Shape selections. No forms were guessed; add or review known forms in Altered before transforming.'});
-  const parsedSpells=parseSpells(data,abilities,totalLevel);const moonSpells=restoreMoonCircleSpells(parsedSpells,classes,abilities,totalLevel);const spells=moonSpells.spells;const feats=parseFeats(data);const resources=parseResources(data,totalLevel);const items=parseItems(data);
+  const parsedSpells=parseSpells(data,abilities,totalLevel);const moonSpells=restoreMoonCircleSpells(parsedSpells,classes,abilities,totalLevel);const spells=moonSpells.spells;const featSelection=parseFeats(data);const feats=featSelection.feats;const resources=parseResources(data,totalLevel);const items=parseItems(data);
+  if(featSelection.ignored.length)warnings.push({code:'incomplete-feat-choice',severity:'info',message:`Altered ignored ${featSelection.ignored.join(', ')} because D&D Beyond returned ${featSelection.ignored.length===1?'it as an unfinished feat choice':'them as unfinished feat choices'}, not selected character features.`});
   if(moonSpells.added)warnings.push({code:'circle-moon-spells-restored',severity:'info',message:`D&D Beyond omitted ${moonSpells.added} always-prepared Circle of the Moon spell${moonSpells.added===1?'':'s'} from its character payload. Altered restored the current 2024 Circle spell list for this Druid level.`});
   const activeItems=array(data.inventory).filter(raw=>Boolean(object(raw).equipped));
   if(activeItems.length)warnings.push({code:'item-text-review',severity:'warning',message:'Numeric armor, saving-throw, ability, speed, and hit-point item modifiers were imported. Review special item text and attack-only bonuses; Altered does not copy proprietary descriptions.'});

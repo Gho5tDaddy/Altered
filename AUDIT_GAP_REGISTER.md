@@ -1,6 +1,14 @@
-# Altered v0.25.1 audit gap register
+# Altered v0.27.2 audit gap register
 
 This register distinguishes an incorrect result from a deliberately conditional or reference-only result. Altered must never present a reference-only mechanic as calculated.
+
+## Resolved in v0.27.2
+
+| Finding | Severity | Resolution | Regression evidence |
+|---|---:|---|---|
+| D&D Beyond could return an unfinished feat chooser as though it were an owned feat | High | Exclude a feat definition when its own chooser exists but has no selected value; retain ordinary granted feats and completed choices | D&D Beyond importer selection regression and live Ferocitus payload comparison |
+| Owned feats and conditional class features were labeled `Requirements missing` | High | Separate owned reference, conditional trigger, active, and unavailable-now presentation states | engine feature-state and UI contract regressions |
+| A previously saved false feat required JSON editing or a full character reset | Medium | Add a scoped imported-feat review/removal control under More → Customize with an explicit re-import recovery path | UI contract, persistence-compatible character replacement, and browser interaction checks |
 
 ## Resolved in v0.25.1
 
@@ -72,5 +80,6 @@ This register distinguishes an incorrect result from a deliberately conditional 
 | Tool checks | Reference only | Imported skill checks are executable; tool-specific checks are not presented as calculated | The current character schema does not contain tool check totals |
 | Death effects requiring revival | External ending event | Dead state blocks ordinary healing and actions | Revival spell targeting and material costs are outside the current self-sheet workflow |
 | Shared combatants, target HP, and battlefield durations | Unsupported | Altered reports its own effects and reminders only | The product remains an adaptive personal character sheet, not a virtual tabletop |
+| Android Gradle 9 migration | Maintenance only | No current user-visible impact; the signed Android release builds successfully with the pinned toolchain | The wrapper reports upstream Gradle deprecations. A coordinated wrapper/plugin upgrade is safer as a separate, fully tested maintenance release |
 
 No open item above changes a displayed numeric result without being labeled conditional, reference-only, or unsupported.

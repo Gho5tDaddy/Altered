@@ -280,6 +280,19 @@ test('More exposes local artwork and homebrew creation without requiring JSON',(
   assert.match(source,/entry\.id\.startsWith\('private-'\)&&entry\.activation/);assert.match(source,/bindArtworkInput\('#character-art-file'/);assert.match(source,/bindArtworkInput\('#current-form-art-file'/);
 });
 
+test('imported feats use accurate ownership language and can be corrected without JSON',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const engine=readFileSync('src/engine.ts','utf8');
+  for(const id of ['imported-feat-summary','imported-feat-list'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(source,/function renderImportedFeatManagement/);assert.match(source,/Remove from Altered/);assert.match(source,/Owned · reference/);assert.match(source,/Conditional · use when triggered/);
+  assert.equal(/feature\.status==='conditional'\?'requirements'/.test(source),false);assert.match(engine,/Owned by this character and retained in the current form/);
+});
+
+test('spent turn economy is unavailable now, not a missing character requirement',()=>{
+  const source=readFileSync('src/app.ts','utf8');
+  assert.match(source,/economyError\?'unavailable':'available'/);assert.match(source,/limit\.unavailable\?'locked':'unavailable'/);assert.match(source,/selected\.usable\?'unavailable':'locked'/);
+  assert.equal(/economyError\?'requirements':'available'/.test(source),false);assert.equal(/limit\.unavailable\?'locked':'requirements'/.test(source),false);
+});
+
 test('service worker never caches private or changing API responses',()=>{
   const source=readFileSync('public/sw.js','utf8');
   assert.match(source,/if\(url\.pathname\.startsWith\('\/api\/'\)\)return/);

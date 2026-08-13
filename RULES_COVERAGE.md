@@ -1,4 +1,4 @@
-# Rules coverage — v0.25.1
+# Rules coverage — v0.27.2
 
 ## Fully calculated in the bundled rules pack
 
@@ -33,7 +33,7 @@
 
 ## Calculated only when the imported sheet declares the feature
 
-- Public D&D Beyond character data is normalized into Altered's schema for identity, classes, abilities, HP, AC, speed, proficiencies, exact save/skill totals, equipped numeric modifiers, spell slots, prepared/known spells, feats, limited-use resources, and recognizable legal forms.
+- Public D&D Beyond character data is normalized into Altered's schema for identity, classes, abilities, HP, AC, speed, proficiencies, exact save/skill totals, equipped numeric modifiers, spell slots, prepared/known spells, selected or granted feats, limited-use resources, and recognizable legal forms. Unfinished feat choosers with no selected value are excluded and reported.
 - Imported D&D Beyond items retain private identity, equipped/attuned state, source IDs, ruleset markers, and whether their numeric effects are already included. Legacy and mixed-rules characters are blocked from the 2024-only engine.
 - Primal Strike and similar selected class options.
 - Imported structured speed bonuses, resistances, immunities, save bonuses, and Armor Class formulas.
@@ -54,7 +54,7 @@ These remain visible and receive active, conditional, inactive, or table-ruling 
 ## Not yet automated
 
 - Private or account-authenticated D&D Beyond characters; both the hosted and local structured adapters require the character's privacy setting to be Public during import.
-- PDF character-sheet extraction. The primary workflow is a temporary-public D&D Beyond link/ID or an Altered JSON backup.
+- Fully automatic interpretation of complex PDF/OCR prose. Altered extracts core character values, then requires editable 2024 review; uncertain spells, features, items, proficiencies, and transformations remain manual rather than guessed.
 - Complete paid-book subclass, feat, spell, and magic-item automation.
 - Nested replacement transformations.
 - Target-specific relationships such as Frightened line of sight or grapple source distance.

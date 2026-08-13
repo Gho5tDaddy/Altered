@@ -1,4 +1,13 @@
-# Altered v0.25.1 QA report
+# Altered v0.27.2 QA report
+
+## v0.27.2 import-integrity and release-candidate verification
+
+- Compared the importer against the live public Ferocitus D&D Beyond payload and confirmed that `Dark Bargain` is an unfinished chooser: its definition is present, but its matching choice has no selected value. Altered now excludes and reports this state while retaining selected and automatically granted feats.
+- Owned imported feats render as `Owned · reference`; trigger-dependent class mechanics render as `Conditional`; genuine current-state blockers render as `Unavailable now`. None are mislabeled `Requirements missing` merely because their full effects are not automated.
+- A live Brown Bear Multiattack produced independent Bite and Claw d20 totals and damage; after the Action was spent, every attack card changed to `Unavailable now` with the action-economy explanation rather than a false prerequisite warning.
+- More → Customize now lists every imported feat and can remove an incorrect historical entry without JSON. The change updates only the selected schema-v1 character and preserves combat state, installed private packs, and the re-import recovery path.
+- Official 2024 Basic Rules were rechecked for Monk level 5 Extra Attack, level-based class-feature ownership, multiclass Extra Attack non-stacking, and feat prerequisites at selection.
+- Strict TypeScript, clean build, complete automated suite, exact hosted-worker desktop/phone audit, package vulnerability audit, signed Android verification, and standalone package checks pass for this release.
 
 ## v0.25.1 mobile gameplay-space verification
 
