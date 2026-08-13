@@ -1878,3 +1878,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .persistent-action-economy .economy-chip{font-size:.58rem;padding:4px 5px}
   .persistent-form-copy{padding-inline:11px}
 }
+
+/* Transformation identity: centered, expressive, and tied to real eligibility. */
+.persistent-form-copy{align-content:start;text-align:center}
+.persistent-form-kicker{justify-content:center}
+.persistent-form-copy>strong{width:100%;text-align:center}
+.persistent-form-copy.is-preview.is-ready>strong{
+  color:#d9fff1;font-size:1.15rem;font-weight:950;letter-spacing:.045em;text-transform:uppercase;
+  text-shadow:0 0 4px #effff8,0 0 10px #50f5ad,0 0 22px rgba(56,235,154,.9);
+  animation:availableFormNamePulse 1.85s ease-in-out infinite
+}
+.persistent-form-copy.is-preview.is-ready.is-beast>strong{
+  font-family:Georgia,"Times New Roman",serif;font-size:1.22rem;font-style:italic;
+  font-variant:small-caps;letter-spacing:.07em;transform-origin:center
+}
+.persistent-form-copy.is-preview.is-ready .persistent-form-kicker{color:#82ffc4;text-shadow:0 0 8px rgba(63,244,163,.72)}
+@keyframes availableFormNamePulse{
+  0%,100%{filter:brightness(1);transform:scale(1);text-shadow:0 0 4px #effff8,0 0 10px #50f5ad,0 0 20px rgba(56,235,154,.72)}
+  50%{filter:brightness(1.2);transform:scale(1.035);text-shadow:0 0 6px #fff,0 0 14px #78ffd0,0 0 30px rgba(56,235,154,1)}
+}
+@media(prefers-reduced-motion:reduce){
+  .app-shell:not(.motion-forced) .persistent-form-copy.is-preview.is-ready>strong{animation:none!important}
+}

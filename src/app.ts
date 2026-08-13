@@ -338,6 +338,8 @@ function renderArt(){
   const previewForm=preview&&preview.profile!=='base'&&preview.formId?creatureById(preview.formId):undefined;
   const displayedForm=activeForm??previewForm;
   const previewing=!aura.active&&Boolean(previewForm);
+  const previewReady=Boolean(previewing&&preview?.usable&&!actionCostError(state,preview.actionCost,sheet.conditionImmunities));
+  const beastIdentity=displayedForm?.type.toLowerCase()==='beast';
   const mainTarget=displayedForm?{targetId:`form:${displayedForm.id}`,label:displayedForm.name,fallbackKey:displayedForm.artKey}:{targetId:'base',label:character.name,fallbackKey:'base'};
   container.classList.toggle('is-active',aura.active);container.classList.toggle('is-preview',previewing);container.classList.toggle('is-base',!aura.active&&!previewing);
   appendPortrait(container,mainTarget.targetId,mainTarget.fallbackKey,mainTarget.label);
@@ -345,7 +347,8 @@ function renderArt(){
   const stateLabel=aura.active?'ACTIVE FORM':previewing?'FORM PREVIEW':'BASE FORM';
   const displayLabel=aura.active?aura.label:previewing?preview?.label??mainTarget.label:'Base Form';
   container.setAttribute('aria-label',`${stateLabel}: ${displayLabel}`);
-  const persistentCopy=$('#open-persistent-form');persistentCopy.classList.toggle('is-active',aura.active);persistentCopy.classList.toggle('is-preview',previewing);
+  const persistentCopy=$('#open-persistent-form');persistentCopy.classList.toggle('is-active',aura.active);persistentCopy.classList.toggle('is-preview',previewing);persistentCopy.classList.toggle('is-ready',previewReady);persistentCopy.classList.toggle('is-beast',beastIdentity);
+  if(previewReady)persistentCopy.title=`${displayLabel} is available to transform into now.`;else persistentCopy.removeAttribute('title');
   $('#persistent-form-state').textContent=stateLabel;$('#persistent-form-name').textContent=displayLabel;
   const target=artTargetInfo();$('#art-target-label').textContent=`Artwork target: ${target.label}`;
   const reset=$<HTMLButtonElement>('#reset-art');const cached=artOverrideCache.get(artCacheKey(target.targetId));reset.disabled=!cached;

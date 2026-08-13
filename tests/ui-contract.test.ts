@@ -217,6 +217,9 @@ test('the focused workspace uses form-panel space for live stats and explains ab
   assert.match(styles,/\.persistent-action-economy/);assert.match(styles,/\.persistent-turn-controls\{display:grid/);
   assert.match(styles,/@media\(min-width:820px\) and \(max-width:1180px\)/);assert.match(styles,/grid-template-columns:minmax\(240px,260px\) minmax\(0,1fr\)/);
   assert.match(styles,/@media\(min-width:820px\)[\s\S]*?\.persistent-action-economy\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(source,/classList\.toggle\('is-ready',previewReady\)/);assert.match(source,/classList\.toggle\('is-beast',beastIdentity\)/);
+  assert.match(styles,/\.persistent-form-copy\.is-preview\.is-ready>strong/);assert.match(styles,/\.persistent-form-copy\.is-preview\.is-ready\.is-beast>strong/);
+  assert.match(styles,/@keyframes availableFormNamePulse/);assert.match(styles,/@media\(prefers-reduced-motion:reduce\)[\s\S]*availableFormNamePulse|animation:none!important/);
   assert.match(html,/id="ability-actions-title">Use now/);assert.match(html,/aria-labelledby="ability-actions-title" hidden/);
   assert.match(html,/id="ability-resources-title">Resources left/);
   assert.match(source,/Abilities, explained/);
