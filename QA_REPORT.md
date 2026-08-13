@@ -1,3 +1,15 @@
+# Altered v0.27.7 QA report
+
+## v0.27.7 guided-cue verification
+
+- Verified the selected-form Transform button is bright red, fully opaque, disabled, and labeled with its blocking reason after its required action has been spent.
+- Verified New Turn immediately changes that control to an enabled bright-green pulse with an accessible Available now label.
+- Verified Suggested next step defaults on, persists when disabled or re-enabled, changes with screen and turn state, and highlights only one existing control.
+- Verified recommendation priority for survival/Concentration checks, unfinished Extra Attack, Rage-before-attack form synergy, Moon Druid Barkskin setup, legal form Multiattack, remaining Bonus Actions, and End Turn flow.
+- Verified Show me focuses the recommendation without activating it, choosing a target, or spending a resource.
+- Corrected and retested a release-candidate focus race so the screen heading cannot steal focus from the exact recommended control.
+- Final release gates pass with **190/190 automated tests**, desktop/phone hosted-worker audits, and the 48-rule/16-function evidence audit.
+
 # Altered v0.27.6 QA report
 
 ## v0.27.6 custom-transformation and usability verification

@@ -68,6 +68,9 @@ const radiantActions=new Set<string>();
 let pendingTempChoice:{incoming:number;source:string}|null=null;
 let magicEffectsEnabled=true;
 let reduceMotion=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)').matches:false;
+let guidedNextStep=true;
+let nextStepTarget:HTMLElement|null=null;
+let nextStepReveal:(()=>HTMLElement)|null=null;
 let restoredDataRepairs:string[]=[];
 let auraInitialized=false;
 let previousTransformId:string|undefined;
@@ -173,10 +176,12 @@ function syncWorkspaceChrome(){
   for(const id of ['nav-play','nav-forms','nav-sheet','nav-more']){const node=$<HTMLButtonElement>(`#${id}`);const active=id===activeNav;node.classList.toggle('active',active);if(active)node.setAttribute('aria-current','page');else node.removeAttribute('aria-current');}
   $('#task-view-title').textContent=TASK_TITLES[currentTab]??'Character Sheet';
   $('#task-abilities').hidden=currentTab!=='features';
+  const urgentAbility=Boolean(state.pendingRelentlessRage||(state.hp===0&&!state.life.dead&&!state.life.stable)||state.concentrationChecks.length);
+  $('#ability-use-now').hidden=currentTab!=='features'||!urgentAbility;
 }
 function setWorkspace(view:WorkspaceView,tab?:string,origin:'play'|'sheet'=taskOrigin,focusTarget?:HTMLElement){
   currentWorkspace=view;if(tab){currentTab=tab;taskOrigin=origin;renderTab();}
-  syncWorkspaceChrome();renderArt();
+  syncWorkspaceChrome();renderArt();renderNextStepGuide();
   const active=document.querySelector<HTMLElement>(`[data-workspace-view="${currentWorkspace}"]`);active?.scrollTo({top:0,behavior:'auto'});
   if(focusTarget)window.setTimeout(()=>focusTarget.focus({preventScroll:true}),0);
 }
@@ -394,7 +399,7 @@ function renderContentRegistry(target:HTMLElement,compact=false){
   for(const pack of registrySnapshot.packs){const row=document.createElement('div');row.className='content-pack';row.append(text('strong',pack.name),text('span',`v${pack.version}`),text('small',`${pack.domain} · ${pack.source} · verified ${pack.verified}`));target.append(row);}
 }
 function renderSettings(){
-  $<HTMLInputElement>('#magic-effects-enabled').checked=magicEffectsEnabled;$<HTMLInputElement>('#reduce-motion').checked=reduceMotion;
+  $<HTMLInputElement>('#magic-effects-enabled').checked=magicEffectsEnabled;$<HTMLInputElement>('#reduce-motion').checked=reduceMotion;$<HTMLInputElement>('#guided-next-step').checked=guidedNextStep;
   $('#content-registry-summary').textContent=`${auditSnapshot.rules} source-ledgered rules cover ${auditSnapshot.functions} state-changing functions (${auditSnapshot.counts.calculated} calculated, ${auditSnapshot.counts.conditional} conditional). ${registrySnapshot.packs.length} versioned built-in packs plus ${installedPacks.length} private local packs are verified through ${registrySnapshot.verifiedThrough}.`;
   renderContentRegistry($('#content-pack-list'));
   const catalog=$('#srd-catalog-status');const state=srdCatalogChecking?'checking':srdCatalogStatus?.healthy?'success':srdCatalogStatus?'warning':srdCatalogMessage.includes('unavailable')?'error':'idle';catalog.className=`catalog-check-result ${state}`;catalog.textContent=srdCatalogChecking?'Checking the live legal SRD 5.2.1 catalog now…':srdCatalogStatus?`${srdCatalogStatus.healthy?'✓ Current and verified':'⚠ Needs review'} · ${srdCatalogStatus.recordCount.toLocaleString()} legal SRD 5.2.1 support records · checked ${new Date(srdCatalogStatus.checkedAt).toLocaleString()}. The live catalog supplies relevant import data; validated built-in rules remain available offline.`:srdCatalogMessage;const check=$<HTMLButtonElement>('#refresh-srd-catalog');check.disabled=srdCatalogChecking;check.textContent=srdCatalogChecking?'Checking…':srdCatalogStatus?'Check Again':'Check Now';
@@ -697,7 +702,7 @@ function renderTransformSelector(){
   const statuses=$('#form-status-strip');clear(statuses);
   if(selected){statuses.append(statusChip('selected'));if(selected.id===active?.id)statuses.append(statusChip('active'));else if(selected.profile==='base')statuses.append(statusChip('available','Base Form'));else if(selected.usable&&!economyError)statuses.append(statusChip('available'));else statuses.append(statusChip(selected.usable?'unavailable':'locked',selected.usable?'Unavailable now':'Locked',economyError??selected.reason));if(selected.profile!=='base')statuses.append(statusChip('inactive',actionCostLabel(selected.actionCost)));}
   $('#form-reason').textContent=active&&selected?.id===active.id?`${active.label} is active. Choose another legal form to change directly, or press End Form to return to ${character.name}.`:economyError??selected?.reason??selected?.source??'';
-  const transform=$<HTMLButtonElement>('#transform-button');const transformLabel=selected?.deactivate?selected.label:selected?.profile==='overlay'?'Activate':active&&selected?.id!==active.id?'Change Form':selected?.profile==='base'?'Choose a Form':'Transform';transform.textContent=economyError?`${transformLabel} — ${economyError.replace(/[.!]$/,'')}`:transformLabel;transform.disabled=!selected||!selected.usable||Boolean(economyError)||selected.profile==='base'||selected.id===active?.id;transform.hidden=Boolean(!selected||selected.profile==='base'||selected.id===active?.id);if(economyError)transform.title=economyError;else transform.removeAttribute('title');
+  const transform=$<HTMLButtonElement>('#transform-button');const transformLabel=selected?.deactivate?selected.label:selected?.profile==='overlay'?'Activate':active&&selected?.id!==active.id?'Change Form':selected?.profile==='base'?'Choose a Form':'Transform';const transformBlockedReason=economyError??(!selected?.usable?selected?.reason:null);transform.textContent=economyError?`${transformLabel} — ${economyError.replace(/[.!]$/,'')}`:transformLabel;transform.disabled=!selected||!selected.usable||Boolean(economyError)||selected.profile==='base'||selected.id===active?.id;transform.hidden=Boolean(!selected||selected.profile==='base'||selected.id===active?.id);transform.classList.toggle('transform-cue-ready',!transform.hidden&&!transform.disabled);transform.classList.toggle('transform-cue-blocked',!transform.hidden&&transform.disabled);transform.dataset.transformState=transform.hidden?'hidden':transform.disabled?'blocked':'ready';transform.setAttribute('aria-label',transform.hidden?transformLabel:transform.disabled?`${transformLabel}. Unavailable: ${transformBlockedReason??'requirements not met'}`:`${transformLabel}. Available now`);if(transformBlockedReason)transform.title=transformBlockedReason;else transform.removeAttribute('title');
   const end=$<HTMLButtonElement>('#end-form-button');const permanentTruePolymorph=active?.profile==='true-polymorph'&&state.activeTransform?.permanentUntilDispelled;const needsBonus=active?.profile==='wildshape'||active?.profile==='animal-shapes';const canEnd=permanentTruePolymorph||!needsBonus||state.turn.bonusRemaining>0;end.textContent=permanentTruePolymorph?'Remove Dispelled Effect':needsBonus&&!canEnd?'End Form — Bonus Action Used':'End Form';end.disabled=!active||!canEnd;end.hidden=!active;if(permanentTruePolymorph)end.title='True Polymorph cannot be ended voluntarily after the full hour. Use this only after the effect is dispelled or otherwise ended externally.';else if(active&&needsBonus&&!canEnd)end.title='Voluntarily ending this form requires a Bonus Action. Start a new turn or regain a Bonus Action first.';else end.removeAttribute('title');
   const playEnd=$<HTMLButtonElement>('#play-end-form');if(active){playEnd.textContent=end.textContent;playEnd.disabled=end.disabled;playEnd.hidden=end.hidden;playEnd.title=end.title;}else if(overlayEnd){const overlayEndError=actionCostError(state,overlayEnd.actionCost,sheet.conditionImmunities);playEnd.textContent=overlayEnd.label;playEnd.disabled=!overlayEnd.usable||Boolean(overlayEndError);playEnd.hidden=false;playEnd.title=overlayEndError??`End ${overlayEnd.label.replace(/^End /,'')} and keep other active effects.`;}else{playEnd.textContent='End Form';playEnd.disabled=true;playEnd.hidden=true;playEnd.removeAttribute('title');}
 }
@@ -784,6 +789,8 @@ function renderQuickFeatures(){
       const rules=deathSaveMode(character,state);const result=rollD20Result(0,rules.mode);const deathPresentation:RollPresentation=result.kept===20?{natural:20,tone:'critical-success',label:'Natural 20 · regain 1 HP'}:result.kept===1?{natural:1,tone:'critical-failure',label:'Natural 1 · two failures'}:result.kept>=10?{natural:result.kept,tone:'high',label:'Death save success'}:{natural:result.kept,tone:'low',label:'Death save failure'};showRoll(result.kept,`${modeText(result)}. No ability modifier applies.${rules.sources.length?` ${rules.sources.join(' · ')}.`:''}`,'Death Saving Throw',deathPresentation);applyResult(resolveDeathSave(character,state,result.kept));
     },'button primary'));
   }
+  if(state.concentrationChecks.length){const pending=state.concentrationChecks[0];if(pending)box.append(button(`Concentration DC ${pending.dc}`,()=>{const save=resolveSheet(character,state).saves.con;const rules=concentrationSaveMode(character,state);const mode=combinedMode(rules.mode as 'normal'|'advantage'|'disadvantage');const total=d20(save.modifier,mode,'Concentration save',undefined,undefined,undefined,save.source);applyResult(resolveConcentrationCheck(state,total));},'button primary'));}
+  if(state.pendingRelentlessRage||(state.hp===0&&!state.life.dead&&!state.life.stable)||state.concentrationChecks.length)return;
   if(state.life.dead||state.hp===0)return;
   if(classLevel(character,'Barbarian')>=1){
     const rageError=state.rage.active?null:rageStartError(character,state);const rageLabel=state.rage.active?'Rage Active · End':state.turn.bonusRemaining===0?'Start Rage — Bonus Action Used':'Start Rage · Bonus Action';const rage=button(rageLabel,()=>applyResult(state.rage.active?endRage(state):startRage(character,state)),'button secondary'+(state.rage.active?' active rage-active-button':''));rage.disabled=Boolean(rageError);if(rageError)rage.title=rageError;box.append(rage);
@@ -798,7 +805,6 @@ function renderQuickFeatures(){
     const shapeToSlotError=wildResurgenceError(character,state,'shape-to-slot');const shapeToSlot=button('Wild Shape → L1 Slot',()=>applyResult(useWildResurgence(character,state,'shape-to-slot')));shapeToSlot.disabled=Boolean(shapeToSlotError);if(shapeToSlotError)shapeToSlot.title=shapeToSlotError;box.append(shapeToSlot);
   }
   const dragonWings=state.resources['sorcerer-dragon-wings'];if(dragonWings&&dragonWings.current<dragonWings.max)box.append(button('3 Sorcery Points → Dragon Wings',()=>applyResult(restoreDragonWings(character,state))));
-  if(state.concentrationChecks.length){const pending=state.concentrationChecks[0];if(pending)box.append(button(`Concentration DC ${pending.dc}`,()=>{const save=resolveSheet(character,state).saves.con;const rules=concentrationSaveMode(character,state);const mode=combinedMode(rules.mode as 'normal'|'advantage'|'disadvantage');const total=d20(save.modifier,mode,'Concentration save',undefined,undefined,undefined,save.source);applyResult(resolveConcentrationCheck(state,total));},'button primary'));}
   if(state.activeTransform?.option.profile==='true-polymorph'&&state.activeTransform.spellConcentration&&!state.activeTransform.permanentUntilDispelled)box.append(button('Complete 1-Hour True Polymorph',()=>applyResult(completeTruePolymorph(state)),'button primary'));
   if(state.concentration)box.append(button('End Concentration',()=>applyResult(endConcentration(state,'Ended voluntarily.',character))));
   for(const feature of sheet.features.filter(entry=>entry.id.startsWith('private-')&&entry.activation&&entry.activation!=='none'&&entry.status!=='inactive')){
@@ -1052,7 +1058,58 @@ function renderTab(){sheet=resolveSheet(character,state);syncTabState();if(curre
 function activateTab(tab:HTMLButtonElement,focus=false){currentTab=tab.dataset.tab??'actions';renderTab();syncWorkspaceChrome();if(focus)tab.focus();}
 function renderConditions(){const list=$('#condition-list');clear(list);for(const condition of state.conditions){const label=condition==='Exhaustion'?`Exhaustion ${state.exhaustionLevel} −1`:`${condition} ×`;const chip=button(label,()=>applyResult(removeCondition(state,condition)),'condition-chip');chip.setAttribute('aria-label',condition==='Exhaustion'?`Reduce Exhaustion from level ${state.exhaustionLevel}`:`Remove ${condition} condition`);list.append(chip);}}
 function renderLog(){const root=$('#activity-log');clear(root);$<HTMLButtonElement>('#clear-activity').disabled=state.log.length===0;if(state.log.length===0){root.append(text('div','No activity yet.','log-row'));return;}for(const item of state.log)root.append(text('div',item,'log-row'));}
-function render(){sheet=resolveSheet(character,state);document.documentElement.dataset.alteredCharacter=character.name;syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderResources();renderQuickFeatures();renderActiveEffects();renderTab();renderConditions();renderLog();persist();}
+type NextStepSuggestion={title:string;copy:string;target:HTMLElement;reveal?:()=>HTMLElement};
+function taskControl(label:string){return Array.from(document.querySelectorAll<HTMLButtonElement>('#tab-content button')).find(control=>control.textContent?.toLowerCase().includes(label.toLowerCase()))??$<HTMLElement>('#task-view-title');}
+function revealTask(tab:string,label?:string){return ()=>{setWorkspace('task',tab,'play');return label?taskControl(label):$<HTMLElement>('#task-view-title');};}
+function recommendNextStep():NextStepSuggestion|null{
+  if(currentWorkspace==='forms'){
+    const transform=$<HTMLButtonElement>('#transform-button');
+    if(!transform.hidden&&transform.disabled){
+      const needsTurn=/already used|remain/i.test(transform.title);
+      if(needsTurn)return {title:'Finish this turn',copy:'The required action is spent. End this turn; a new turn will restore it.',target:transform,reveal:()=>{setWorkspace('play');return $<HTMLElement>('#end-turn');}};
+      return {title:'Review transformation requirements',copy:transform.title||'The selected form explains what is currently missing.',target:transform};
+    }
+    if(!transform.hidden&&!transform.disabled)return {title:transform.textContent||'Transform',copy:'The selected form is legal and its required action is available.',target:transform};
+    return {title:'Choose a form',copy:'Select a form to see whether your character can use it now.',target:$<HTMLElement>('#form-select')};
+  }
+  if(currentWorkspace==='task'){
+    const available=Array.from(document.querySelectorAll<HTMLButtonElement>('#tab-content button:not(:disabled)')).find(control=>!control.hidden);
+    if(available)return {title:available.textContent?.trim().replace(/\s+/g,' ')||'Use this option',copy:`This is an available ${TASK_TITLES[currentTab]?.toLowerCase()??'character'} option. You can still choose any other legal action.`,target:available};
+    return {title:'Return to Play',copy:'No executable option is available in this section right now. Review another tool or start a new turn.',target:$<HTMLElement>('#nav-play')};
+  }
+  if(currentWorkspace==='play'){
+    const abilities=$<HTMLElement>('#open-features-view');
+    if(state.pendingRelentlessRage)return {title:'Resolve Relentless Rage',copy:`Your survival check against DC ${state.pendingRelentlessRage.dc} is unresolved and takes priority.`,target:abilities,reveal:revealTask('features','Relentless Rage')};
+    if(state.hp===0&&!state.life.dead&&!state.life.stable)return {title:'Roll a death save',copy:'The character is at 0 HP and has an unresolved Death Saving Throw.',target:abilities,reveal:revealTask('features','Death Saving Throw')};
+    if(state.concentrationChecks.length)return {title:'Resolve Concentration',copy:`Resolve the pending Constitution save against DC ${state.concentrationChecks[0]?.dc??10} before relying on the spell.`,target:abilities,reveal:revealTask('features','Concentration')};
+    if(state.turn.attackAction?.remaining)return {title:'Complete Extra Attack',copy:`The Attack action has ${state.turn.attackAction.remaining} attack${state.turn.attackAction.remaining===1?'':'s'} remaining.`,target:$<HTMLElement>('#open-actions-view'),reveal:revealTask('actions')};
+    const rage=state.resources['rage'];
+    if(state.activeTransform&&classLevel(character,'Barbarian')>0&&!state.rage.active&&!state.concentration&&state.turn.bonusRemaining>0&&(rage?.current??0)>0)return {title:'Consider Rage, then attack',copy:'Rage can improve durability and Strength checks or saves, while leaving your Action free. Beast stat-block attacks do not add Rage Damage.',target:abilities,reveal:revealTask('features','Start Rage')};
+    const multiattack=sheet.actions.find(action=>action.type==='multiattack'&&!actionExecutionError(character,state,action,sheet.conditionImmunities));
+    if(state.activeTransform&&state.turn.actionsRemaining>0&&multiattack)return {title:`Use ${multiattack.name}`,copy:'This form action makes its listed attack sequence efficiently. Battlefield position and target choice still matter.',target:$<HTMLElement>('#open-actions-view'),reveal:revealTask('actions',multiattack.name)};
+    const barkskin=sheet.spells.find(spell=>spell.name.toLowerCase()==='barkskin'&&spell.available);
+    if(!state.activeTransform&&isMoonDruid()&&sheet.ac<17&&state.turn.bonusRemaining>0&&barkskin)return {title:'Consider Barkskin',copy:'It can raise AC to 17 and continue through Wild Shape. Because both use a Bonus Action, transform on a later turn.',target:$<HTMLElement>('#open-spells-view'),reveal:revealTask('spells','Barkskin')};
+    const usableBonus=sheet.features.find(feature=>feature.activation==='bonus'&&feature.status!=='inactive'&&!actionCostError(state,'bonus',sheet.conditionImmunities));
+    if(state.turn.actionsRemaining===0&&state.turn.bonusRemaining>0&&usableBonus)return {title:`Consider ${usableBonus.name}`,copy:'Your Action is spent, but a Bonus Action remains. This is one currently available option.',target:abilities,reveal:revealTask('features',usableBonus.name)};
+    if(state.turn.actionsRemaining===0&&state.turn.bonusRemaining===0)return {title:'End this turn',copy:'Your Action and Bonus Action are spent. End Turn records completion; New Turn restores the normal choices.',target:$<HTMLElement>('#end-turn')};
+    return {title:'Open Actions',copy:state.activeTransform?'Review the attacks and actions available in your current form.':'Review attacks and other actions available to this character.',target:$<HTMLElement>('#open-actions-view')};
+  }
+  return null;
+}
+function renderNextStepGuide(){
+  document.querySelectorAll<HTMLElement>('.next-step-target').forEach(control=>control.classList.remove('next-step-target'));
+  nextStepTarget=null;nextStepReveal=null;const guide=$('#next-step-guide');
+  if(!guidedNextStep){guide.hidden=true;return;}
+  const suggestion=recommendNextStep();if(!suggestion){guide.hidden=true;return;}
+  nextStepTarget=suggestion.target;nextStepReveal=suggestion.reveal??null;suggestion.target.classList.add('next-step-target');
+  $('#next-step-title').textContent=suggestion.title;$('#next-step-copy').textContent=suggestion.copy;guide.hidden=false;
+}
+function revealNextStep(){
+  if(!nextStepTarget)return;
+  if(nextStepReveal){document.querySelectorAll<HTMLElement>('.next-step-target').forEach(control=>control.classList.remove('next-step-target'));nextStepTarget=nextStepReveal();nextStepTarget.classList.add('next-step-target');}
+  nextStepTarget.scrollIntoView({block:'center',behavior:reduceMotion?'auto':'smooth'});nextStepTarget.focus({preventScroll:true});
+}
+function render(){sheet=resolveSheet(character,state);document.documentElement.dataset.alteredCharacter=character.name;syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderResources();renderQuickFeatures();renderActiveEffects();renderTab();renderConditions();renderLog();renderNextStepGuide();persist();}
 
 function endCurrentForm(){
   if(!state.activeTransform&&state.overlays.length){const options=availableTransformations(character,state);const overlay=[...options].reverse().find(option=>option.profile==='overlay'&&option.deactivate);if(overlay){selectedOptionId=overlay.id;applyResult(startTransformation(character,state,overlay));return;}}
@@ -1146,8 +1203,10 @@ function initializeControls(){
   $('#open-settings').addEventListener('click',()=>{renderSettings();$<HTMLDialogElement>('#settings-dialog').showModal();});
   $('#close-settings').addEventListener('click',()=>$<HTMLDialogElement>('#settings-dialog').close());
   $('#refresh-srd-catalog').addEventListener('click',()=>void refreshSrdCatalogStatus());
+  $('#show-next-step').addEventListener('click',revealNextStep);
   $('#magic-effects-enabled').addEventListener('change',event=>{magicEffectsEnabled=(event.target as HTMLInputElement).checked;void saveBooleanSetting('magic-effects-enabled',magicEffectsEnabled);syncAuraState();});
   $('#reduce-motion').addEventListener('change',event=>{reduceMotion=(event.target as HTMLInputElement).checked;void saveBooleanSetting('reduce-motion',reduceMotion);syncAuraState();});
+  $('#guided-next-step').addEventListener('change',event=>{guidedNextStep=(event.target as HTMLInputElement).checked;void saveBooleanSetting('guided-next-step-v1',guidedNextStep);renderNextStepGuide();});
   window.addEventListener('beforeunload',persist);
   if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
@@ -1167,6 +1226,7 @@ async function boot(){
   if(pendingActiveSnapshot?.option?.id){const option=availableTransformations(character,state).find(candidate=>candidate.id===pendingActiveSnapshot?.option?.id);if(option)state.activeTransform={option,startedTurn:boundedWhole(pendingActiveSnapshot.startedTurn,state.turn.number,1,1_000_000),duration:safeSavedText(pendingActiveSnapshot.duration,'',200),tempHpSource:Boolean(pendingActiveSnapshot.tempHpSource),...(pendingActiveSnapshot.spellConcentration?{spellConcentration:true}:{}),...(pendingActiveSnapshot.permanentUntilDispelled?{permanentUntilDispelled:true}:{})};}
   magicEffectsEnabled=await loadBooleanSetting('magic-effects-enabled',true);
   reduceMotion=await loadBooleanSetting('reduce-motion',reduceMotion);
+  guidedNextStep=await loadBooleanSetting('guided-next-step-v1',true);
   const walkthroughCompleted=await loadBooleanSetting(WALKTHROUGH_SETTING,false);
   renderSettings();renderInstalledPacks();
   const repairNote=invalidPackCount?` ${invalidPackCount} damaged private pack${invalidPackCount===1?' was':'s were'} removed safely.`:'';const migrationNote=restoredDataRepairs.length?` ${restoredDataRepairs.join(' ')}`:'';

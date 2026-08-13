@@ -1,3 +1,11 @@
+# Altered v0.27.7 release notes
+
+## Guided visual next steps
+
+The selected form's Transform button now pulses bright magical green when it can be used immediately and bright red when it is currently blocked. Its written reason, tooltip, disabled state, and screen-reader description remain present, so the cue never relies on color alone. Reduced-motion users receive the same high-contrast static glow without animation.
+
+Settings now includes a Suggested next step guide, on by default and easy to disable. It prioritizes unresolved survival and Concentration rolls, unfinished Extra Attack sequences, compatible form/class combinations, usable Action and Bonus Action options, and correct End Turn flow. Recommendations use only facts Altered knows; battlefield position, targets, and player intent remain the user's choice. It never performs an action or spends a resource. Show me only navigates to and focuses the suggested control.
+
 # Altered v0.27.6 release notes
 
 ## Custom transformations and usability release

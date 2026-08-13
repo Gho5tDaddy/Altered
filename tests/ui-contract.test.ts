@@ -258,6 +258,28 @@ test('combat state and spell availability are explained before a click',()=>{
   assert.match(source,/Extra Attack: \$\{state\.turn\.attackAction\.remaining\} remaining/);
 });
 
+test('the Transform button gives accessible ready and blocked next-step cues',()=>{
+  const html=readFileSync('public/index.html','utf8');
+  const source=readFileSync('src/app.ts','utf8');
+  const styles=readFileSync('public/styles.css','utf8');
+  assert.match(html,/id="transform-button"[^>]*aria-describedby="form-reason"/);
+  assert.match(source,/transform-cue-ready/);assert.match(source,/transform-cue-blocked/);
+  assert.match(source,/dataset\.transformState/);assert.match(source,/Available now/);assert.match(source,/Unavailable:/);
+  assert.match(styles,/#transform-button\.transform-cue-ready/);assert.match(styles,/#transform-button\.transform-cue-blocked:disabled/);
+  assert.match(styles,/@keyframes transformReadyPulse/);assert.match(styles,/@keyframes transformBlockedPulse/);
+  assert.match(styles,/@media\(prefers-reduced-motion:reduce\)[\s\S]*#transform-button\.transform-cue-ready/);
+});
+
+test('optional next-step guidance stays contextual, non-tactical, and persistent',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
+  for(const id of ['guided-next-step','next-step-guide','next-step-title','next-step-copy','show-next-step'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(html,/never chooses tactics, targets, or spends resources/i);
+  assert.match(source,/loadBooleanSetting\('guided-next-step-v1',true\)/);assert.match(source,/saveBooleanSetting\('guided-next-step-v1'/);
+  assert.match(source,/function recommendNextStep/);assert.match(source,/function renderNextStepGuide/);assert.match(source,/function revealNextStep/);
+  for(const guidance of ['Resolve Relentless Rage','Roll a death save','Resolve Concentration','Complete Extra Attack','Consider Rage, then attack','Consider Barkskin','End this turn'])assert.match(source,new RegExp(guidance));
+  assert.match(source,/You can still choose any other legal action/);assert.match(styles,/\.next-step-target/);assert.match(styles,/prefers-reduced-motion:reduce[\s\S]*\.next-step-target/);
+});
+
 test('static shell applies a restrictive local-only content policy',()=>{
   const html=readFileSync('public/index.html','utf8');
   const policy=html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1]??'';

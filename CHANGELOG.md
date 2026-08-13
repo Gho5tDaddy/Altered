@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.27.7
+
+- Added bright green ready and bright red blocked pulses to the Transform button, with written and screen-reader state labels.
+- Added a default-on, optional Suggested next step setting that prioritizes urgent rolls, unfinished attacks, compatible class/form sequences, remaining action economy, and turn flow without performing actions.
+- Made Show me navigate and focus only; it never activates the recommendation.
+- Preserved high-contrast static guidance when reduced motion is enabled.
+
 ## v0.27.6
 
 - Fixed active additive transformations locking the focused workspace scroll area.
