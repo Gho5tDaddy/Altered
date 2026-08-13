@@ -1,3 +1,14 @@
+# Altered v0.27.10 QA report
+
+## Priority-ability release verification
+
+- Verified Rage and Wild Shape readiness comes from the existing rules and action-economy checks.
+- Verified ready, active, and blocked transitions in the live phone interface.
+- Verified blocked states name the exact reason and remain visually legible when disabled.
+- Verified phone, Fold/wide, and desktop layouts without horizontal overflow or browser-console errors.
+- Verified reduced-motion behavior, strict type checking, production build, and **191/191 automated tests**.
+- Android v0.27.10 uses version code 43; saved data and private content require no migration.
+
 # Altered v0.27.9 QA report
 
 ## Responsive cockpit and eligibility-cue verification

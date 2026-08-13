@@ -1,3 +1,11 @@
+# Altered v0.27.10 release notes
+
+## Clear priority abilities
+
+Frequently used core abilities now appear first on the Character abilities page. Rage and Wild Shape use the existing eligibility and action-economy checks to show a prominent green ready state, red blocked state with the exact reason, or distinct active state.
+
+The update changes presentation only. Ability rules, resource spending, saved characters, imports, exports, and private content remain compatible.
+
 # Altered v0.27.9 release notes
 
 ## Focused transformation cockpit

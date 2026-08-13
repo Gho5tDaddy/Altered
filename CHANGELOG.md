@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.27.10
+
+- Promoted Rage and Wild Shape into an always-open Core abilities group.
+- Added rule-driven green ready, red blocked, and distinct active visual states.
+- Kept exact blocker explanations visible and preserved reduced-motion accessibility.
+- Preserved gameplay rules, resource spending, imports, exports, and saved-data compatibility.
+
 ## v0.27.9
 
 - Consolidated duplicated form, turn, and action-economy status into the persistent form cockpit.

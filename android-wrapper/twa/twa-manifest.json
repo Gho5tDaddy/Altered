@@ -20,8 +20,8 @@
     "path": "../../.android-signing/altered-release.keystore",
     "alias": "altered"
   },
-  "appVersion": "0.27.9",
-  "appVersionCode": 42,
+  "appVersion": "0.27.10",
+  "appVersionCode": 43,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://altered-ferocitus.ghostdaddy.chatgpt.site/manifest.json",
