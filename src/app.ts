@@ -12,6 +12,7 @@ import {SAMPLE_CHARACTERS} from './sample-data.js';
 import {FEROCITUS_CHARACTER} from './ferocitus-data.js';
 import {applyOwnedContentPack,applyOwnedContentPacks,ownedContentTemplate,parseOwnedContentPack,privateMechanicPack,safeOwnedContentParse} from './owned-content.js';
 import {rulesAuditSnapshot} from './audit-ledger.js';
+import {migratePersistedCharacter} from './data-migrations.js';
 import {
   actionCostError,applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,criticalDiceExpression,criticalHitThreshold,
   clearConditions,completeTruePolymorph,concentrationSaveMode,createInitialState,deathSaveMode,declareAttack,declareRecklessAttack,endConcentration,endRage,endSpellEffect,endTransformation,endTurn,
@@ -67,6 +68,7 @@ const radiantActions=new Set<string>();
 let pendingTempChoice:{incoming:number;source:string}|null=null;
 let magicEffectsEnabled=true;
 let reduceMotion=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)').matches:false;
+let restoredDataRepairs:string[]=[];
 let auraInitialized=false;
 let previousTransformId:string|undefined;
 let previousAuraId:string|undefined;
@@ -227,12 +229,13 @@ function savedActionUses(value:unknown){
 }
 function restore(){
   try{
+    restoredDataRepairs=[];
     const raw=localStorage.getItem('altered-v0.18')??localStorage.getItem('altered-v0.17')??localStorage.getItem('altered-v0.15')??localStorage.getItem('altered-v0.9')??localStorage.getItem('altered-v0.8')??localStorage.getItem('altered-v0.4');if(!raw)return false;
     const parsed=JSON.parse(raw) as {baseCharacters?:unknown[];currentCharacterId?:string;baseCharacter?:unknown;character?:unknown;state?:Partial<GameState>;deletedCharacterIds?:unknown[]};
     deletedCharacterIds=new Set(Array.isArray(parsed.deletedCharacterIds)?parsed.deletedCharacterIds.filter((id):id is string=>typeof id==='string'&&id.length<=160).slice(0,50):[]);
     const library:Character[]=[];
-    if(Array.isArray(parsed.baseCharacters)){for(const rawCharacter of parsed.baseCharacters.slice(0,50)){try{const entry=parseCharacter(rawCharacter);if(!library.some(existing=>existing.id===entry.id))library.push(entry);}catch{/* one damaged library entry should not block the rest */}}}
-    if(library.length===0){const restored=parseCharacter(parsed.baseCharacter??parsed.character);library.push(restored);}
+    if(Array.isArray(parsed.baseCharacters)){for(const rawCharacter of parsed.baseCharacters.slice(0,50)){try{const migrated=migratePersistedCharacter(parseCharacter(rawCharacter));restoredDataRepairs.push(...migrated.repairs);const entry=migrated.character;if(!library.some(existing=>existing.id===entry.id))library.push(entry);}catch{/* one damaged library entry should not block the rest */}}}
+    if(library.length===0){const migrated=migratePersistedCharacter(parseCharacter(parsed.baseCharacter??parsed.character));restoredDataRepairs.push(...migrated.repairs);library.push(migrated.character);}
     for(const sample of BUNDLED_CHARACTERS.map(parseCharacter))if(!deletedCharacterIds.has(sample.id)&&!library.some(entry=>entry.id===sample.id))library.push(sample);
     baseCharacters=library;
     const requestedId=typeof parsed.currentCharacterId==='string'?parsed.currentCharacterId:typeof (parsed.baseCharacter as {id?:unknown}|undefined)?.id==='string'?String((parsed.baseCharacter as {id:string}).id):typeof (parsed.character as {id?:unknown}|undefined)?.id==='string'?String((parsed.character as {id:string}).id):library[0]?.id;
@@ -1130,8 +1133,8 @@ async function boot(){
   reduceMotion=await loadBooleanSetting('reduce-motion',reduceMotion);
   const walkthroughCompleted=await loadBooleanSetting(WALKTHROUGH_SETTING,false);
   renderSettings();renderInstalledPacks();
-  const repairNote=invalidPackCount?` ${invalidPackCount} damaged private pack${invalidPackCount===1?' was':'s were'} removed safely.`:'';
-  notify(`Altered loaded for ${character.name}. ${installedPacks.length} private content pack${installedPacks.length===1?'':'s'} available.${repairNote}`);render();
+  const repairNote=invalidPackCount?` ${invalidPackCount} damaged private pack${invalidPackCount===1?' was':'s were'} removed safely.`:'';const migrationNote=restoredDataRepairs.length?` ${restoredDataRepairs.join(' ')}`:'';
+  notify(`Altered loaded for ${character.name}. ${installedPacks.length} private content pack${installedPacks.length===1?'':'s'} available.${repairNote}${migrationNote}`);render();
   if(!walkthroughCompleted)startWalkthrough();
   void refreshSrdCatalogStatus();
 }

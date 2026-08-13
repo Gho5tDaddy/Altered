@@ -1,4 +1,8 @@
-# Altered v0.27.2 release notes
+# Altered v0.27.3 release notes
+
+## Saved-character repair
+
+Older Ferocitus data already stored by a browser or Android installation is upgraded automatically. The known unfinished `Dark Bargain` chooser is removed on startup and the corrected character is saved again. Fresh imports were already protected by the v0.27.2 importer fix; v0.27.3 closes the remaining persistence gap.
 
 ## Import integrity and honest feature states
 

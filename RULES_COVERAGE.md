@@ -1,4 +1,4 @@
-# Rules coverage — v0.27.2
+# Rules coverage — v0.27.3
 
 ## Fully calculated in the bundled rules pack
 

@@ -1,4 +1,10 @@
-# Altered v0.27.2 QA report
+# Altered v0.27.3 QA report
+
+## v0.27.3 persisted-import repair
+
+- Verified the known unfinished feat is removed from an older saved D&D Beyond Ferocitus character.
+- Verified unrelated D&D Beyond characters are untouched.
+- Verified a newly imported, feat-selection-verified character is not altered by the legacy repair.
 
 ## v0.27.2 import-integrity and release-candidate verification
 

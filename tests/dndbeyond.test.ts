@@ -192,6 +192,7 @@ test('ignores unfinished D&D Beyond feat choosers without dropping selected or g
   assert.deepEqual(report.character.feats,['Sentinel','Tough']);
   assert.equal(report.setupNeeds.some(need=>need.label==='Dark Bargain'),false);
   assert.ok(report.warnings.some(warning=>warning.code==='incomplete-feat-choice'&&warning.message.includes('Dark Bargain')));
+  assert.ok(report.character.provenance.rulesetEvidence.includes('Altered verified D&D Beyond feat selections'));
 });
 
 test('identifies unsupported paid subclass features without copying descriptions',()=>{

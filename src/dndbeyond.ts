@@ -1,6 +1,7 @@
 import type {Ability,ActionCost,Character,CharacterItem,CharacterRuleset,Creature,DamagePacket,DamageType,ProficiencyRank,ResourcePool,Spell} from './types.js';
 import {CREATURES,MOON_FORM_SPELL_LEVELS,SUBCLASS_FEATURES} from './content-registry.js';
 import {parseCharacter} from './schema.js';
+import {DDB_FEAT_SELECTION_EVIDENCE} from './data-migrations.js';
 
 type JsonObject=Record<string,unknown>;
 type CoverageStatus='verified'|'review'|'not-provided';
@@ -579,7 +580,7 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
   const raw={
     schemaVersion:1,id:`ddb-${sourceId}`,name:string(data.name)||`D&D Beyond ${sourceId}`,species:race.species,creatureType:'Humanoid',size:race.size,totalLevel,classes,abilities,hp,
     ac:defense.ac,speed:parseSpeed(data,race.speed,modifiers),proficiencies:proficiencies.proficiencies,skillBonuses:proficiencies.skillBonuses,saveBonuses:proficiencies.saveBonuses,
-    knownForms,seenForms:knownForms,spells,spellSlots:parseSpellSlots(data,classes),feats,features:[],resources,equipment:defense.equipment,items,provenance:{provider:'dndbeyond',sourceId,ruleset:ruleset.ruleset,rulesetEvidence:ruleset.evidence,reviewRequired:ruleset.reviewRequired},customForms:[],
+    knownForms,seenForms:knownForms,spells,spellSlots:parseSpellSlots(data,classes),feats,features:[],resources,equipment:defense.equipment,items,provenance:{provider:'dndbeyond',sourceId,ruleset:ruleset.ruleset,rulesetEvidence:[...ruleset.evidence,DDB_FEAT_SELECTION_EVIDENCE],reviewRequired:ruleset.reviewRequired},customForms:[],
   };
   const character=parseCharacter(raw);
   const privateSetup=setupNeeds(data,classes,feats,items,spells,homebrew);

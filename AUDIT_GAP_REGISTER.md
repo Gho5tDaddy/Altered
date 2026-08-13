@@ -1,4 +1,10 @@
-# Altered v0.27.2 audit gap register
+# Altered v0.27.3 audit gap register
+
+## Resolved in v0.27.3
+
+| Finding | Severity | Resolution | Regression evidence |
+|---|---:|---|---|
+| Older device storage could retain the previously imported unfinished `Dark Bargain` chooser | High | Added a source-specific saved-character repair and explicit evidence on new verified imports | `repairs the known unfinished feat in an older saved Ferocitus import` |
 
 This register distinguishes an incorrect result from a deliberately conditional or reference-only result. Altered must never present a reference-only mechanic as calculated.
 

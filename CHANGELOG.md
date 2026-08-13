@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.27.3
+
+- Repairs older saved Ferocitus imports that still contain D&D Beyond's unfinished `Dark Bargain` feat-choice placeholder.
+- Marks new D&D Beyond imports with feat-selection evidence so the legacy repair never removes a legitimately selected future feat.
+- Keeps the repair narrowly scoped to D&D Beyond character `152187683`; other characters and homebrew feats are unchanged.
+
 ## v0.27.2
 
 - Excluded unfinished D&D Beyond feat choosers so unselected placeholders such as `Dark Bargain` do not become character feats.
