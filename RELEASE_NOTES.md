@@ -1,3 +1,13 @@
+# Altered v0.27.9 release notes
+
+## Focused transformation cockpit
+
+Form statistics, turn availability, End Form, New Turn, and End Turn now share the persistent artwork cockpit instead of repeating information in the Play workspace. Unfolded phones and compact tablets receive a wider cockpit with readable turn indicators while ordinary phones and desktop screens retain their established layouts.
+
+The form state and name remain centered at the top of the status panel. A form that is genuinely legal and usable now receives a larger magical glow; Beast previews use a restrained feral serif treatment. Blocked and locked previews do not glow, and reduced-motion mode retains a static high-contrast treatment.
+
+No rules-engine formula, import format, saved-character schema, combat-state format, artwork store, or private-pack format changed.
+
 # Altered v0.27.8 release notes
 
 ## Clearer enhancements and forms

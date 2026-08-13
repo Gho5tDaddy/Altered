@@ -1,3 +1,14 @@
+# Altered v0.27.9 QA report
+
+## Responsive cockpit and eligibility-cue verification
+
+- Verified a single visible form/turn status source with no duplicate Play status block.
+- Verified phone, unfolded Fold, compact-tablet, and desktop layouts without horizontal overflow or clipped Fold indicators.
+- Verified form identity remains centered for Base Form, blocked previews, available previews, and active forms.
+- Verified the dramatic Beast name treatment is applied only when the existing legality and action-economy checks report the transformation ready.
+- Verified reduced-motion styling, production build, hosted worker startup, and **190/190 automated tests**.
+- Android v0.27.9 uses version code 42; saved data and private content require no migration.
+
 # Altered v0.27.8 QA report
 
 ## Enhancement-builder stability verification

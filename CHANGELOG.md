@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.27.9
+
+- Consolidated duplicated form, turn, and action-economy status into the persistent form cockpit.
+- Added a dedicated unfolded-phone/compact-tablet layout so Samsung Fold displays retain readable controls and artwork emphasis.
+- Centered form identity at the top of the status panel in every state.
+- Added eligibility-driven magical form-name styling, including a feral Beast treatment and reduced-motion fallback.
+- Preserved rules, imports, persistence, character schema, and private-pack compatibility.
+
 ## v0.27.8
 
 - Reframed private setup as Enhancement versus Replacement so additive states no longer read like creature forms.
