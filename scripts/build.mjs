@@ -71,11 +71,14 @@ const toolAssets=Object.fromEntries(await Promise.all(['pdf.bundle.js','tesserac
 const downloadAssets=Object.fromEntries(await Promise.all([
   ['Altered-Android-v0.29.1.apk','application/vnd.android.package-archive'],
   ['Altered-Desktop-Mac-v0.29.2.zip','application/zip'],
-  ['Altered-Windows-Setup-v0.29.2.exe','application/octet-stream'],
 ].map(async([name,type])=>[
   `/downloads/${name}`,
   {name,type,data:(await readFile(path.join(root,'public','downloads',name))).toString('base64')},
 ])));
+// The installer is already copied to dist/downloads and served by Sites' static
+// asset binding. Verify it exists without base64-embedding a redundant 1.6 MB
+// copy into the Worker bundle, which keeps the deployment below its size cap.
+await readFile(path.join(root,'public','downloads','Altered-Windows-Setup-v0.29.2.exe'));
 const workerTemplate=await readFile(path.join(root,'scripts','hosted-worker.template.js'),'utf8');
 const hostedWorker=workerTemplate
   .replace('__ALTERED_PAGE_BASE64__',()=>JSON.stringify(hostedPage))
