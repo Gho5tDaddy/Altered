@@ -38,7 +38,7 @@ test('help and first-launch walkthrough remain optional, searchable, and restart
   const source=readFileSync('src/app.ts','utf8');
   const styles=readFileSync('public/styles.css','utf8');
   assert.match(html,/id="open-help"[^>]*>Help<\/button>/);
-  assert.match(html,/id="more-help"[^>]*>[\s\S]*?<strong>Help<\/strong>/);assert.match(source,/#more-help'\)\.addEventListener\('click'/);
+  assert.match(html,/id="toggle-app-menu"[^>]*aria-label="Open Altered menu"/);assert.equal(/id="more-help"/.test(html),false);
   assert.match(html,/id="help-search"[^>]*type="search"/);
   assert.ok((html.match(/class="help-topic"/g)??[]).length>=15);
   for(const topic of ['What Altered is','What the app is for','Supported transformation types','Getting Started','Loading characters','Importing characters','Browsing forms, search, and filters','Activating forms','Ending forms and returning to normal','Tracking resources and turns','Images','Settings','Troubleshooting','FAQ','About'])assert.ok(html.includes(topic));
@@ -74,7 +74,7 @@ test('form browsing and visual statuses explain availability without changing fo
   assert.match(styles,/\.ui-status\.locked/);
   assert.match(styles,/\.main-form-art img\{/);
   assert.match(styles,/\.form-art\.is-preview/);
-  assert.match(styles,/\.top-actions\{width:100%;margin-left:0;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(styles,/single global A menu/);assert.match(styles,/\.topbar\.menu-open \.top-actions\{display:grid\}/);
   assert.match(styles,/\.help-topic summary:focus-visible/);
 });
 
@@ -148,7 +148,7 @@ test('the exact hosted build executes before optional mobile storage hydration',
   assert.match(worker,/character-service\.dndbeyond\.com/);
   assert.match(worker,/api\.open5e\.com/);
   assert.match(source,/credentials:'same-origin'/);
-  assert.equal((source.match(/'X-Altered-Request':'app'/g)??[]).length,4);
+  assert.ok((source.match(/'X-Altered-Request':'app'/g)??[]).length>=5);
   assert.match(worker,/fetch\(String\(url\)/);
   assert.match(worker,/redirect:'manual'/);
   assert.match(worker,/guardApiRequest\(request,'ddb',12\)/);
@@ -178,6 +178,7 @@ test('account identity and focused workspace stay incremental and accessible',()
   const hostedServiceWorker=readFileSync('public/sw-hosted.js','utf8');
   assert.match(html,/id="account-status"[^>]*hidden/);
   assert.match(html,/id="toggle-app-menu"[^>]*aria-expanded="false"[^>]*aria-controls="top-actions"/);
+  assert.match(html,/id="toggle-app-menu"[\s\S]*?<img src="icon-192\.png"/);
   assert.match(html,/id="account-name"/);
   assert.match(html,/href="\/signout-with-chatgpt\?return_to=%2F"/);
   assert.equal((html.match(/<details class="panel dashboard-drawer" name="more-controls"/g)??[]).length,4);
@@ -248,8 +249,18 @@ test('the focused workspace uses form-panel space for live stats and explains ab
 
 test('character management exposes safe add and delete paths',()=>{
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');
-  assert.match(html,/id="more-import"[^>]*>[\s\S]*?<strong>Add \/ Import<\/strong>/);assert.match(html,/id="more-delete-character"/);
+  assert.match(html,/id="open-import-center"/);assert.match(html,/id="more-delete-character"/);assert.equal(/id="more-import"/.test(html),false);
   assert.match(html,/id="delete-character-dialog"/);assert.match(source,/function deleteCurrentCharacter\(\)/);assert.match(source,/deletedCharacterIds/);assert.match(source,/baseCharacters\.length<=1/);
+});
+
+test('linked D&D Beyond characters refresh safely and can keep a saved version',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');
+  assert.match(html,/id="refresh-character"[^>]*>Refresh Character<\/button>/);assert.match(html,/id="auto-refresh-character"[^>]*type="checkbox"/);
+  assert.match(html,/id="character-refresh-status"[^>]*aria-live="polite"/);assert.match(source,/AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1'/);
+  assert.match(source,/loadBooleanSetting\(AUTO_REFRESH_CHARACTER_SETTING,true\)/);assert.match(source,/cache:'no-store'/);
+  assert.match(source,/document\.addEventListener\('visibilitychange'/);assert.match(source,/rebuildEffectiveCharacterLibrary\(true\)/);
+  assert.match(source,/target\.id\.match\(\/\^ddb-/);
+  assert.match(source,/Using the saved version/);assert.match(source,/Current combat state was preserved/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
@@ -326,7 +337,7 @@ test('PWA manifest has a stable identity, scope, and description',()=>{
 test('More exposes local artwork and homebrew creation without requiring JSON',()=>{
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');
   for(const id of ['character-art-file','current-form-art-file','more-reset-art','create-homebrew-ability','create-homebrew-transformation','manage-private-content'])assert.match(html,new RegExp(`id="${id}"`));
-  assert.match(html,/More → Customize/);assert.match(html,/Create Ability or Feature/);assert.match(source,/function openManualPrivateMechanic/);assert.match(source,/User-created homebrew mechanic/);
+  assert.match(html,/Manage → Customize/);assert.match(html,/Create Ability or Feature/);assert.match(source,/function openManualPrivateMechanic/);assert.match(source,/User-created homebrew mechanic/);
   assert.match(source,/entry\.id\.startsWith\('private-'\)&&entry\.activation/);assert.match(source,/bindArtworkInput\('#character-art-file'/);assert.match(source,/bindArtworkInput\('#current-form-art-file'/);
 });
 

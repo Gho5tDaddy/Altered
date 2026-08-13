@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.28.0
+
+- Added safe default-on synchronization for linked public D&D Beyond characters.
+- Checks on startup, foreground return, character selection, network restoration, and manual refresh.
+- Preserves the saved version after any failed or blocked refresh and reconciles current combat state after valid updates.
+- Added a persistent Settings switch for users who want to keep an older saved character version.
+- Replaced the separate Menu control with the packaged Altered A icon and made it the single home for global commands.
+- Renamed More to Manage and removed duplicate Help, Import, Export, and Settings shortcuts.
+- Preserved schema-v1 characters, private content, artwork, import/export formats, and rules-engine behavior.
+
 ## v0.27.10
 
 - Promoted Rage and Wild Shape into an always-open Core abilities group.

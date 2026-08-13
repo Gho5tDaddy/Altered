@@ -1,3 +1,13 @@
+# Altered v0.28.0 release notes
+
+## Current-character sync and unified A menu
+
+Linked public D&D Beyond characters now check for a current sheet on startup, when Altered returns to the foreground, and when the selected character changes. A failed, blocked, or incomplete check leaves the saved character untouched. Combat state is reconciled instead of reset when a valid update arrives. Automatic checks are enabled by default and can be disabled in Settings to keep an older saved version.
+
+The packaged Altered icon now opens a compact global menu containing Refresh Character, Help, Import, Export, and Settings. Those global commands were removed from the renamed Manage tab, which now stays focused on character and session tools.
+
+Existing character storage, imports, exports, private packs, artwork, and gameplay rules remain compatible.
+
 # Altered v0.27.10 release notes
 
 ## Clear priority abilities

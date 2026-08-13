@@ -12,14 +12,14 @@
 <body>
   <div id="app" class="app-shell">
     <header class="topbar">
-      <div class="brand-mark" aria-hidden="true">A</div>
+      <button id="toggle-app-menu" class="brand-mark" type="button" aria-label="Open Altered menu" aria-expanded="false" aria-controls="top-actions"><img src="icon-192.png" alt=""></button>
       <div class="brand-copy"><h1>ALTERED</h1><p>Rules-aware transformation character sheet</p></div>
-      <button id="toggle-app-menu" class="button secondary app-menu-toggle" type="button" aria-expanded="false" aria-controls="top-actions">Menu</button>
       <div id="top-actions" class="top-actions" aria-label="Application controls">
         <div id="account-status" class="account-status" hidden>
           <span class="account-copy"><small>Signed in</small><strong id="account-name">Adventurer</strong></span>
           <a class="button secondary compact account-signout" href="/signout-with-chatgpt?return_to=%2F">Sign out</a>
         </div>
+        <button id="refresh-character" class="button primary" type="button">Refresh Character</button>
         <button id="open-help" class="button secondary" type="button">Help</button>
         <button id="open-import-center" class="button secondary" type="button" aria-label="Import character and private content">Import</button>
         <button id="export-character" class="button secondary" type="button">Export</button>
@@ -172,14 +172,10 @@
       </section>
 
       <section id="workspace-more" class="workspace-view more-view" data-workspace-view="more" aria-labelledby="more-view-title" hidden>
-        <div class="workspace-heading panel"><div><span>Utilities</span><h2 id="more-view-title">More tools</h2></div><button class="text-button workspace-home" type="button">Back to Play</button></div>
-        <div class="more-links panel" aria-label="Application tools">
-          <button id="more-help" class="button secondary more-link" type="button"><strong>Help</strong><small>Guides &amp; tutorial</small></button>
-          <button id="more-import" class="button secondary more-link" type="button"><strong>Add / Import</strong><small>Character &amp; content</small></button>
+        <div class="workspace-heading panel"><div><span>Management</span><h2 id="more-view-title">Character &amp; Session</h2></div><button class="text-button workspace-home" type="button">Back to Play</button></div>
+        <div class="more-links panel" aria-label="Character management">
           <button id="more-resume-setup" class="button secondary resume-setup-button" type="button" hidden>Resume Content Setup</button>
           <button id="more-customize" class="button secondary more-link" type="button"><strong>Customize</strong><small>Art &amp; homebrew</small></button>
-          <button id="more-export" class="button secondary more-link" type="button"><strong>Export</strong><small>Character backup</small></button>
-          <button id="more-settings" class="button secondary more-link" type="button"><strong>Settings</strong><small>Effects &amp; rules status</small></button>
           <button id="more-delete-character" class="button danger more-link" type="button"><strong>Delete</strong><small>Current character</small></button>
         </div>
         <aside class="side-column">
@@ -259,7 +255,7 @@
       <button id="nav-play" class="workspace-nav-button active" type="button" aria-current="page"><span aria-hidden="true">&#9670;</span>Play</button>
       <button id="nav-forms" class="workspace-nav-button" type="button"><span aria-hidden="true">&#9789;</span>Forms</button>
       <button id="nav-sheet" class="workspace-nav-button" type="button" aria-label="Character: abilities, rules, and sheet details"><span aria-hidden="true">&#9776;</span>Character</button>
-      <button id="nav-more" class="workspace-nav-button" type="button"><span aria-hidden="true">&#8943;</span>More</button>
+      <button id="nav-more" class="workspace-nav-button" type="button"><span aria-hidden="true">&#9881;</span>Manage</button>
     </nav>
   </div>
 
@@ -331,15 +327,15 @@
         </details>
         <details class="help-topic" data-help-keywords="tracking resources action bonus reaction slots turns rest active changed">
           <summary><span aria-hidden="true">◇</span> Tracking resources and turns</summary>
-          <p>Play shows what remains this turn and summarizes active effects. Open <strong>Abilities</strong> for full resource counters. New Turn refreshes turn actions; rests under More recover only what the 2024 rules allow.</p>
+          <p>Play shows what remains this turn and summarizes active effects. Open <strong>Abilities</strong> for full resource counters. New Turn refreshes turn actions; rests under Manage recover only what the 2024 rules allow.</p>
         </details>
         <details class="help-topic" data-help-keywords="images artwork upload crop reset portrait lazy">
           <summary><span aria-hidden="true">▣</span> Images</summary>
-          <p>Open <strong>More → Customize</strong> to upload a character portrait or separate artwork for the selected or active form. Images are cropped without distortion, optimized locally, and stored only on this device. Reset Current Image restores the built-in portrait.</p>
+          <p>Open <strong>Manage → Customize</strong> to upload a character portrait or separate artwork for the selected or active form. Images are cropped without distortion, optimized locally, and stored only on this device. Reset Current Image restores the built-in portrait.</p>
         </details>
         <details class="help-topic" data-help-keywords="homebrew custom private ability feature transformation create manual">
           <summary><span aria-hidden="true">+</span> Homebrew and custom abilities</summary>
-          <p>Open <strong>More → Customize</strong>. Create Ability or Feature handles reminders and passive mechanics. Create Transformation handles forms, ability substitutions, attack-and-damage ability changes, and optional saving-throw effects on activation. Manage Private Content lets you export or remove anything you created.</p>
+          <p>Open <strong>Manage → Customize</strong>. Create Ability or Feature handles reminders and passive mechanics. Create Transformation handles forms, ability substitutions, attack-and-damage ability changes, and optional saving-throw effects on activation. Manage Private Content lets you export or remove anything you created.</p>
         </details>
         <details class="help-topic" data-help-keywords="settings aura motion catalog">
           <summary><span aria-hidden="true">⚙</span> Settings</summary>
@@ -580,6 +576,8 @@
       <label class="setting-row" for="magic-effects-enabled"><span><strong>Magical form aura</strong><small>Show a clearly visible pulsing energy ring and changing glow while a form is active.</small></span><input id="magic-effects-enabled" type="checkbox"></label>
       <label class="setting-row" for="reduce-motion"><span><strong>Reduce motion</strong><small>Keep a static transformed glow without pulsing or burst animations.</small></span><input id="reduce-motion" type="checkbox"></label>
       <label class="setting-row" for="guided-next-step"><span><strong>Suggested next step</strong><small>Show one optional, rules-valid place to go next. It never chooses tactics, targets, or spends resources.</small></span><input id="guided-next-step" type="checkbox"></label>
+      <label class="setting-row" for="auto-refresh-character"><span><strong>Keep linked character current</strong><small>Check the selected public D&amp;D Beyond character on startup and whenever Altered returns to the foreground. Turn this off to keep the saved version.</small></span><input id="auto-refresh-character" type="checkbox"></label>
+      <div class="character-refresh-setting"><p id="character-refresh-status" role="status" aria-live="polite">No linked character has been checked yet.</p><button id="settings-refresh-character" class="button compact secondary" type="button">Check Character Now</button></div>
       <div class="settings-data">
         <h3>Rules databank</h3>
         <p id="content-registry-summary"></p>

@@ -1630,6 +1630,30 @@ html[data-altered-workspace="forms"] .persistent-form-copy>strong{font-size:1rem
   .persistent-form-copy,.task-launcher,.workspace-nav-button{transition:none!important}
 }
 
+/* v0.28.0 single global A menu and linked-character refresh */
+.topbar{position:relative;z-index:40}
+.brand-mark{padding:0;overflow:hidden;appearance:none;cursor:pointer;background:#080b0d!important}
+.brand-mark::before,.brand-mark::after{display:none!important}
+.brand-mark img{display:block;width:100%;height:100%;object-fit:cover}
+.top-actions{
+  position:absolute;top:calc(100% + 5px);left:0;right:auto;z-index:41;
+  width:min(330px,calc(100vw - 20px));margin:0;padding:8px;
+  display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;
+  border:1px solid var(--line);border-radius:12px;
+  background:linear-gradient(180deg,rgba(27,33,38,.995),rgba(10,13,16,.995));
+  box-shadow:0 18px 42px rgba(0,0,0,.68)
+}
+.topbar.menu-open .top-actions{display:grid}
+.top-actions .button{min-height:44px;min-width:0;padding-inline:7px}
+.account-status{grid-column:1/-1}
+.character-refresh-setting{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;margin:8px 0 12px;padding:9px;border:1px solid var(--line);background:rgba(10,14,18,.72)}
+.character-refresh-setting p{margin:0;color:var(--muted);font-size:.76rem}
+@media(max-width:700px){
+  .top-actions{left:0;right:auto;width:min(330px,calc(100vw - 12px))}
+  .brand-copy{margin-right:auto}
+}
+@media(max-width:420px){.character-refresh-setting{grid-template-columns:1fr}.character-refresh-setting .button{width:100%}}
+
 /* v0.26.2 arcane glow: luminous text contrast and magical state accents */
 :root{
   --muted:#e4e9ff;

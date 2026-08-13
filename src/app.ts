@@ -69,6 +69,10 @@ let pendingTempChoice:{incoming:number;source:string}|null=null;
 let magicEffectsEnabled=true;
 let reduceMotion=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)').matches:false;
 let guidedNextStep=true;
+let autoRefreshCharacter=true;
+let characterRefreshRunning=false;
+let lastCharacterRefreshAt=0;
+let characterRefreshMessage='No linked character has been checked yet.';
 let nextStepTarget:HTMLElement|null=null;
 let nextStepReveal:(()=>HTMLElement)|null=null;
 let restoredDataRepairs:string[]=[];
@@ -105,6 +109,8 @@ let walkthroughReturnFocus:HTMLElement|undefined;
 let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
+const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
+const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 type UiStatus='available'|'active'|'inactive'|'locked'|'unavailable'|'requirements'|'selected'|'favorite'|'new'|'importing'|'loading'|'success'|'warning'|'error';
 const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
   available:{icon:'✓',label:'Available'},active:{icon:'✦',label:'Active'},inactive:{icon:'○',label:'Inactive'},
@@ -402,10 +408,21 @@ function renderContentRegistry(target:HTMLElement,compact=false){
   for(const pack of registrySnapshot.packs){const row=document.createElement('div');row.className='content-pack';row.append(text('strong',pack.name),text('span',`v${pack.version}`),text('small',`${pack.domain} · ${pack.source} · verified ${pack.verified}`));target.append(row);}
 }
 function renderSettings(){
-  $<HTMLInputElement>('#magic-effects-enabled').checked=magicEffectsEnabled;$<HTMLInputElement>('#reduce-motion').checked=reduceMotion;$<HTMLInputElement>('#guided-next-step').checked=guidedNextStep;
+  $<HTMLInputElement>('#magic-effects-enabled').checked=magicEffectsEnabled;$<HTMLInputElement>('#reduce-motion').checked=reduceMotion;$<HTMLInputElement>('#guided-next-step').checked=guidedNextStep;$<HTMLInputElement>('#auto-refresh-character').checked=autoRefreshCharacter;
+  $('#character-refresh-status').textContent=characterRefreshMessage;const refresh=$<HTMLButtonElement>('#settings-refresh-character');refresh.disabled=characterRefreshRunning;refresh.textContent=characterRefreshRunning?'Checking…':'Check Character Now';
   $('#content-registry-summary').textContent=`${auditSnapshot.rules} source-ledgered rules cover ${auditSnapshot.functions} state-changing functions (${auditSnapshot.counts.calculated} calculated, ${auditSnapshot.counts.conditional} conditional). ${registrySnapshot.packs.length} versioned built-in packs plus ${installedPacks.length} private local packs are verified through ${registrySnapshot.verifiedThrough}.`;
   renderContentRegistry($('#content-pack-list'));
   const catalog=$('#srd-catalog-status');const state=srdCatalogChecking?'checking':srdCatalogStatus?.healthy?'success':srdCatalogStatus?'warning':srdCatalogMessage.includes('unavailable')?'error':'idle';catalog.className=`catalog-check-result ${state}`;catalog.textContent=srdCatalogChecking?'Checking the live legal SRD 5.2.1 catalog now…':srdCatalogStatus?`${srdCatalogStatus.healthy?'✓ Current and verified':'⚠ Needs review'} · ${srdCatalogStatus.recordCount.toLocaleString()} legal SRD 5.2.1 support records · checked ${new Date(srdCatalogStatus.checkedAt).toLocaleString()}. The live catalog supplies relevant import data; validated built-in rules remain available offline.`:srdCatalogMessage;const check=$<HTMLButtonElement>('#refresh-srd-catalog');check.disabled=srdCatalogChecking;check.textContent=srdCatalogChecking?'Checking…':srdCatalogStatus?'Check Again':'Check Now';
+}
+function setCharacterRefreshStatus(message:string){
+  characterRefreshMessage=message;const status=document.querySelector<HTMLElement>('#character-refresh-status');if(status)status.textContent=message;
+  for(const selector of ['#refresh-character','#settings-refresh-character']){const control=document.querySelector<HTMLButtonElement>(selector);if(control){control.disabled=characterRefreshRunning;control.textContent=characterRefreshRunning?(selector==='#refresh-character'?'Refreshing…':'Checking…'):(selector==='#refresh-character'?'Refresh Character':'Check Character Now');}}
+}
+function linkedDdbSourceId(target=baseCharacter){
+  const value=target.provenance.sourceId?.trim()??'';if(target.provenance.provider==='dndbeyond'&&/^\d+$/.test(value))return value;
+  // Early Altered imports already used this stable numeric ID shape before
+  // provenance was stored. Recognizing it preserves upgrade compatibility.
+  return target.id.match(/^ddb-(\d{5,15})$/)?.[1]??null;
 }
 function slug(value:string){return value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,70)||'private-content';}
 function downloadJson(data:unknown,filename:string){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=filename;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
@@ -545,6 +562,37 @@ async function refreshSrdCatalogStatus(){
     srdCatalogMessage=srdCatalogStatus.healthy?'The legal SRD support catalog is current.':'The catalog changed and needs validation before new records affect transformations.';
   }catch(error){srdCatalogStatus=null;srdCatalogMessage=`Live SRD catalog unavailable${error instanceof Error?`: ${error.message}`:''}. Altered is still using its validated offline transformation rules.`;}
   finally{srdCatalogChecking=false;renderSettings();}
+}
+async function retrieveDdbCharacterForRefresh(id:string){
+  // Credentials stay on Altered's same-origin edge and are never forwarded to
+  // D&D Beyond. A no-store request ensures the saved copy cannot mask changes.
+  const response=await fetch(`/api/dndbeyond/character/${id}`,{headers:{Accept:'application/json','X-Altered-Request':'app'},credentials:'same-origin',cache:'no-store'});
+  const body=await response.text();let payload:unknown;try{payload=JSON.parse(body);}catch{throw new Error(response.ok?'The refresh service returned invalid data.':'Use the hosted Altered app to refresh a linked character.');}
+  if(!response.ok){const message=typeof payload==='object'&&payload!==null&&typeof (payload as {error?:unknown}).error==='string'?(payload as {error:string}).error:`Refresh service returned status ${response.status}.`;throw new Error(message);}
+  let report=importDdbCharacter(payload,id);
+  if(report.supportRequests.creatures.length){
+    setCharacterRefreshStatus('Loading current SRD forms…');
+    try{const creatures=(await Promise.all(report.supportRequests.creatures.map(loadSrdCreature))).filter((entry):entry is NonNullable<typeof entry>=>Boolean(entry));report=applyDdbSrdCreatures(report,creatures);}
+    catch{report.warnings.push({code:'srd-catalog-unavailable',severity:'warning',message:'The live SRD support catalog was unavailable. Existing validated form support remains available.'});}
+  }
+  return report;
+}
+async function refreshLinkedCharacter(manual=false,force=false){
+  if(!manual&&!autoRefreshCharacter)return false;
+  const id=linkedDdbSourceId();
+  if(!id){const message=`${baseCharacter.name} is not linked to a public D&D Beyond character. Import a public character first, or continue using this saved local version.`;setCharacterRefreshStatus(message);if(manual)notify(message);return false;}
+  const now=Date.now();if(!force&&now-lastCharacterRefreshAt<CHARACTER_REFRESH_INTERVAL)return false;
+  if(characterRefreshRunning)return false;characterRefreshRunning=true;lastCharacterRefreshAt=now;const targetCharacterId=baseCharacter.id;setCharacterRefreshStatus(`Checking ${baseCharacter.name} for updates…`);
+  try{
+    const report=await retrieveDdbCharacterForRefresh(id);
+    if(report.blocked||report.character.provenance.ruleset!=='2024')throw new Error(report.blockReason??'The refreshed sheet did not pass Altered’s 2024 rules check.');
+    const index=baseCharacters.findIndex(entry=>entry.id===targetCharacterId);if(index<0)throw new Error('The selected saved character is no longer available.');
+    const changed=JSON.stringify(baseCharacters[index])!==JSON.stringify(report.character);baseCharacters[index]=report.character;
+    if(baseCharacter.id===targetCharacterId){rebuildEffectiveCharacterLibrary(true);render();}else persist();
+    const checked=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});const message=changed?`${report.character.name} updated from the latest public D&D Beyond sheet at ${checked}. Current combat state was preserved.`:`${report.character.name} is already current. Checked at ${checked}.`;
+    setCharacterRefreshStatus(message);if(manual)notify(message);return true;
+  }catch(error){const message=`Using the saved version of ${baseCharacter.name}; refresh could not be completed: ${error instanceof Error?error.message:'Unknown error'}`;setCharacterRefreshStatus(message);if(manual)notify(message);return false;}
+  finally{characterRefreshRunning=false;setCharacterRefreshStatus(characterRefreshMessage);}
 }
 async function fetchDdbCharacter(explicitSource?:string):Promise<boolean>{
   const source=explicitSource??$<HTMLInputElement>('#dndbeyond-source').value;const id=extractDdbCharacterId(source);
@@ -1184,18 +1232,14 @@ function initializeControls(){
   $('#open-damage-view').addEventListener('click',()=>openMoreDrawer('Damage'));
   $('#open-conditions-view').addEventListener('click',()=>openMoreDrawer('Conditions'));
   $('#play-end-form').addEventListener('click',endCurrentForm);
-  $('#more-help').addEventListener('click',()=>$<HTMLButtonElement>('#open-help').click());
-  $('#more-import').addEventListener('click',()=>$<HTMLButtonElement>('#open-import-center').click());
   $('#more-customize').addEventListener('click',()=>openMoreDrawer('Customize'));
   $('#more-resume-setup').addEventListener('click',resumePrivateSetup);
   $('#more-delete-character').addEventListener('click',()=>{$('#delete-character-name').textContent=character.name;$('#delete-character-status').textContent=baseCharacters.length<=1?'Import or keep at least one other character before deleting this one.':'';$<HTMLDialogElement>('#delete-character-dialog').showModal();});
-  $('#more-export').addEventListener('click',()=>$<HTMLButtonElement>('#export-character').click());
-  $('#more-settings').addEventListener('click',()=>$<HTMLButtonElement>('#open-settings').click());
   $('#create-homebrew-ability').addEventListener('click',openManualPrivateMechanic);
   $('#create-homebrew-transformation').addEventListener('click',()=>$<HTMLButtonElement>('#open-transform-builder').click());
   $('#manage-private-content').addEventListener('click',()=>{$<HTMLButtonElement>('#open-import-center').click();window.setTimeout(()=>$('#installed-pack-list').scrollIntoView({block:'nearest'}),0);});
   const compactFormQuery=window.matchMedia('(max-width:700px)');syncCharacterFormDrawer();compactFormQuery.addEventListener('change',syncCharacterFormDrawer);window.addEventListener('resize',()=>{if(innerWidth>700)setAppMenuOpen(false);syncCharacterFormDrawer();});
-  $('#sample-character').addEventListener('change',event=>{const id=(event.target as HTMLSelectElement).value;const found=characters.find(c=>c.id===id);if(found)setCharacter(found);});
+  $('#sample-character').addEventListener('change',event=>{const id=(event.target as HTMLSelectElement).value;const found=characters.find(c=>c.id===id);if(found){setCharacter(found);void refreshLinkedCharacter(false,true);}});
   $('#form-select').addEventListener('change',event=>{selectedOptionId=(event.target as HTMLSelectElement).value;renderTransformSelector();renderArt();});
   $('#form-search').addEventListener('input',event=>{formSearch=(event.target as HTMLInputElement).value;renderTransformSelector();renderArt();});
   $('#form-filter').addEventListener('change',event=>{formFilter=(event.target as HTMLSelectElement).value;renderTransformSelector();renderArt();});
@@ -1253,12 +1297,17 @@ function initializeControls(){
   bindArtworkInput('#art-file',()=>artTargetInfo());bindArtworkInput('#character-art-file',()=>({targetId:'base',label:character.name}));bindArtworkInput('#current-form-art-file',()=>currentFormArtTarget());
   $('#reset-art').addEventListener('click',()=>void resetArtwork(artTargetInfo()));$('#more-reset-art').addEventListener('click',()=>void resetArtwork(artTargetInfo()));
   $('#open-settings').addEventListener('click',()=>{renderSettings();$<HTMLDialogElement>('#settings-dialog').showModal();});
+  $('#refresh-character').addEventListener('click',()=>void refreshLinkedCharacter(true,true));
+  $('#settings-refresh-character').addEventListener('click',()=>void refreshLinkedCharacter(true,true));
   $('#close-settings').addEventListener('click',()=>$<HTMLDialogElement>('#settings-dialog').close());
   $('#refresh-srd-catalog').addEventListener('click',()=>void refreshSrdCatalogStatus());
   $('#show-next-step').addEventListener('click',revealNextStep);
   $('#magic-effects-enabled').addEventListener('change',event=>{magicEffectsEnabled=(event.target as HTMLInputElement).checked;void saveBooleanSetting('magic-effects-enabled',magicEffectsEnabled);syncAuraState();});
   $('#reduce-motion').addEventListener('change',event=>{reduceMotion=(event.target as HTMLInputElement).checked;void saveBooleanSetting('reduce-motion',reduceMotion);syncAuraState();});
   $('#guided-next-step').addEventListener('change',event=>{guidedNextStep=(event.target as HTMLInputElement).checked;void saveBooleanSetting('guided-next-step-v1',guidedNextStep);renderNextStepGuide();});
+  $('#auto-refresh-character').addEventListener('change',event=>{autoRefreshCharacter=(event.target as HTMLInputElement).checked;void saveBooleanSetting(AUTO_REFRESH_CHARACTER_SETTING,autoRefreshCharacter);setCharacterRefreshStatus(autoRefreshCharacter?'Automatic character refresh is on. Checking the selected linked character now…':'Automatic character refresh is off. Altered will keep the saved character version until you refresh manually.');if(autoRefreshCharacter)void refreshLinkedCharacter(false,true);});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshLinkedCharacter(false,false);});
+  window.addEventListener('online',()=>void refreshLinkedCharacter(false,true));
   window.addEventListener('beforeunload',persist);
   if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
@@ -1279,11 +1328,13 @@ async function boot(){
   magicEffectsEnabled=await loadBooleanSetting('magic-effects-enabled',true);
   reduceMotion=await loadBooleanSetting('reduce-motion',reduceMotion);
   guidedNextStep=await loadBooleanSetting('guided-next-step-v1',true);
+  autoRefreshCharacter=await loadBooleanSetting(AUTO_REFRESH_CHARACTER_SETTING,true);
   const walkthroughCompleted=await loadBooleanSetting(WALKTHROUGH_SETTING,false);
   renderSettings();renderInstalledPacks();
   const repairNote=invalidPackCount?` ${invalidPackCount} damaged private pack${invalidPackCount===1?' was':'s were'} removed safely.`:'';const migrationNote=restoredDataRepairs.length?` ${restoredDataRepairs.join(' ')}`:'';
   notify(`Altered loaded for ${character.name}. ${installedPacks.length} private content pack${installedPacks.length===1?'':'s'} available.${repairNote}${migrationNote}`);render();
   if(!walkthroughCompleted)startWalkthrough();
   void refreshSrdCatalogStatus();
+  void refreshLinkedCharacter(false,true);
 }
 void boot().catch(error=>{console.error(error);document.documentElement.dataset.alteredReady='error';const status=document.querySelector<HTMLElement>('#status-message');if(status)status.textContent=`Altered could not start: ${error instanceof Error?error.message:'Unknown error'}`;});
