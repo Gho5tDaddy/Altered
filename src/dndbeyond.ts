@@ -98,7 +98,7 @@ function activeInventoryIds(data:JsonObject):Set<number>{
   const ids=new Set<number>();
   for(const raw of array(data.inventory)){
     const item=object(raw);const definition=object(item.definition);const id=finite(definition.id);
-    const attunementRequired=whole(definition.canAttune)===1||Boolean(definition.requiresAttunement);
+    const attunementRequired=Boolean(definition.canAttune)||Boolean(definition.requiresAttunement);
     if(id!==undefined&&Boolean(item.equipped)&&(!attunementRequired||Boolean(item.isAttuned)))ids.add(id);
   }
   return ids;
@@ -447,14 +447,19 @@ function rulesetAssessment(data:JsonObject):{ruleset:CharacterRuleset;evidence:s
   };
 }
 function weaponProficiencies(data:JsonObject){const result=new Set<string>();for(const rawGroup of Object.values(object(data.modifiers)))for(const raw of array(rawGroup)){const entry=object(raw);if(string(entry.type).toLowerCase()==='proficiency'){const subtype=string(entry.subType).toLowerCase();if(subtype)result.add(subtype);}}return result;}
+function itemEffects(data:JsonObject,definitionId:number){
+  const result:NonNullable<CharacterItem['effects']>=[];const map:Record<string,NonNullable<CharacterItem['effects']>[number]['kind']>={'bonus:armor-class':'armor-class','bonus:saving-throws':'saving-throws','bonus:natural-attacks':'natural-attack-rolls','damage:natural-attacks':'natural-attack-damage'};
+  for(const raw of array(object(data.modifiers).item)){const modifier=object(raw);if(whole(modifier.componentId)!==definitionId||modifier.isGranted===false)continue;const kind=map[`${string(modifier.type).toLowerCase()}:${string(modifier.subType).toLowerCase()}`];const value=finite(modifier.value)??finite(modifier.fixedValue);if(kind&&value!==undefined)result.push({kind,value,includedInImportedTotals:kind==='armor-class'||kind==='saving-throws'});}
+  return result;
+}
 function parseItems(data:JsonObject,abilities:Character['abilities']):CharacterItem[]{
   const proficiencies=weaponProficiencies(data);
   return array(data.inventory).slice(0,300).flatMap((raw,index)=>{
     const item=object(raw),definition=object(item.definition);const name=string(definition.name);if(!name)return [];
-    const id=String(whole(item.id)||whole(definition.id)||slug(`${name}-${index}`));const requiresAttunement=whole(definition.canAttune)===1||Boolean(definition.requiresAttunement);const equipped=Boolean(item.equipped),attuned=Boolean(item.isAttuned);
+    const definitionId=whole(definition.id);const id=String(whole(item.id)||definitionId||slug(`${name}-${index}`));const requiresAttunement=Boolean(definition.canAttune)||Boolean(definition.requiresAttunement);const equipped=Boolean(item.equipped),attuned=Boolean(item.isAttuned);
     const sourceIds=[finite(definition.sourceId),...array(definition.sources).flatMap(source=>[finite(object(source).sourceId),finite(object(source).id)])].filter((value):value is number=>value!==undefined).map(String);
     const ruleset=definitionRuleset(definition);const included=equipped&&(!requiresAttunement||attuned);const properties=array(definition.properties).map(rawProperty=>string(object(rawProperty).name)).filter(Boolean).slice(0,20);const damage=string(object(definition.damage).diceString);const damageType=DAMAGE_TYPES[string(definition.damageType).toLowerCase()];const category=whole(definition.categoryId);const weapon=string(definition.filterType).toLowerCase()==='weapon'&&Boolean(damage)&&Boolean(damageType);const weaponSlug=slug(name);const proficient=category===1?proficiencies.has('simple-weapons'):category===2?proficiencies.has('martial-weapons'):proficiencies.has(weaponSlug)||proficiencies.has(`${weaponSlug}s`);const ranged=whole(definition.attackType)===2;const finesse=properties.some(property=>property.toLowerCase()==='finesse');const ability:Ability=ranged?'dex':finesse&&abilities.dex>abilities.str?'dex':'str';const magicBonus=Math.max(-5,Math.min(10,whole(definition.magicBonus,whole(definition.attackBonus))));
-    return [{id:`ddb-item-${id}`,name,type:string(definition.type)||'Item',equipped,attuned,requiresAttunement,ruleset,sourceIds:[...new Set(sourceIds)].slice(0,20),mechanics:included?'included-in-imported-totals':ruleset==='legacy'||ruleset==='mixed'?'review-required':'reference-only',...(weapon&&damageType?{attack:{ability,damage,damageType,proficient,properties,magicBonus,...(finite(definition.range)!==undefined?{range:whole(definition.range)}:{}),...(finite(definition.longRange)!==undefined?{longRange:whole(definition.longRange)}:{})}}:{})} satisfies CharacterItem];
+    const effects=itemEffects(data,definitionId);return [{id:`ddb-item-${id}`,name,type:string(definition.type)||'Item',equipped,attuned,requiresAttunement,ruleset,sourceIds:[...new Set(sourceIds)].slice(0,20),mechanics:included?'included-in-imported-totals':ruleset==='legacy'||ruleset==='mixed'?'review-required':'reference-only',...(effects.length?{effects}:{}),...(weapon&&damageType?{attack:{ability,damage,damageType,proficient,properties,magicBonus,...(finite(definition.range)!==undefined?{range:whole(definition.range)}:{}),...(finite(definition.longRange)!==undefined?{longRange:whole(definition.longRange)}:{})}}:{})} satisfies CharacterItem];
   });
 }
 

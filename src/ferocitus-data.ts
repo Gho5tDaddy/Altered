@@ -117,7 +117,16 @@ export const FEROCITUS_CHARACTER:unknown={
     {id:'stone-s-endurance-stone-giant',name:'Stone’s Endurance (Stone Giant)',current:3,max:3,recovery:'long-all'},
   ],
   equipment:{armorCategory:'none',shield:false,transformBehavior:'merge'},
-  items:[],
+  items:[
+    {id:'ddb-item-1008895351',name:'Cloak of Protection',type:'Wondrous item',equipped:true,attuned:true,requiresAttunement:true,ruleset:'2024',sourceIds:['146','1','148'],mechanics:'included-in-imported-totals',effects:[{kind:'armor-class',value:1,includedInImportedTotals:true},{kind:'saving-throws',value:1,includedInImportedTotals:true}]},
+    {id:'ddb-item-919091546',name:'Insignia of Claws',type:'Wondrous item',equipped:true,attuned:false,requiresAttunement:false,ruleset:'unknown',sourceIds:['102','11','7'],mechanics:'included-in-imported-totals',effects:[{kind:'natural-attack-rolls',value:1,includedInImportedTotals:false},{kind:'natural-attack-damage',value:1,includedInImportedTotals:false}]},
+    {id:'ddb-item-878457011',name:'Handaxe',type:'Handaxe',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:['148','1'],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d6',damageType:'Slashing',proficient:true,range:20,longRange:60,properties:['Light','Thrown','Vex'],magicBonus:0}},
+    {id:'ddb-item-878457012',name:'Handaxe',type:'Handaxe',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:['148','1'],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d6',damageType:'Slashing',proficient:true,range:20,longRange:60,properties:['Light','Thrown','Vex'],magicBonus:0}},
+    {id:'ddb-item-878457013',name:'Handaxe',type:'Handaxe',equipped:false,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:['148','1'],mechanics:'reference-only',attack:{ability:'str',damage:'1d6',damageType:'Slashing',proficient:true,range:20,longRange:60,properties:['Light','Thrown','Vex'],magicBonus:0}},
+    {id:'ddb-item-878457014',name:'Handaxe',type:'Handaxe',equipped:false,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:['148','1'],mechanics:'reference-only',attack:{ability:'str',damage:'1d6',damageType:'Slashing',proficient:true,range:20,longRange:60,properties:['Light','Thrown','Vex'],magicBonus:0}},
+    {id:'ddb-item-878457010',name:'Greataxe',type:'Greataxe',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:['148','1'],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d12',damageType:'Slashing',proficient:true,range:5,longRange:5,properties:['Heavy','Two-Handed','Cleave'],magicBonus:0}},
+    ...['Backpack','Oil','Rations','Rope','Bedroll','Tinderbox','Torch','Waterskin'].map((name,index)=>({id:`ddb-item-stored-${index}`,name,type:'Gear',equipped:false,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:['145','148'],mechanics:'reference-only'})),
+  ],
   provenance:{provider:'local',ruleset:'unknown',rulesetEvidence:[],reviewRequired:true},
   customForms:{},
   skillBonuses:{

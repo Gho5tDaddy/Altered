@@ -96,9 +96,12 @@ export interface ResourcePool {id:string;name:string;current:number;max:number;r
 export interface EquipmentState {armorCategory:'none'|'light'|'medium'|'heavy';shield:boolean;transformBehavior:'merge'|'drop'|'wear';formCanWear?:boolean}
 export type CharacterRuleset='2024'|'legacy'|'mixed'|'unknown';
 export interface CharacterProvenance {provider:'local'|'dndbeyond';sourceId?:string;ruleset:CharacterRuleset;rulesetEvidence:string[];reviewRequired:boolean}
+export type CharacterItemEffectKind='armor-class'|'saving-throws'|'natural-attack-rolls'|'natural-attack-damage';
+export interface CharacterItemEffect {kind:CharacterItemEffectKind;value:number;includedInImportedTotals:boolean}
 export interface CharacterItem {
   id:string;name:string;type:string;equipped:boolean;attuned:boolean;requiresAttunement:boolean;
   ruleset:CharacterRuleset;sourceIds:string[];mechanics:'included-in-imported-totals'|'reference-only'|'review-required';
+  effects?:CharacterItemEffect[];
   attack?:{ability:Ability;damage:string;damageType:DamageType;proficient:boolean;range?:number;longRange?:number;properties:string[];magicBonus:number};
 }
 

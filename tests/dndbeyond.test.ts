@@ -71,7 +71,7 @@ const ferocitusPayload={
       condition:[],
     },
     inventory:[
-      {equipped:true,isAttuned:true,definition:{id:100,name:'Cloak of Protection',type:'Wondrous item',requiresAttunement:true,armorClass:null,armorTypeId:null}},
+      {equipped:true,isAttuned:true,definition:{id:100,name:'Cloak of Protection',type:'Wondrous item',canAttune:true,armorClass:null,armorTypeId:null}},
       {equipped:true,isAttuned:true,definition:{id:101,name:'Insignia of Claws',type:'Wondrous item',requiresAttunement:true,armorClass:null,armorTypeId:null}},
     ],
     feats:[
@@ -174,6 +174,8 @@ test('normalizes a Ferocitus-shaped multiclass character without guessing core v
     {name:'Cloak of Protection',equipped:true,attuned:true,mechanics:'included-in-imported-totals'},
     {name:'Insignia of Claws',equipped:true,attuned:true,mechanics:'included-in-imported-totals'},
   ]);
+  assert.equal(character.items[0]?.requiresAttunement,true);
+  assert.deepEqual(character.items[0]?.effects,[{kind:'armor-class',value:1,includedInImportedTotals:true},{kind:'saving-throws',value:1,includedInImportedTotals:true}]);
   assert.ok(report.coverage.every(item=>item.status!=='review'||['2024 ruleset','Items and homebrew'].includes(item.label)));
   assert.ok(report.warnings.some(item=>item.code==='ruleset-review'));
   assert.ok(report.warnings.some(item=>item.code==='item-text-review'));

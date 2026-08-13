@@ -22,3 +22,8 @@ test('does not remove feats from other characters or newly verified imports',()=
   assert.deepEqual(verified.character.feats,['Tough','Dark Bargain']);
   assert.equal(verified.character.items[0]?.attack?.damage,'1d6');
 });
+
+test('restores only the known empty Ferocitus inventory without changing other characters',()=>{
+  const ferocitus=character();ferocitus.items=[];const repaired=migratePersistedCharacter(ferocitus);assert.equal(repaired.character.items.length,15);assert.ok(repaired.character.items.some(item=>item.name==='Greataxe'&&item.attack));
+  const other=character('999999999');other.items=[];assert.equal(migratePersistedCharacter(other).character.items.length,0);
+});

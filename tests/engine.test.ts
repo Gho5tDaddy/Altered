@@ -341,6 +341,16 @@ test('unarmored defense eligibility uses actual armor and equipped weapons becom
   const axe=must(sheet.actions.find(action=>action.id==='item-attack-axe'));assert.equal(axe.type,'attack');if(axe.type==='attack'){assert.equal(axe.attackBonus,4);assert.equal(axe.damage[0]?.expression,'1d12+1');}
 });
 
+test('structured equipment effects are visible in calculations once and respect form retention',()=>{
+  const c=character({ac:15,items:[
+    {id:'cloak',name:'Cloak',type:'Wondrous item',equipped:true,attuned:true,requiresAttunement:true,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',effects:[{kind:'armor-class',value:1,includedInImportedTotals:true},{kind:'saving-throws',value:1,includedInImportedTotals:true}]},
+    {id:'claws',name:'Claws',type:'Wondrous item',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',effects:[{kind:'natural-attack-rolls',value:1,includedInImportedTotals:false},{kind:'natural-attack-damage',value:1,includedInImportedTotals:false}]},
+  ]});const state=createInitialState(c);let sheet=resolveSheet(c,state);
+  assert.equal(sheet.ac,15,'base imported AC must not receive its included item bonus twice');const unarmed=must(sheet.actions.find(action=>action.id==='unarmed'));assert.equal(unarmed.type,'attack');if(unarmed.type==='attack'){assert.equal(unarmed.attackBonus,5);assert.equal(unarmed.damage[0]?.expression,'3');}
+  const wolf=must(availableTransformations(c,state).find(option=>option.formId==='dire-wolf'));startTransformation(c,state,wolf);sheet=resolveSheet(c,state);const mergedBite=must(sheet.actions.find(action=>action.id==='bite'));assert.equal(mergedBite.type,'attack');if(mergedBite.type==='attack')assert.equal(mergedBite.attackBonus,5,'merged item effects must be inactive');
+  state.equipment.transformBehavior='wear';state.equipment.formCanWear=true;sheet=resolveSheet(c,state);assert.equal(sheet.ac,18,'retained Cloak adds to the selected Circle Forms AC');const bite=must(sheet.actions.find(action=>action.id==='bite'));assert.equal(bite.type,'attack');if(bite.type==='attack'){assert.equal(bite.attackBonus,6);assert.equal(bite.damage[0]?.expression,'1d10+4');}
+});
+
 test('Beast Spells does not make an unprepared spell available',()=>{
   const c=character({classes:[{name:'Druid',level:18,subclass:'Circle of the Land'}],totalLevel:18,knownForms:['dire-wolf'],spells:[{name:'Cure Wounds',level:1,sourceClass:'Druid',ability:'wis',prepared:false,castingTime:'magic-action'}]});const state=createInitialState(c);const wolf=availableTransformations(c,state).find(o=>o.profile==='wildshape');assert.ok(wolf);startTransformation(c,state,wolf);assert.equal(resolveSheet(c,state).spells[0]?.available,false);
 });

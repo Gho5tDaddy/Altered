@@ -10,6 +10,12 @@ test('rejects unsafe damage expressions',()=>assert.throws(()=>parseCharacter({.
 test('rejects unknown damage types',()=>assert.throws(()=>parseCharacter({...base,spells:[{name:'Bad',level:1,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',damage:[{expression:'1d6',type:'Laser'}]}]}),/supported damage type/));
 test('safeJsonParse enforces size limit',()=>assert.throws(()=>safeJsonParse(' '.repeat(1_000_001)),/1 MB/));
 
+test('preserves structured item effects without accepting arbitrary effect kinds',()=>{
+  const c=parseCharacter({...base,items:[{id:'cloak',name:'Cloak',type:'Wondrous item',equipped:true,attuned:true,requiresAttunement:true,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',effects:[{kind:'armor-class',value:1,includedInImportedTotals:true}]}]});
+  assert.deepEqual(c.items[0]?.effects,[{kind:'armor-class',value:1,includedInImportedTotals:true}]);
+  assert.throws(()=>parseCharacter({...base,items:[{id:'bad',name:'Bad',type:'Item',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'reference-only',effects:[{kind:'execute-code',value:1}]}]}),/unsupported/);
+});
+
 test('rejects unknown spell action costs instead of silently defaulting',()=>assert.throws(()=>parseCharacter({...base,spells:[{name:'Bad Timing',level:1,sourceClass:'Druid',ability:'wis',castingTime:'instant'}]}),/castingTime must be one of/));
 
 test('rejects unsafe healing expressions',()=>assert.throws(()=>parseCharacter({...base,spells:[{name:'Bad Healing',level:1,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',healing:'2d8+alert(1)'}]}),/healing is not a safe dice expression/));

@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 test('static shell exposes accessible tabs, dialogs, and condition input',()=>{
   const html=readFileSync('public/index.html','utf8');
   assert.match(html,/role="tablist"/);
-  assert.equal((html.match(/role="tab"/g)??[]).length,5);
+  assert.equal((html.match(/role="tab"/g)??[]).length,6);
   assert.match(html,/id="tab-content"[^>]*role="tabpanel"[^>]*aria-labelledby="tab-actions"/);
   assert.match(html,/for="condition-select">Condition<\/label>/);
   for(const id of ['help-dialog','import-dialog','private-mechanics-dialog','transform-builder-dialog','settings-dialog','temp-hp-dialog','delete-character-dialog']){
@@ -343,9 +343,10 @@ test('feature view explains effects and places activation controls with the feat
   assert.match(source,/function appendFeatureControls/);assert.match(source,/Use or confirm/);assert.match(source,/Applied automatically/);assert.match(source,/Owned references/);assert.match(source,/Unavailable now/);
 });
 
-test('actions surface equipped gear and usable imported weapons',()=>{
-  const source=readFileSync('src/app.ts','utf8');
-  assert.match(source,/Equipped gear/);assert.match(source,/usable weapon/);assert.match(source,/imported bonuses are not applied twice/);
+test('equipment has a dedicated focused tab while equipped weapons remain executable actions',()=>{
+  const source=readFileSync('src/app.ts','utf8');const engine=readFileSync('src/engine.ts','utf8');
+  const html=readFileSync('public/index.html','utf8');assert.match(html,/data-tab="equipment"/);assert.match(source,/function renderEquipment/);assert.match(source,/Stored inventory/);assert.match(engine,/item\.equipped&&/);
+  assert.match(source,/Equipment & effects/);assert.match(source,/Applied now/);assert.match(source,/Melded in form/);assert.match(source,/Needs attunement/);
 });
 
 test('spent turn economy is unavailable now, not a missing character requirement',()=>{
