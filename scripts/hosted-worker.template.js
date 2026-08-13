@@ -221,7 +221,7 @@ async function proxySrdCatalog(requestUrl){
 }
 
 export default {
-  async fetch(request){
+  async fetch(request,env){
     if(request.method!=='GET'&&request.method!=='HEAD'){
       return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
     }
@@ -266,6 +266,7 @@ export default {
       const asset=TOOL_ASSETS[url.pathname];
       return new Response(request.method==='HEAD'?null:decodeBase64(asset.data),{headers:headers(asset.type,'public, max-age=31536000, immutable')});
     }
+    if(url.pathname.startsWith('/downloads/')&&env?.ASSETS?.fetch)return env.ASSETS.fetch(request);
     if(url.pathname!=='/'&&url.pathname!=='/index.html')return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
     if(!authenticatedUser(request))return new Response(request.method==='HEAD'?null:LOGIN_PAGE,{headers:headers('text/html; charset=utf-8','private, no-store')});
     if(!pageBytes)pageBytes=decodeBase64(PAGE);

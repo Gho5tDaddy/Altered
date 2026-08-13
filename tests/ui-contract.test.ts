@@ -163,6 +163,12 @@ test('the exact hosted build executes before optional mobile storage hydration',
   assert.ok(!worker.includes('Live imports are unavailable'));
 });
 
+test('hosted release downloads use the platform static-asset binding',()=>{
+  const worker=readFileSync('scripts/hosted-worker.template.js','utf8');
+  assert.match(worker,/async fetch\(request,env\)/);
+  assert.match(worker,/url\.pathname\.startsWith\('\/downloads\/'\)&&env\?\.ASSETS\?\.fetch/);
+});
+
 test('account identity and focused workspace stay incremental and accessible',()=>{
   const html=readFileSync('public/index.html','utf8');
   const source=readFileSync('src/app.ts','utf8');
