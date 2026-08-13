@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.29.1
+
+- Made every Suggested Next Show me action navigate to or expose its actual focused control.
+- Added unclipped, luminous feral styling to active Beast form names with reduced-motion support.
+- Reclassified Pack Tactics as a per-attack battlefield confirmation instead of an automatically applied trait.
+
 ## v0.29.0
 
 - Synchronized Suggested Next after form selection, transformation, and Character-tab changes.

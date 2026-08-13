@@ -1956,13 +1956,29 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-family:Georgia,"Times New Roman",serif;font-size:1.22rem;font-style:italic;
   font-variant:small-caps;letter-spacing:.07em;transform-origin:center
 }
+.persistent-form-copy.is-active>strong{
+  min-height:1.25em;overflow:visible;white-space:normal;text-overflow:clip;line-height:1.08
+}
+.persistent-form-copy.is-active.is-beast>strong{
+  color:#e7fff3;font-family:"Copperplate Gothic","Papyrus",Georgia,"Times New Roman",serif;
+  font-size:1.22rem;font-style:italic;font-weight:950;font-variant:small-caps;
+  letter-spacing:.075em;text-transform:uppercase;transform-origin:center;
+  text-shadow:0 0 3px #fff,0 0 9px #60ffd0,0 0 22px rgba(38,224,197,.94),2px 2px 0 rgba(8,40,38,.9);
+  animation:activeBeastNamePulse 1.75s ease-in-out infinite
+}
+.persistent-form-copy.is-active.is-beast .persistent-form-kicker{color:#75ffe1;text-shadow:0 0 7px rgba(71,255,221,.88)}
 .persistent-form-copy.is-preview.is-ready .persistent-form-kicker{color:#82ffc4;text-shadow:0 0 8px rgba(63,244,163,.72)}
 @keyframes availableFormNamePulse{
   0%,100%{filter:brightness(1);transform:scale(1);text-shadow:0 0 4px #effff8,0 0 10px #50f5ad,0 0 20px rgba(56,235,154,.72)}
   50%{filter:brightness(1.2);transform:scale(1.035);text-shadow:0 0 6px #fff,0 0 14px #78ffd0,0 0 30px rgba(56,235,154,1)}
 }
+@keyframes activeBeastNamePulse{
+  0%,100%{filter:brightness(1);transform:scale(1);text-shadow:0 0 3px #fff,0 0 9px #60ffd0,0 0 20px rgba(38,224,197,.82),2px 2px 0 rgba(8,40,38,.9)}
+  50%{filter:brightness(1.25);transform:scale(1.045);text-shadow:0 0 6px #fff,0 0 15px #8affdc,0 0 32px rgba(36,242,204,1),2px 2px 0 rgba(8,40,38,.9)}
+}
 @media(prefers-reduced-motion:reduce){
-  .app-shell:not(.motion-forced) .persistent-form-copy.is-preview.is-ready>strong{animation:none!important}
+  .app-shell:not(.motion-forced) .persistent-form-copy.is-preview.is-ready>strong,
+  .app-shell:not(.motion-forced) .persistent-form-copy.is-active.is-beast>strong{animation:none!important}
 }
 
 /* v0.28.1 final responsive overrides: keep useful summaries readable on phones. */
@@ -2041,7 +2057,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:700px){
   .task-view .latest-roll-value>span{display:-webkit-box;overflow:hidden;white-space:normal;text-overflow:clip;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;line-height:1.25}
   .app-shell.form-active .workspace{grid-template-rows:255px minmax(0,1fr)}
-  html[data-altered-workspace="forms"] .app-shell.form-active .workspace{grid-template-rows:265px minmax(0,1fr)}
+  html[data-altered-workspace="forms"] .app-shell.form-active .workspace{grid-template-rows:315px minmax(0,1fr)}
+  .persistent-form-copy.is-active{flex:0 0 auto;min-height:78px;padding-top:9px;align-content:start}
 }
 @media(max-width:430px){
   .task-view .tabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}

@@ -321,8 +321,16 @@ test('optional next-step guidance stays contextual, non-tactical, and persistent
   assert.match(source,/function recommendNextStep/);assert.match(source,/function renderNextStepGuide/);assert.match(source,/function revealNextStep/);
   assert.match(source,/function activateTab[\s\S]*renderNextStepGuide\(\)/);assert.match(source,/#form-select'\)\.addEventListener\('change',[\s\S]*renderNextStepGuide\(\)/);
   assert.match(source,/Your form is active\. Return to Play/);assert.match(source,/latestRollTab=currentTab/);assert.match(source,/openTask\(latestRollTab,'play'\)/);
+  assert.match(source,/title:'Open Actions'[\s\S]*reveal:revealTask\('actions'\)/);
   for(const guidance of ['Resolve Relentless Rage','Roll a death save','Resolve Concentration','Complete Extra Attack','Consider Rage, then attack','Consider Barkskin','End this turn'])assert.match(source,new RegExp(guidance));
   assert.match(source,/You can still choose any other legal action/);assert.match(styles,/\.next-step-target/);assert.match(styles,/prefers-reduced-motion:reduce[\s\S]*\.next-step-target/);
+});
+
+test('active beast identity and conditional form traits remain visually and mechanically honest',()=>{
+  const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
+  assert.match(source,/trait\.name\.trim\(\)\.toLowerCase\(\)==='pack tactics'/);assert.match(source,/Confirm for each attack/);assert.match(source,/cannot know where allies and targets are/);
+  assert.match(styles,/\.persistent-form-copy\.is-active\.is-beast>strong/);assert.match(styles,/@keyframes activeBeastNamePulse/);
+  assert.match(styles,/html\[data-altered-workspace="forms"\] \.app-shell\.form-active \.workspace\{grid-template-rows:315px/);
 });
 
 test('static shell applies a restrictive local-only content policy',()=>{

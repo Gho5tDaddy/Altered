@@ -1,3 +1,11 @@
+# Altered v0.29.1 release notes
+
+## Guidance, active-form identity, and conditional trait correction
+
+Suggested Next now opens the relevant focused tool even when its original target tile is already visible, so Show me always produces an obvious navigation result. Active Beast names stay fully visible in the persistent form header and use the same expressive, luminous transformation identity as eligible previews, with a static accessible alternative under reduced motion.
+
+Pack Tactics is no longer labeled as automatically applied. Altered explicitly explains that it cannot know battlefield positioning and requires the player to confirm Pack Tactics for each eligible attack through that attack's Roll options. No rule calculations, character data, imports, exports, or saved combat state were changed.
+
 # Altered v0.29.0 release notes
 
 ## Stability-first usability and accessibility polish
