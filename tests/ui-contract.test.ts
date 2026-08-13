@@ -274,6 +274,7 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   const installer=readFileSync('scripts/build-windows-installer.ps1','utf8');const build=readFileSync('scripts/build.mjs','utf8');
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
+  assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
   assert.match(build,/Altered-Windows-Setup-v0\.29\.2\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.2\.zip/);
 });
 

@@ -49,16 +49,24 @@ $startMenu = if ($testRoot) { Join-Path $testRoot 'StartMenu\Altered' } else { J
 New-Item -ItemType Directory -Force -Path $desktop | Out-Null
 New-Item -ItemType Directory -Force -Path $startMenu | Out-Null
 $appFile = Join-Path $installDirectory 'Altered-v__VERSION__.html'
+$appUrl = 'https://altered-ferocitus.ghostdaddy.chatgpt.site/'
 $iconFile = Join-Path $installDirectory 'Altered.ico'
 foreach ($shortcutPath in @((Join-Path $desktop 'Altered.lnk'),(Join-Path $startMenu 'Altered.lnk'))) {
   $shortcut = $shell.CreateShortcut($shortcutPath)
   $shortcut.TargetPath = Join-Path $env:WINDIR 'explorer.exe'
-  $shortcut.Arguments = '"' + $appFile + '"'
+  $shortcut.Arguments = '"' + $appUrl + '"'
   $shortcut.WorkingDirectory = $installDirectory
   $shortcut.IconLocation = $iconFile + ',0'
   $shortcut.Description = 'Altered rules-aware transformation character sheet'
   $shortcut.Save()
 }
+$offlineShortcut = $shell.CreateShortcut((Join-Path $startMenu 'Altered Offline.lnk'))
+$offlineShortcut.TargetPath = Join-Path $env:WINDIR 'explorer.exe'
+$offlineShortcut.Arguments = '"' + $appFile + '"'
+$offlineShortcut.WorkingDirectory = $installDirectory
+$offlineShortcut.IconLocation = $iconFile + ',0'
+$offlineShortcut.Description = 'Altered offline fallback (live character refresh unavailable)'
+$offlineShortcut.Save()
 
 $uninstall = @"
 `$desktop = (New-Object -ComObject WScript.Shell).SpecialFolders('Desktop')
@@ -85,7 +93,7 @@ if (-not $testRoot) {
   New-ItemProperty -Path $uninstallKey -Name UninstallString -Value ('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + $uninstallPath + '"') -PropertyType String -Force | Out-Null
   New-ItemProperty -Path $uninstallKey -Name NoModify -Value 1 -PropertyType DWord -Force | Out-Null
   New-ItemProperty -Path $uninstallKey -Name NoRepair -Value 1 -PropertyType DWord -Force | Out-Null
-  Start-Process -FilePath $appFile
+  Start-Process -FilePath $appUrl
 }
 '@.Replace('__VERSION__',$Version)
 Set-Content -LiteralPath (Join-Path $stageDir 'Install-Altered.ps1') -Value $installScript -Encoding UTF8
