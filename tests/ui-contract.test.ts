@@ -207,11 +207,14 @@ test('the focused workspace uses form-panel space for live stats and explains ab
   const html=readFileSync('public/index.html','utf8');
   const source=readFileSync('src/app.ts','utf8');
   const styles=readFileSync('public/styles.css','utf8');
-  for(const id of ['persistent-hp','persistent-temp','persistent-ac','persistent-speed'])assert.match(html,new RegExp(`id="${id}"`));
+  for(const id of ['persistent-hp','persistent-temp','persistent-ac','persistent-speed','action-economy','play-end-form'])assert.match(html,new RegExp(`id="${id}"`));
   for(const id of ['persistent-new-turn','persistent-end-turn','persistent-turn-number'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(html,/persistent-form-side[\s\S]*?id="action-economy"[\s\S]*?id="persistent-new-turn"/);
+  assert.equal(/class="play-form-status"/.test(html),false);assert.match(html,/id="metric-grid"[^>]*hidden/);assert.match(html,/class="turn-bar"[^>]*hidden/);
   assert.match(source,/#persistent-hp/);
   assert.match(source,/#persistent-new-turn/);assert.match(source,/#persistent-end-turn/);assert.match(styles,/\.play-view \.turn-bar\{display:none\}/);
   assert.match(styles,/\.play-view \.metric-grid\{display:none\}/);
+  assert.match(styles,/\.persistent-action-economy/);assert.match(styles,/\.persistent-turn-controls\{display:grid/);
   assert.match(html,/id="ability-actions-title">Use now/);assert.match(html,/aria-labelledby="ability-actions-title" hidden/);
   assert.match(html,/id="ability-resources-title">Resources left/);
   assert.match(source,/Abilities, explained/);

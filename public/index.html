@@ -51,6 +51,8 @@
           </span>
           <small class="persistent-form-open">Open Forms &#8250;</small>
         </button>
+        <div id="action-economy" class="action-economy persistent-action-economy" aria-label="Action economy"></div>
+        <button id="play-end-form" class="button secondary compact persistent-end-form" type="button" hidden>End Form</button>
         <div class="persistent-turn-controls" aria-label="Always available turn controls">
           <button id="persistent-new-turn" class="button primary compact" type="button">New Turn</button>
           <button id="persistent-end-turn" class="button secondary compact" type="button">End Turn</button>
@@ -60,12 +62,9 @@
       </aside>
       <div class="workspace-stage">
       <section id="workspace-play" class="workspace-view play-view panel" data-workspace-view="play" aria-labelledby="play-view-title">
-        <div class="play-form-status">
-          <div><span>Current form</span><strong id="play-view-title">Base Form</strong><small id="play-form-detail">Character sheet</small></div>
-          <button id="play-end-form" class="button secondary compact" type="button" hidden>End Form</button>
-        </div>
-        <div id="metric-grid" class="metric-grid"></div>
-        <div id="action-economy" class="action-economy" aria-label="Action economy"></div>
+        <h2 id="play-view-title" class="sr-only">Play</h2>
+        <span id="play-form-detail" hidden>Character sheet</span>
+        <div id="metric-grid" class="metric-grid" hidden aria-hidden="true"></div>
         <button id="open-active-effects" class="play-summary-button" type="button" hidden>
           <span>Active now</span><strong id="play-active-summary">No active effects</strong><span aria-hidden="true">&#8250;</span>
         </button>
@@ -88,7 +87,7 @@
           <button id="open-damage-view" class="button secondary" type="button">Damage / Heal</button>
           <button id="open-conditions-view" class="button secondary" type="button">Conditions</button>
         </div>
-        <div class="turn-bar" aria-label="Turn controls">
+        <div class="turn-bar" aria-label="Turn controls" hidden>
           <button id="new-turn" class="button primary" type="button">New Turn</button>
           <button id="end-turn" class="button secondary" type="button">End Turn</button>
           <span id="turn-number">Turn 1</span>
