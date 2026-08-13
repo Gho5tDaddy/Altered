@@ -70,6 +70,9 @@ export interface TransformationEffects {
   acFormula?:{base:number;abilities:Ability[]};
   resistances?:DamageType[];immunities?:DamageType[];vulnerabilities?:DamageType[];
   senses?:string[];actions?:CreatureAction[];
+  checkAbilitySubstitution?:Partial<Record<Ability,Ability>>;
+  saveAbilitySubstitution?:Partial<Record<Ability,Ability>>;
+  attackAbilityOverride?:{ability:Ability;appliesTo:('weapon'|'unarmed')[]};
   checkAdvantage?:Ability[];checkDisadvantage?:Ability[];saveAdvantage?:Ability[];saveDisadvantage?:Ability[];
   conditionImmunities?:string[];canSpeak?:boolean;canCast?:boolean;canConcentrate?:boolean;canAttack?:boolean;canManipulateObjects?:boolean;endsAtZeroHp?:boolean;endsAtZeroTemporaryHp?:boolean;endsOnIncapacitated?:boolean;
   attackDamageModifier?:{expression:string;mode:'add'|'subtract';appliesTo:('weapon'|'unarmed')[];minimumDamage?:number};

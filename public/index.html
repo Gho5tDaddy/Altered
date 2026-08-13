@@ -104,7 +104,7 @@
             <label for="form-select">Choose form</label>
             <select id="form-select"></select>
             <details class="form-tools-drawer">
-              <summary>Find forms & artwork</summary>
+              <summary>Search, filters &amp; artwork</summary>
               <div class="form-tools-content">
                 <div class="form-browse-tools">
                   <div>
@@ -146,8 +146,8 @@
       <section id="workspace-task" class="workspace-view task-view panel" data-workspace-view="task" aria-labelledby="task-view-title" hidden>
         <div class="workspace-heading"><div><span>Focused tool</span><h2 id="task-view-title" tabindex="-1">Actions</h2></div><button id="close-task-view" class="text-button" type="button">Back to Play</button></div>
         <section id="task-abilities" class="task-abilities" hidden>
-          <div class="ability-guide"><strong>Use abilities here</strong><span>Available buttons apply or spend an ability. Disabled buttons explain what is missing.</span></div>
-          <section class="ability-control-group" aria-labelledby="ability-actions-title">
+          <div class="ability-guide"><strong>Abilities &amp; resources</strong><span>Resource counts stay visible here. Use each ability from its explained card below; disabled controls say what is missing.</span></div>
+          <section class="ability-control-group" aria-labelledby="ability-actions-title" hidden>
             <div class="ability-group-heading"><h3 id="ability-actions-title">Use now</h3><span>Tap an available ability</span></div>
             <div id="quick-features" class="quick-features"></div>
           </section>
@@ -159,9 +159,9 @@
         <section id="active-effects" class="active-effects" aria-live="polite" hidden></section>
         <nav class="tabs" role="tablist" aria-label="Character sheet sections">
           <button id="tab-actions" class="tab active" data-tab="actions" type="button" role="tab" aria-selected="true" aria-controls="tab-content" tabindex="0">Actions</button>
-          <button id="tab-rolls" class="tab" data-tab="rolls" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Saves & Skills</button>
+          <button id="tab-rolls" class="tab" data-tab="rolls" type="button" role="tab" aria-selected="false" aria-controls="tab-content" aria-label="Checks: saves, skills, and initiative" tabindex="-1">Checks</button>
           <button id="tab-spells" class="tab" data-tab="spells" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Spells</button>
-          <button id="tab-features" class="tab" data-tab="features" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Features</button>
+          <button id="tab-features" class="tab" data-tab="features" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Abilities</button>
           <button id="tab-rules" class="tab" data-tab="rules" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Rules</button>
         </nav>
         <section id="latest-roll" class="latest-roll" aria-live="polite">
@@ -174,15 +174,16 @@
       <section id="workspace-more" class="workspace-view more-view" data-workspace-view="more" aria-labelledby="more-view-title" hidden>
         <div class="workspace-heading panel"><div><span>Utilities</span><h2 id="more-view-title">More tools</h2></div><button class="text-button workspace-home" type="button">Back to Play</button></div>
         <div class="more-links panel" aria-label="Application tools">
-          <button id="more-help" class="button secondary" type="button">Help</button>
-          <button id="more-import" class="button secondary" type="button">Add / Import Character</button>
+          <button id="more-help" class="button secondary more-link" type="button"><strong>Help</strong><small>Guides &amp; tutorial</small></button>
+          <button id="more-import" class="button secondary more-link" type="button"><strong>Add / Import</strong><small>Character &amp; content</small></button>
           <button id="more-resume-setup" class="button secondary resume-setup-button" type="button" hidden>Resume Content Setup</button>
-          <button id="more-delete-character" class="button danger" type="button">Delete Current Character</button>
-          <button id="more-export" class="button secondary" type="button">Export</button>
-          <button id="more-settings" class="button secondary" type="button">Settings</button>
+          <button id="more-customize" class="button secondary more-link" type="button"><strong>Customize</strong><small>Art &amp; homebrew</small></button>
+          <button id="more-export" class="button secondary more-link" type="button"><strong>Export</strong><small>Character backup</small></button>
+          <button id="more-settings" class="button secondary more-link" type="button"><strong>Settings</strong><small>Effects &amp; rules status</small></button>
+          <button id="more-delete-character" class="button danger more-link" type="button"><strong>Delete</strong><small>Current character</small></button>
         </div>
         <aside class="side-column">
-        <details class="panel dashboard-drawer customize-drawer" name="more-controls" open>
+        <details class="panel dashboard-drawer customize-drawer" name="more-controls">
           <summary><span>Customize</span><small>Artwork &amp; homebrew</small></summary>
           <div class="drawer-content customize-content">
             <section class="customize-group" aria-labelledby="customize-art-title">
@@ -251,7 +252,7 @@
     <nav class="workspace-nav" aria-label="Primary navigation">
       <button id="nav-play" class="workspace-nav-button active" type="button" aria-current="page"><span aria-hidden="true">&#9670;</span>Play</button>
       <button id="nav-forms" class="workspace-nav-button" type="button"><span aria-hidden="true">&#9789;</span>Forms</button>
-      <button id="nav-sheet" class="workspace-nav-button" type="button"><span aria-hidden="true">&#9776;</span>Sheet</button>
+      <button id="nav-sheet" class="workspace-nav-button" type="button" aria-label="Character: abilities, rules, and sheet details"><span aria-hidden="true">&#9776;</span>Character</button>
       <button id="nav-more" class="workspace-nav-button" type="button"><span aria-hidden="true">&#8943;</span>More</button>
     </nav>
   </div>
@@ -320,7 +321,7 @@
         </details>
         <details class="help-topic" data-help-keywords="ending forms return normal base release revert">
           <summary><span aria-hidden="true">↶</span> Ending forms and returning to normal</summary>
-          <p>Press <strong>End Form</strong> on Play or Forms. If it is disabled, the label explains the missing Bonus Action or external ending condition. Base Form returns automatically when a rule ends the form.</p>
+          <p>Press <strong>End Form</strong> on Play or Forms. Additive and custom effects show <strong>End [effect name]</strong> on Play, even when no replacement body is active. If ending is disabled, the label explains the missing action or external condition.</p>
         </details>
         <details class="help-topic" data-help-keywords="tracking resources action bonus reaction slots turns rest active changed">
           <summary><span aria-hidden="true">◇</span> Tracking resources and turns</summary>
@@ -332,7 +333,7 @@
         </details>
         <details class="help-topic" data-help-keywords="homebrew custom private ability feature transformation create manual">
           <summary><span aria-hidden="true">+</span> Homebrew and custom abilities</summary>
-          <p>Open <strong>More → Customize</strong>. Create Ability or Feature handles reminders, conditional action buttons, Speed bonuses, resistances, immunities, and Armor Class formulas. Create Transformation handles forms and activated states. Manage Private Content lets you export or remove anything you created.</p>
+          <p>Open <strong>More → Customize</strong>. Create Ability or Feature handles reminders and passive mechanics. Create Transformation handles forms, ability substitutions, attack-and-damage ability changes, and optional saving-throw effects on activation. Manage Private Content lets you export or remove anything you created.</p>
         </details>
         <details class="help-topic" data-help-keywords="settings aura motion catalog">
           <summary><span aria-hidden="true">⚙</span> Settings</summary>
@@ -510,6 +511,28 @@
         <div><label for="builder-wis-set">WIS becomes</label><input id="builder-wis-set" type="number" min="1" max="30" placeholder="Unchanged"></div>
         <div><label for="builder-cha-set">CHA becomes</label><input id="builder-cha-set" type="number" min="1" max="30" placeholder="Unchanged"></div>
       </div>
+      <h3>Roll substitutions</h3>
+      <p class="builder-help">Optional. Use these when the active form explicitly lets one ability replace another; this changes the displayed modifiers and rolled totals.</p>
+      <div class="builder-grid">
+        <div><label for="builder-substitute-from">Replace this ability</label><select id="builder-substitute-from"><option value="">No substitution</option><option value="str">Strength</option><option value="dex">Dexterity</option><option value="con">Constitution</option><option value="int">Intelligence</option><option value="wis">Wisdom</option><option value="cha">Charisma</option></select></div>
+        <div><label for="builder-substitute-to">With this ability</label><select id="builder-substitute-to"><option value="wis">Wisdom</option><option value="str">Strength</option><option value="dex">Dexterity</option><option value="con">Constitution</option><option value="int">Intelligence</option><option value="cha">Charisma</option></select></div>
+        <label class="setting-row compact-setting"><span><strong>Apply to checks</strong><small>Skills and other checks using the replaced ability.</small></span><input id="builder-substitute-checks" type="checkbox"></label>
+        <label class="setting-row compact-setting"><span><strong>Apply to saving throws</strong><small>Saving throws using the replaced ability.</small></span><input id="builder-substitute-saves" type="checkbox"></label>
+        <div><label for="builder-attack-ability">Attack and damage ability</label><select id="builder-attack-ability"><option value="">Unchanged</option><option value="str">Strength</option><option value="dex">Dexterity</option><option value="con">Constitution</option><option value="int">Intelligence</option><option value="wis">Wisdom</option><option value="cha">Charisma</option></select></div>
+        <div><label for="builder-attack-scope">Applies to</label><select id="builder-attack-scope"><option value="unarmed">Unarmed Strikes</option><option value="weapon-unarmed">Weapons and Unarmed Strikes</option></select></div>
+      </div>
+      <details class="advanced-builder guided-builder">
+        <summary>Optional effect when activated</summary>
+        <p>Add a table-ready saving throw card for an effect that happens when this form is summoned or activated. Leave the effect name blank to omit it.</p>
+        <div class="builder-grid">
+          <div><label for="builder-trigger-name">Effect name</label><input id="builder-trigger-name" maxlength="120" placeholder="Example: Astral Arms summon"></div>
+          <div><label for="builder-trigger-save">Target save</label><select id="builder-trigger-save"><option value="dex">Dexterity</option><option value="str">Strength</option><option value="con">Constitution</option><option value="int">Intelligence</option><option value="wis">Wisdom</option><option value="cha">Charisma</option></select></div>
+          <div><label for="builder-trigger-dc">Save DC</label><input id="builder-trigger-dc" type="number" min="1" max="40" value="10"></div>
+          <div><label for="builder-trigger-damage">Damage on failed save</label><input id="builder-trigger-damage" maxlength="40" placeholder="Example: 2d6"></div>
+          <div><label for="builder-trigger-damage-type">Damage type</label><select id="builder-trigger-damage-type"><option>Acid</option><option>Bludgeoning</option><option>Cold</option><option>Fire</option><option>Force</option><option>Lightning</option><option>Necrotic</option><option>Piercing</option><option>Poison</option><option>Psychic</option><option>Radiant</option><option>Slashing</option><option>Thunder</option></select></div>
+          <label class="setting-row compact-setting"><span><strong>Half damage on success</strong><small>Turn on only when the source says so.</small></span><input id="builder-trigger-half" type="checkbox"></label>
+        </div>
+      </details>
       <h3>Movement and defenses</h3>
       <div class="builder-grid">
         <div><label for="builder-walk-bonus">Walking speed bonus</label><input id="builder-walk-bonus" type="number" min="0" max="500" value="0"></div>
@@ -527,8 +550,8 @@
         <div><label for="builder-match">Apply to</label><select id="builder-match"><option value="character">Current character only</option><option value="subclass">Current class and subclass</option><option value="class">Current class</option><option value="all">Every character</option></select></div>
         <div><label for="builder-match-class">Class used for matching</label><select id="builder-match-class"></select></div>
       </div>
-      <details class="advanced-builder"><summary>Advanced mechanics JSON</summary><p>Optional values here are merged into the effects object and can define ability minimums or bonuses, AC formulas, actions, senses, saving throw advantages, or other supported effects.</p><textarea id="builder-advanced-effects" rows="8" placeholder='{"abilityMinimum":{"str":18},"saveAdvantage":["wis"]}'></textarea></details>
-      <details class="advanced-builder"><summary>Custom replacement form JSON</summary><p>Required only when the transformation assumes a stat block that is not already in Altered. Enter one private creature object, then reference its ID below.</p><textarea id="builder-custom-form" rows="12" placeholder='{"id":"my-private-form","name":"My Private Form","type":"Undead","cr":5,"size":"Medium","ac":16,"hp":60,"hitDice":"8d8+24","abilities":{"str":16,"dex":14,"con":16,"int":10,"wis":12,"cha":14},"saves":{},"skills":{},"speeds":{"walk":30},"senses":["Darkvision 60 ft."],"resistances":["Necrotic"],"immunities":[],"vulnerabilities":[],"traits":[],"actions":[],"source":{"ruleset":"Private owned content","page":"My book","verified":"User-entered"}}'></textarea>
+      <details class="advanced-builder"><summary>Advanced mechanics JSON</summary><p>Optional values here are merged into the effects object and can define ability minimums or bonuses, AC formulas, actions, senses, saving throw advantages, or other supported effects.</p><label for="builder-advanced-effects">Advanced effects object</label><textarea id="builder-advanced-effects" rows="8" placeholder='{"abilityMinimum":{"str":18},"saveAdvantage":["wis"]}'></textarea></details>
+      <details class="advanced-builder"><summary>Custom replacement form JSON</summary><p>Required only when the transformation assumes a stat block that is not already in Altered. Enter one private creature object, then reference its ID below.</p><label for="builder-custom-form">Custom form object</label><textarea id="builder-custom-form" rows="12" placeholder='{"id":"my-private-form","name":"My Private Form","type":"Undead","cr":5,"size":"Medium","ac":16,"hp":60,"hitDice":"8d8+24","abilities":{"str":16,"dex":14,"con":16,"int":10,"wis":12,"cha":14},"saves":{},"skills":{},"speeds":{"walk":30},"senses":["Darkvision 60 ft."],"resistances":["Necrotic"],"immunities":[],"vulnerabilities":[],"traits":[],"actions":[],"source":{"ruleset":"Private owned content","page":"My book","verified":"User-entered"}}'></textarea>
         <div><label for="builder-form-id">Replacement form ID</label><input id="builder-form-id" placeholder="Must match the custom form id"></div>
       </details>
       <div class="dialog-actions builder-actions"><button id="cancel-transform-builder" class="button secondary" type="button">Cancel</button><button class="button primary" type="submit">Create & Install Pack</button></div>

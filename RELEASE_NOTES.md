@@ -1,3 +1,11 @@
+# Altered v0.27.6 release notes
+
+## Custom transformations and usability release
+
+Additive transformations such as Astral Arms now remain fully scrollable and always provide an End control from Play. The guided transformation builder can substitute one ability for another on checks or saves, use a chosen ability for weapon or Unarmed Strike attack and damage rolls, and describe an activation saving throw with damage and half-on-success behavior. These structured mechanics are character-local and remain compatible with existing schema-v1 private packs.
+
+Navigation labels, More shortcuts, phone touch targets, and the Abilities page are clearer and more consistent. Resource counts remain visible, while ability activation now lives on the relevant explained card instead of appearing in a duplicate quick-control bank. All 188 automated tests, the desktop/phone hosted browser audit, and the 48-rule/16-function release audit pass.
+
 # Altered v0.27.5 release notes
 
 ## Full 2024 rules and compatibility audit

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.27.6
+
+- Fixed active additive transformations locking the focused workspace scroll area.
+- Added a reliable Play-screen End control for additive custom transformations.
+- Added guided check/save ability substitution and attack/damage ability override fields for mechanics such as Astral Arms.
+- Added structured activation saving throws, damage, and half-on-success support to the transformation builder.
+- Clarified primary navigation, More shortcuts, form search, and Abilities controls while increasing small phone touch targets.
+- Added regression coverage for the complete Astral-style overlay lifecycle and passed 188 tests plus desktop/phone browser audits.
+
 ## v0.27.5
 
 - Audited every executable rule path against current official 2024 Basic Rules, SRD 5.2.1, and Player's Handbook errata boundaries.

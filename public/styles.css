@@ -1782,3 +1782,21 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(prefers-reduced-motion:reduce){
   .roll-toast,.roll-toast.show,.roll-toast.show .roll-toast-total{animation:none!important;transition:none!important}
 }
+
+/* v0.27.6 navigation clarity, touch safety, and active-overlay escape paths */
+.more-links{grid-template-columns:repeat(3,minmax(0,1fr))}
+.more-link{min-height:52px!important;display:grid;align-content:center;gap:1px;text-align:left}
+.more-link strong{font-size:.76rem}
+.more-link small{overflow:hidden;color:var(--muted);font-size:.61rem;font-weight:650;text-overflow:ellipsis;white-space:nowrap}
+.more-link.danger small{color:#ffd5dc}
+.builder-help{margin:-4px 0 8px;color:var(--muted);font-size:.72rem}.guided-builder{margin:10px 0}.guided-builder>summary{color:var(--accent-2);text-shadow:0 0 6px rgba(121,247,255,.42)}
+.app-shell.form-active:not(.effects-disabled) .workspace-view{overflow:auto}
+.app-shell.form-active:not(.effects-disabled) dialog.wide-dialog{overflow:auto}
+
+@media(max-width:900px){.more-links{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){
+  .button,.text-button,.app-menu-toggle,.character-strip select,.form-tools-drawer>summary,.transform-buttons .button,.task-view .tab,.persistent-turn-controls .button,.play-utility-row .button,.more-view .dashboard-drawer>summary{min-height:44px}
+  .text-button{min-width:44px}
+  .persistent-turn-controls .button{padding:5px 6px;font-size:.62rem}
+  .more-links .button{min-height:52px;padding:6px 8px}
+}

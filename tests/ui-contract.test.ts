@@ -38,7 +38,7 @@ test('help and first-launch walkthrough remain optional, searchable, and restart
   const source=readFileSync('src/app.ts','utf8');
   const styles=readFileSync('public/styles.css','utf8');
   assert.match(html,/id="open-help"[^>]*>Help<\/button>/);
-  assert.match(html,/id="more-help"[^>]*>Help<\/button>/);assert.match(source,/#more-help'\)\.addEventListener\('click'/);
+  assert.match(html,/id="more-help"[^>]*>[\s\S]*?<strong>Help<\/strong>/);assert.match(source,/#more-help'\)\.addEventListener\('click'/);
   assert.match(html,/id="help-search"[^>]*type="search"/);
   assert.ok((html.match(/class="help-topic"/g)??[]).length>=15);
   for(const topic of ['What Altered is','What the app is for','Supported transformation types','Getting Started','Loading characters','Importing characters','Browsing forms, search, and filters','Activating forms','Ending forms and returning to normal','Tracking resources and turns','Images','Settings','Troubleshooting','FAQ','About'])assert.ok(html.includes(topic));
@@ -212,7 +212,7 @@ test('the focused workspace uses form-panel space for live stats and explains ab
   assert.match(source,/#persistent-hp/);
   assert.match(source,/#persistent-new-turn/);assert.match(source,/#persistent-end-turn/);assert.match(styles,/\.play-view \.turn-bar\{display:none\}/);
   assert.match(styles,/\.play-view \.metric-grid\{display:none\}/);
-  assert.match(html,/id="ability-actions-title">Use now/);
+  assert.match(html,/id="ability-actions-title">Use now/);assert.match(html,/aria-labelledby="ability-actions-title" hidden/);
   assert.match(html,/id="ability-resources-title">Resources left/);
   assert.match(source,/Abilities, explained/);
   assert.match(source,/featureReferenceSection/);
@@ -221,7 +221,7 @@ test('the focused workspace uses form-panel space for live stats and explains ab
 
 test('character management exposes safe add and delete paths',()=>{
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');
-  assert.match(html,/id="more-import"[^>]*>Add \/ Import Character<\/button>/);assert.match(html,/id="more-delete-character"/);
+  assert.match(html,/id="more-import"[^>]*>[\s\S]*?<strong>Add \/ Import<\/strong>/);assert.match(html,/id="more-delete-character"/);
   assert.match(html,/id="delete-character-dialog"/);assert.match(source,/function deleteCurrentCharacter\(\)/);assert.match(source,/deletedCharacterIds/);assert.match(source,/baseCharacters\.length<=1/);
 });
 
@@ -347,4 +347,28 @@ test('SRD support proxy is fixed-host, source-filtered, bounded, and domain-whit
   assert.match(source,/if\(!\(domain in srdDomains\)\)/);
   assert.match(source,/url\.searchParams\.set\('document__key__in',srdDocument\)/);
   assert.match(source,/redirect:'error'/);
+});
+
+test('every primary workspace uses consistent names and phone-safe controls',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
+  assert.match(html,/id="nav-sheet"[^>]*aria-label="Character: abilities, rules, and sheet details"[^>]*>[\s\S]*?Character<\/button>/);
+  assert.match(html,/id="tab-rolls"[^>]*aria-label="Checks: saves, skills, and initiative"[^>]*>Checks<\/button>/);assert.match(html,/id="tab-features"[^>]*>Abilities<\/button>/);
+  assert.match(html,/id="more-customize"/);assert.match(source,/#more-customize'\)\.addEventListener/);assert.equal(/customize-drawer" name="more-controls" open/.test(html),false);
+  assert.match(styles,/navigation clarity, touch safety, and active-overlay escape paths/);assert.match(styles,/\.persistent-turn-controls \.button[^}]*min-height:44px/);assert.match(styles,/\.app-shell\.form-active:not\(\.effects-disabled\) \.workspace-view\{overflow:auto\}/);
+});
+
+test('private transformation builder supports guided ability substitutions and activation saves',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const types=readFileSync('src/types.ts','utf8');const schema=readFileSync('src/schema.ts','utf8');
+  for(const id of ['builder-substitute-from','builder-substitute-to','builder-substitute-checks','builder-substitute-saves','builder-attack-ability','builder-attack-scope','builder-trigger-name','builder-trigger-save','builder-trigger-dc','builder-trigger-damage','builder-trigger-damage-type','builder-trigger-half'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(types,/checkAbilitySubstitution/);assert.match(types,/saveAbilitySubstitution/);assert.match(types,/attackAbilityOverride/);assert.match(schema,/attackAbilityOverride\.appliesTo/);assert.match(source,/Resolve this once when the transformation is activated/);
+});
+
+test('additive forms always expose an end path while preserving workspace scrolling',()=>{
+  const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
+  assert.match(source,/overlayEnd=\[\.\.\.options\]\.reverse\(\)\.find/);assert.match(source,/if\(!state\.activeTransform&&state\.overlays\.length\)/);assert.match(source,/tap End to release the latest/);assert.match(styles,/form-active:not\(\.effects-disabled\) \.workspace-view\{overflow:auto\}/);
+});
+
+test('every static form control has an accessible name',()=>{
+  const html=readFileSync('public/index.html','utf8');
+  for(const match of html.matchAll(/<(input|select|textarea)\b([^>]*)>/g)){const id=/\bid="([^"]+)"/.exec(match[2]??'')?.[1];if(!id)continue;const lineStart=html.lastIndexOf('\n',match.index)+1;const lineEnd=html.indexOf('\n',match.index);const line=html.slice(lineStart,lineEnd<0?html.length:lineEnd);const before=line.slice(0,line.indexOf(match[0]));const named=new RegExp(`for="${id}"`).test(html)||/aria-label=/.test(match[2]??'')||/<label\b/.test(before);assert.ok(named,`${id} has no accessible label`);}
 });

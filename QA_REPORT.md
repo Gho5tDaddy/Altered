@@ -1,3 +1,13 @@
+# Altered v0.27.6 QA report
+
+## v0.27.6 custom-transformation and usability verification
+
+- Verified additive transformations preserve workspace scrolling and expose a visible, usable End control from Play.
+- Verified a private Astral-style transformation can replace Strength checks and saves with Wisdom, use Wisdom for Unarmed Strike attack and damage rolls, expose an activation Dexterity save with damage, and end cleanly.
+- Verified all primary tabs, More shortcuts, static buttons, accessible form labels, and phone-size touch targets through UI contract tests and the hosted-worker desktop/phone audit.
+- Final release gates pass: strict TypeScript, clean production build, **188/188 automated tests**, hosted-worker browser audit at desktop and phone dimensions, and 48-rule/16-function evidence across 160 content records.
+- Android v0.27.6 uses version code 39. Existing schema-v1 character/private-pack data and state-v5 combat saves remain compatible.
+
 # Altered v0.27.5 QA report
 
 ## v0.27.5 complete rules audit

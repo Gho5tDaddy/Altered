@@ -57,6 +57,11 @@ test('validates dynamic speed links and incapacitation endings in private transf
   assert.throws(()=>parseCharacter({...base,transformationGrants:[{id:'bad-speed',label:'Bad Speed',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',effects:{speedEqualToWalk:['teleport']}}]}),/speedEqualToWalk/);
 });
 
+test('validates guided roll substitutions and activation save actions',()=>{
+  const c=parseCharacter({...base,transformationGrants:[{id:'astral',label:'Astral Arms',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',effects:{checkAbilitySubstitution:{str:'wis'},saveAbilitySubstitution:{str:'wis'},attackAbilityOverride:{ability:'wis',appliesTo:['unarmed']},actions:[{id:'summon',name:'Summon effect',type:'save',cost:'none',saveAbility:'dex',dc:14,damageOnFail:[{expression:'2d6',type:'Force'}]}]}}]});const effects=c.transformationGrants?.[0]?.effects;assert.deepEqual(effects?.checkAbilitySubstitution,{str:'wis'});assert.deepEqual(effects?.attackAbilityOverride,{ability:'wis',appliesTo:['unarmed']});assert.equal(effects?.actions?.[0]?.type,'save');
+  assert.throws(()=>parseCharacter({...base,transformationGrants:[{id:'bad-override',label:'Bad Override',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',effects:{attackAbilityOverride:{ability:'wis',appliesTo:['spell']}}}]}),/attackAbilityOverride\.appliesTo/);
+});
+
 test('rejects inverted recharge ranges in imported creature actions',()=>{
   const badForm={id:'bad-recharge',name:'Bad Recharge',type:'Beast',cr:1,size:'Medium',ac:12,hp:10,hitDice:'2d8',abilities:{str:10,dex:10,con:10,int:10,wis:10,cha:10},saves:{},skills:{},speeds:{walk:30},senses:[],resistances:[],immunities:[],vulnerabilities:[],traits:[],actions:[{id:'burst',name:'Burst',type:'save',cost:'action',saveAbility:'dex',dc:12,recharge:{min:6,max:5}}],source:{ruleset:'Private',page:'Fixture',verified:'Test'}};
   assert.throws(()=>parseCharacter({...base,customForms:[badForm]}),/recharge\.min must not exceed recharge\.max/);
