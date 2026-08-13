@@ -1,3 +1,11 @@
+# Altered v0.27.5 release notes
+
+## Full 2024 rules and compatibility audit
+
+The release audit now executes a complete matrix across all 12 supported base classes, all 12 bundled SRD subclasses, all 10 supported species, every bundled transformation profile, and all 16 built-in creature forms. It also repeats strict type checking, clean builds, import/export and persistence tests, hosted phone/desktop browser checks, security checks, and generated rule-to-function evidence.
+
+Extra Attack is now executable instead of reference-only. A single Attack action correctly permits two attacks for level-5 Barbarian, Fighter, Monk, Paladin, and Ranger characters; Fighter levels 11 and 20 receive three and four attacks. Multiclass Extra Attack features do not stack, Grapple or Shove can replace an eligible Unarmed Strike, individual Beast-form attacks can be selected, Action Surge supplies a fresh Attack action, and a form's defined Multiattack sequence remains a separate alternative that never stacks. Existing schema-v1 characters and state-v5 saves remain compatible; an optional in-progress attack sequence is additive and safely absent from older saves.
+
 # Altered v0.27.4 release notes
 
 ## Equipment and understandable abilities

@@ -1,4 +1,4 @@
-# Rules coverage — v0.27.4
+# Rules coverage — v0.27.5
 
 ## Fully calculated in the bundled rules pack
 
@@ -14,6 +14,7 @@
 - Barbarian and Monk Unarmored Defense competition.
 - Built-in Barbarian, Monk, and Ranger movement calculations.
 - Action Surge's extra non-Magic action and once-per-turn limit.
+- Extra Attack for Barbarian, Fighter, Monk, Paladin, and Ranger; Fighter level 11/20 scaling; multiclass non-stacking; eligible Grapple/Shove substitutions; individual Beast-form attacks; and complete Attack-action sequences after Action Surge. A form's defined Multiattack sequence remains an alternative and never stacks with Extra Attack.
 - Second Wind, Lay On Hands, Wild Resurgence exchanges, base-or-higher spell-slot spending, supported Circle-spell higher-slot scaling, and common resource recovery.
 - Damage resistances, immunities, vulnerabilities, Temporary HP conflicts, healing, and damage-triggered Concentration checks.
 - Exhaustion levels 0–6, their D20 Test and Speed penalties, Long Rest recovery, and death at level 6.
@@ -46,7 +47,7 @@ These remain visible and receive active, conditional, inactive, or table-ruling 
 
 - Bardic Inspiration and communication-dependent features.
 - Cleric and Paladin Channel Divinity options involving symbols, weapons, or option-specific wording.
-- Fighting Styles, Weapon Mastery riders, Sneak Attack, Blessed Strikes, Martial Arts, and Extra Attack sequencing. Basic imported weapon attacks are calculated, while private or conditional additions remain explicit rather than guessed.
+- Fighting Styles, Weapon Mastery riders, Sneak Attack, Blessed Strikes, and Martial Arts. Basic imported weapon attacks and core-class Extra Attack sequencing are calculated, while private or conditional additions remain explicit rather than guessed.
 - Species body traits during replacement transformations; already-active timed effects can persist as overlays when declared.
 - Imported feats, subclasses, magic items, legacy content, and homebrew features without a structured grant definition.
 - Every SRD 5.2.1 subclass is listed feature-by-feature with an explicit calculated, conditional, or reference-only classification. Paid non-SRD subclass mechanics still require imported structured data.

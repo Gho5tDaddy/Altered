@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.27.5
+
+- Audited every executable rule path against current official 2024 Basic Rules, SRD 5.2.1, and Player's Handbook errata boundaries.
+- Added matrix coverage for all 12 supported classes, 12 bundled SRD subclasses, 10 supported species, and 16 built-in creature forms.
+- Made Extra Attack executable for Barbarian, Fighter, Monk, Paladin, and Ranger, including Fighter's level 11/20 scaling.
+- Preserved multiclass non-stacking, Unarmed Strike Grapple/Shove substitutions, individual Beast-form attacks, complete Action Surge sequences, and the separation between Extra Attack and a defined creature Multiattack sequence.
+- Kept state-v5 saves backward compatible through an optional bounded turn-sequence field and added clear remaining-attack status in the action economy and action cards.
+
 ## v0.27.4
 
 - Extends the stale Ferocitus feat repair to early bundled saves whose canonical D&D Beyond character ID was stored with local provenance.

@@ -29,7 +29,7 @@ function rule(
 export const RULE_LEDGER:ReadonlyArray<RuleLedgerEntry>=Object.freeze([
   rule('core.action-economy','Action economy','core','calculated',srd('Actions and combat'),
     'Tracks the Action, Bonus Action, Reaction, Action Surge action, and their restrictions independently.',
-    ['engine.actionCostError','engine.spendActionCost','engine.useActionSurge'],['engine: action and Bonus Action remain independent','engine: Action Surge restrictions']),
+    ['engine.actionCostError','engine.spendActionCost','engine.actionExecutionError','engine.spendActionExecution','engine.extraAttackCount','engine.useActionSurge'],['engine: action and Bonus Action remain independent','engine: Extra Attack sequences and multiclass non-stacking','engine: Action Surge restrictions']),
   rule('core.slot-spell-limit','One spell-slot expenditure per turn','core','calculated',srd('Casting Time'),
     'Prevents a second spell-slot expenditure on the same turn without blocking cantrips or non-spell features.',
     ['engine.castSpell','engine.startTransformation'],['engine: one slot spell per turn','engine: transformation spells share slot limit']),

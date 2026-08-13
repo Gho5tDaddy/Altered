@@ -1,4 +1,11 @@
-# Altered v0.27.4 audit gap register
+# Altered v0.27.5 audit gap register
+
+## Resolved in v0.27.5
+
+| Finding | Severity | Resolution | Regression evidence |
+|---|---:|---|---|
+| Extra Attack was described but the first eligible attack consumed the complete Attack action | High | Track a bounded per-Attack-action sequence for the five core classes, Fighter scaling, attack substitution, individual Beast attacks, and Action Surge while keeping defined Multiattack sequences separate | Extra Attack count, non-stacking, Grapple/Shove, Beast attack, blocker, Multiattack-separation, and Action Surge regressions |
+| Class/species/form compatibility depended on spot checks | Medium | Add a complete supported-content resolution matrix | all 12 classes, 12 SRD subclasses, 10 species, and 16 form regression |
 
 ## Resolved in v0.27.4
 

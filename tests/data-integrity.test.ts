@@ -5,7 +5,7 @@ import {CREATURES} from '../src/content-registry.js';
 test('every bundled creature has current provenance and valid action references',()=>{
   for(const creature of Object.values(CREATURES)){
     assert.match(creature.source.ruleset,/2024/);
-    assert.match(creature.source.verified,/^2026-07-30$/);
+    assert.match(creature.source.verified,/^2026-08-13$/);
     const ids=new Set<string>();
     for(const action of creature.actions){assert.ok(!ids.has(action.id),`${creature.name} repeats action id ${action.id}`);ids.add(action.id);}
     for(const action of creature.actions){

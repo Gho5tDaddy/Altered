@@ -1,4 +1,12 @@
-# Altered v0.27.4 QA report
+# Altered v0.27.5 QA report
+
+## v0.27.5 complete rules audit
+
+- Executed a class/species/form matrix covering all 12 supported classes, 12 bundled SRD subclasses, 10 supported species, and 16 built-in forms.
+- Verified Extra Attack counts for core martial classes, Fighter level 11/20 scaling, multiclass non-stacking, Grapple/Shove attack substitution, action blockers, Action Surge, and the strict separation from creature Multiattack.
+- Preserved schema-v1 character data and state-v5 combat saves; older saves omit the new optional bounded attack-sequence field and continue loading unchanged.
+- Final release gates pass: strict TypeScript, clean production build, **182/182 automated tests**, hosted-worker browser audit at desktop and phone dimensions, and 48-rule/16-function evidence across 160 content records.
+- Android v0.27.5 (version code 38) verifies with the existing release certificate under APK signature schemes v1, v2, and v3. The desktop/Mac archive contains the standalone HTML, lazy PDF/OCR readers, installation guide, and release notes.
 
 ## v0.27.4 early-save verification
 

@@ -202,7 +202,8 @@ function evaluateFeatures(character:Character,state:GameState,option:Transformat
     if(status!=='inactive'&&status!=='ruling'&&feature.requires?.noArmor&&armorActive(state,option)){status='inactive';reason='Unavailable while armor is active.';}
     if(status!=='inactive'&&status!=='ruling'&&feature.requires?.noShield&&shieldActive(state,option)){status='inactive';reason='Unavailable while a Shield is active.';}
     if(status!=='inactive'&&status!=='ruling'&&(feature.requires?.weapon||feature.requires?.unarmed||feature.requires?.strengthAttack)){status='conditional';reason='Use when the selected attack meets this feature’s conditions.';}
-    if(status!=='inactive'&&status!=='ruling'&&['sneak-attack','radiant-strikes','blessed-strikes','martial-arts','extra-attack-fighter','extra-attack-monk'].includes(feature.id)){status='conditional';reason=feature.summary;}
+    if(status!=='inactive'&&status!=='ruling'&&['sneak-attack','radiant-strikes','blessed-strikes','martial-arts'].includes(feature.id)){status='conditional';reason=feature.summary;}
+    if(status!=='inactive'&&feature.id.startsWith('extra-attack-')){const attacks=extraAttackCount(character);status=attacks>1?'active':'inactive';reason=attacks>1?`${attacks} attacks are available whenever this character takes the Attack action. This never adds attacks to Multiattack.`:'This character does not currently meet an Extra Attack level threshold.';}
     if(feature.id==='rage'){status=state.rage.active?'active':'conditional';reason=state.rage.active?'Active now. Concentration and spellcasting are blocked.':'Activate with the Start Rage button when a Rage use and Bonus Action remain.';}
     if(feature.id==='wild-shape'){const active=state.activeTransform?.option.profile==='wildshape';status=active?'active':'conditional';reason=active?'The selected Wild Shape is active now.':'Choose a legal form, then activate it with a Bonus Action and one Wild Shape use.';}
     if(feature.id==='wild-resurgence'){status='conditional';reason='Use one of the exchange buttons when its listed resource is available.';}
@@ -346,6 +347,23 @@ export function spendActionCost(state:GameState,cost:ActionCost,conditionImmunit
   else if(cost==='reaction')state.turn.reactionRemaining--;
   else if(cost==='magic-action')state.turn.actionsRemaining--;
   else if(cost==='action'){if(state.turn.actionsRemaining>0)state.turn.actionsRemaining--;else state.turn.surgeActionsRemaining--;}
+  return null;
+}
+export function extraAttackCount(character:Character){
+  const fighter=classLevel(character,'Fighter');
+  const ordinary=Math.max(classLevel(character,'Barbarian'),classLevel(character,'Monk'),classLevel(character,'Paladin'),classLevel(character,'Ranger'))>=5?2:1;
+  return Math.max(ordinary,fighter>=20?4:fighter>=11?3:fighter>=5?2:1);
+}
+function belongsToAttackAction(action:CreatureAction){return action.cost==='action'&&((action.type==='attack'&&action.kind!=='spell')||(action.type==='save'&&(action.id==='unarmed-grapple'||action.id==='unarmed-shove')))}
+export function actionExecutionError(character:Character,state:GameState,action:CreatureAction,conditionImmunities:Iterable<string>=[]){
+  if(belongsToAttackAction(action)&&(state.turn.attackAction?.remaining??0)>0){const error=actionError(state,'action',conditionImmunities);return error==='Action already used this turn.'?null:error;}
+  return actionError(state,action.cost,conditionImmunities);
+}
+export function spendActionExecution(character:Character,state:GameState,action:CreatureAction,conditionImmunities:Iterable<string>=[]):string|null{
+  const error=actionExecutionError(character,state,action,conditionImmunities);if(error)return error;
+  if(belongsToAttackAction(action)&&state.turn.attackAction&&state.turn.attackAction.remaining>0){state.turn.attackAction.remaining--;if(state.turn.attackAction.remaining===0)delete state.turn.attackAction;return null;}
+  const spendError=spendActionCost(state,action.cost,conditionImmunities);if(spendError)return spendError;
+  if(belongsToAttackAction(action)){const total=extraAttackCount(character);if(total>1)state.turn.attackAction={remaining:total-1,total,source:total>2?'Fighter Extra Attack':'Extra Attack'};}
   return null;
 }
 function hasResource(state:GameState,id:string,amount=1){const r=resource(state,id);return !!r&&r.current>=amount}

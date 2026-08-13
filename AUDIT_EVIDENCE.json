@@ -1,7 +1,7 @@
 {
   "artifact": "Altered D&D 5e 2024 rules audit evidence",
-  "version": "0.27.4",
-  "generatedAt": "2026-08-13T03:38:34.391Z",
+  "version": "0.27.5",
+  "generatedAt": "2026-08-13T13:19:26.981Z",
   "rules": {
     "rules": 48,
     "functions": 16,
@@ -22,86 +22,86 @@
       "import": 2,
       "product": 2
     },
-    "verifiedThrough": "2026-07-30",
-    "ledgerSha256": "25cdad986f94e30740f21dd4eb41edd75ba0ef015660f1e20cddc0eb210c4ab1"
+    "verifiedThrough": "2026-08-13",
+    "ledgerSha256": "c556d3ff7d8b287b377fb5aedc686bf1a3487c919ebcba1360552f15d2e08d1c"
   },
   "content": {
     "packs": [
       {
         "id": "altered-srd-creatures",
         "domain": "creatures",
-        "version": "0.27.4",
+        "version": "0.27.5",
         "ruleset": "2024 Revised Fifth Edition",
-        "verified": "2026-07-30",
+        "verified": "2026-08-13",
         "records": 16,
-        "sha256": "8cdef708bac8fc877773cf935107e9b305f6b966fed997db08e4fca4df404666"
+        "sha256": "8cfd948229746aa2582d1f667db7eb8647785f7cd4449ef7c44415f01a5903fd"
       },
       {
         "id": "altered-core-class-features",
         "domain": "class-features",
-        "version": "0.27.4",
+        "version": "0.27.5",
         "ruleset": "2024 Revised Fifth Edition",
-        "verified": "2026-07-30",
-        "records": 93,
-        "sha256": "5d68038b9535d4e8fe7fdbe6a3a38c85e2a8af7b88394e8b7606fbe4b321d962"
+        "verified": "2026-08-13",
+        "records": 96,
+        "sha256": "4aa48a1cd1f7e2bb7949291e7ea5ec62132b716443fbb595af779ec87f926ea2"
       },
       {
         "id": "altered-core-species-features",
         "domain": "species-features",
-        "version": "0.27.4",
+        "version": "0.27.5",
         "ruleset": "2024 Revised Fifth Edition",
-        "verified": "2026-07-30",
+        "verified": "2026-08-13",
         "records": 11,
         "sha256": "ac7d7763c8b09909f0fccbb028e2aac6ddac0cb4f3297aec2340ff6322f45943"
       },
       {
         "id": "altered-core-feat-hooks",
         "domain": "feats",
-        "version": "0.27.4",
+        "version": "0.27.5",
         "ruleset": "2024 Revised Fifth Edition",
-        "verified": "2026-07-30",
+        "verified": "2026-08-13",
         "records": 1,
         "sha256": "e4fa7e7294590b3864dd4b5505afa4a472ae951a10c14c4858025fd34e0f63f1"
       },
       {
         "id": "altered-spell-hooks",
         "domain": "spells",
-        "version": "0.27.4",
+        "version": "0.27.5",
         "ruleset": "2024 Revised Fifth Edition",
-        "verified": "2026-07-30",
+        "verified": "2026-08-13",
         "records": 13,
         "sha256": "9940c455bd3280bfdb9a06b1bb112ba0e3938da62ce554b9187f4e62f7c654fe"
       },
       {
         "id": "altered-item-hooks",
         "domain": "items",
-        "version": "0.27.4",
+        "version": "0.27.5",
         "ruleset": "2024 Revised Fifth Edition",
-        "verified": "2026-07-30",
+        "verified": "2026-08-13",
         "records": 0,
         "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
       },
       {
         "id": "altered-core-conditions",
         "domain": "conditions",
-        "version": "0.27.4",
+        "version": "0.27.5",
         "ruleset": "2024 Revised Fifth Edition",
-        "verified": "2026-07-30",
+        "verified": "2026-08-13",
         "records": 15,
         "sha256": "3ccf54ae67d5961717bfa99d09dd66f136f6b8248798849f2ad79bd5f6bb4607"
       },
       {
         "id": "altered-transformation-profiles",
         "domain": "transformation-profiles",
-        "version": "0.27.4",
+        "version": "0.27.5",
         "ruleset": "2024 Revised Fifth Edition",
-        "verified": "2026-07-30",
+        "verified": "2026-08-13",
         "records": 8,
         "sha256": "899b51877067ea7c30752993b5e8fe9f18ba86be3f1f5d787f6e981555767cf4"
       }
     ],
-    "totalRecords": 157,
-    "manifestSha256": "f22841fe4ffdcb3db0cb48877da088a860ecf459f23244218c540a6808d370d1"
+    "totalRecords": 160,
+    "manifestSha256": "15ce4cee11225c27854011f5e4e8f43080d84df50c08af6317751064b443fe95"
   },
   "interactionMatrix": [
     {

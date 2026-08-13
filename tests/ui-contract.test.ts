@@ -254,7 +254,8 @@ test('combat state and spell availability are explained before a click',()=>{
   assert.match(source,/Available now \(\$\{ready\.length\}\)/);
   assert.match(source,/Unavailable right now \(\$\{blocked\.length\}\)/);
   assert.match(source,/availableSpellSlotLevels\(character,state,slotLevel\)/);
-  assert.match(source,/actionCostError\(state,action\.cost,sheet\.conditionImmunities\)/);
+  assert.match(source,/actionExecutionError\(character,state,action,sheet\.conditionImmunities\)/);
+  assert.match(source,/Extra Attack: \$\{state\.turn\.attackAction\.remaining\} remaining/);
 });
 
 test('static shell applies a restrictive local-only content policy',()=>{

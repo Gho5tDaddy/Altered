@@ -111,7 +111,8 @@ export interface Character {
 
 export interface TransformationOption {id:string;label:string;profile:TransformProfile;formId?:string|undefined;grantId?:string|undefined;source:string;actionCost:ActionCost;usable:boolean;reason?:string|undefined;duration?:string|undefined;endActionCost?:ActionCost|undefined;resourceId?:string|undefined;resourceCost?:number|undefined;concentration?:boolean|undefined;retention?:Partial<RetentionPolicy>|undefined;effects?:TransformationEffects|undefined;deactivate?:boolean|undefined;spellName?:string|undefined;spellLevel?:number|undefined;switchGroup?:string|undefined}
 export interface RageState {active:boolean;endsAtTurn:number;usedThisTurn:boolean;recklessDeclared:boolean;extendedThisTurn:boolean}
-export interface TurnState {number:number;actionsRemaining:number;surgeActionsRemaining:number;bonusRemaining:number;reactionRemaining:number;slotSpellCast:boolean;attackRollsMade:number;oncePerTurn:Record<string,boolean>}
+export interface AttackActionSequence {remaining:number;total:number;source:string}
+export interface TurnState {number:number;actionsRemaining:number;surgeActionsRemaining:number;bonusRemaining:number;reactionRemaining:number;slotSpellCast:boolean;attackRollsMade:number;attackAction?:AttackActionSequence;oncePerTurn:Record<string,boolean>}
 export interface ConcentrationState {name:string;source:string;castLevel?:number}
 export interface PendingRelentlessRage {dc:number;damage:number;source:DamageType}
 export interface LifeState {dead:boolean;stable:boolean;deathSaveSuccesses:number;deathSaveFailures:number}

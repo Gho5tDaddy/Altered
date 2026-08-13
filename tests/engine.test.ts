@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type {AttackAction,Character} from '../src/types.js';
-import {CREATURES} from '../src/content-registry.js';
+import {CLASS_FEATURES,CREATURES,SPECIES_FEATURES,SUBCLASS_FEATURES} from '../src/content-registry.js';
 import {parseCharacter} from '../src/schema.js';
 import {
   applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,criticalDiceExpression,criticalHitThreshold,deathSaveMode,declareRecklessAttack,
-  clearConditions,endConcentration,endSpellEffect,endTransformation,endTurn,extendRage,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,removeCondition,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
+  actionExecutionError,clearConditions,endConcentration,endSpellEffect,endTransformation,endTurn,extendRage,extraAttackCount,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,removeCondition,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,spendActionExecution,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
 } from '../src/engine.js';
 
 function must<T>(value:T|undefined):T{if(value===undefined)throw new Error('Expected value was missing.');return value}
@@ -47,6 +47,17 @@ test('verified 2024 creature golden values are locked',()=>{
     ['giant-octopus','lion','tiger'].map(id=>{const form=must(CREATURES[id]);return [form.id,form.cr,form.ac,form.hp]}),
     [['giant-octopus',1,11,45],['lion',1,12,22],['tiger',1,13,30]],
   );
+});
+
+test('every supported class, SRD subclass, and species resolves without conflicting feature ids',()=>{
+  const subclassParents:Record<string,string>={'Path of the Berserker':'Barbarian','College of Lore':'Bard','Life Domain':'Cleric','Circle of the Land':'Druid',Champion:'Fighter','Warrior of the Open Hand':'Monk','Oath of Devotion':'Paladin',Hunter:'Ranger',Thief:'Rogue','Draconic Sorcery':'Sorcerer','Fiend Patron':'Warlock',Evoker:'Wizard'};
+  for(const name of Object.keys(CLASS_FEATURES)){const c=character({name:`${name} audit`,classes:[{name,level:20}],totalLevel:20});const sheet=resolveSheet(c,createInitialState(c));assert.ok(sheet.features.some(feature=>feature.source===name),`${name} has no evaluated features`);assert.equal(new Set(sheet.features.map(feature=>feature.id)).size,sheet.features.length,`${name} repeats a feature id`);}
+  for(const [subclass,name] of Object.entries(subclassParents)){assert.ok(SUBCLASS_FEATURES[subclass],`${subclass} is missing from the registry`);const c=character({name:`${subclass} audit`,classes:[{name,level:20,subclass}],totalLevel:20});const sheet=resolveSheet(c,createInitialState(c));for(const feature of SUBCLASS_FEATURES[subclass]??[])assert.ok(sheet.features.some(entry=>entry.id===feature.id),`${subclass} omits ${feature.name}`);}
+  for(const species of Object.keys(SPECIES_FEATURES)){const c=character({name:`${species} audit`,species,classes:[{name:'Fighter',level:20}],totalLevel:20});const sheet=resolveSheet(c,createInitialState(c));for(const feature of SPECIES_FEATURES[species]??[])assert.ok(sheet.features.some(entry=>entry.id===feature.id),`${species} omits ${feature.name}`);}
+});
+
+test('every bundled form resolves through the strict Moon Druid eligibility path',()=>{
+  for(const id of Object.keys(CREATURES)){const c=character({classes:[{name:'Druid',level:20,subclass:'Circle of the Moon'}],totalLevel:20,knownForms:[id],seenForms:[id]});const state=createInitialState(c);const option=availableTransformations(c,state).find(entry=>entry.profile==='wildshape'&&entry.formId===id);assert.ok(option,`${id} was not offered to an eligible level 20 Moon Druid`);assert.equal(option.usable,true,`${id} was incorrectly locked`);const transition=startTransformation(c,state,option);assert.match(transition.message,/transformed/i);const sheet=resolveSheet(c,state);assert.equal(sheet.form?.id,id);assert.ok(sheet.ac>0);assert.ok(Object.values(sheet.speeds).some(speed=>(speed??0)>0));}
 });
 
 test('Moon Druid legal forms use Druid level and known forms',()=>{
@@ -233,6 +244,41 @@ test('Reckless Attack can be declared without Rage',()=>{
 
 test('Action Surge is limited to once per turn',()=>{
   const c=character({classes:[{name:'Fighter',level:17}],totalLevel:17});const state=createInitialState(c);assert.match(useActionSurge(c,state).message,/added one action/);assert.match(useActionSurge(c,state).message,/only once/);assert.equal(state.turn.surgeActionsRemaining,1);
+});
+
+test('Extra Attack spends one Attack action and preserves every granted attack',()=>{
+  const c=character({classes:[{name:'Fighter',level:11}],totalLevel:11});const state=createInitialState(c);const action=resolveSheet(c,state).actions.find(entry=>entry.id==='unarmed');assert.ok(action);
+  assert.equal(extraAttackCount(c),3);assert.equal(spendActionExecution(c,state,action),null);assert.equal(state.turn.actionsRemaining,0);assert.deepEqual(state.turn.attackAction,{remaining:2,total:3,source:'Fighter Extra Attack'});
+  assert.equal(actionExecutionError(c,state,action),null);assert.equal(spendActionExecution(c,state,action),null);assert.equal(state.turn.attackAction?.remaining,1);
+  assert.equal(spendActionExecution(c,state,action),null);assert.equal(state.turn.attackAction,undefined);assert.match(actionExecutionError(c,state,action)??'',/Action already used/);
+});
+
+test('Extra Attack features do not stack across multiclass levels',()=>{
+  const c=character({classes:[{name:'Barbarian',level:5},{name:'Monk',level:5},{name:'Paladin',level:5},{name:'Ranger',level:5}],totalLevel:20});assert.equal(extraAttackCount(c),2);
+});
+
+test('Grapple or Shove can replace one attack granted by Extra Attack',()=>{
+  const c=character({classes:[{name:'Monk',level:5}],totalLevel:5});const state=createInitialState(c);const actions=resolveSheet(c,state).actions;const damage=actions.find(entry=>entry.id==='unarmed'),grapple=actions.find(entry=>entry.id==='unarmed-grapple');assert.ok(damage);assert.ok(grapple);
+  assert.equal(spendActionExecution(c,state,damage),null);assert.equal(state.turn.attackAction?.remaining,1);assert.equal(spendActionExecution(c,state,grapple),null);assert.equal(state.turn.attackAction,undefined);
+});
+
+test('Extra Attack never bypasses incapacitation or other action blockers',()=>{
+  const c=character({classes:[{name:'Monk',level:5}],totalLevel:5});const state=createInitialState(c);const action=resolveSheet(c,state).actions.find(entry=>entry.id==='unarmed');assert.ok(action);spendActionExecution(c,state,action);applyCondition(c,state,'Stunned');assert.match(actionExecutionError(c,state,action)??'',/Incapacitated condition/);
+});
+
+test('Multiattack remains one stat-block action and never receives Extra Attack',()=>{
+  const c=character({classes:[{name:'Fighter',level:11},{name:'Druid',level:6,subclass:'Circle of the Moon'}],totalLevel:17,knownForms:['brown-bear'],seenForms:['brown-bear']});const state=createInitialState(c);const bear=availableTransformations(c,state).find(option=>option.profile==='wildshape'&&option.formId==='brown-bear');assert.ok(bear);startTransformation(c,state,bear);state.turn.actionsRemaining=1;const multi=resolveSheet(c,state).actions.find(entry=>entry.type==='multiattack');assert.ok(multi);
+  assert.equal(spendActionExecution(c,state,multi),null);assert.equal(state.turn.actionsRemaining,0);assert.equal(state.turn.attackAction,undefined);
+});
+
+test('a retained Extra Attack can use individual Beast-form attacks instead of Multiattack',()=>{
+  const c=character({classes:[{name:'Fighter',level:5},{name:'Druid',level:6,subclass:'Circle of the Moon'}],totalLevel:11,knownForms:['brown-bear'],seenForms:['brown-bear']});const state=createInitialState(c);const bear=availableTransformations(c,state).find(option=>option.profile==='wildshape'&&option.formId==='brown-bear');assert.ok(bear);startTransformation(c,state,bear);state.turn.actionsRemaining=1;const bite=resolveSheet(c,state).actions.find(entry=>entry.type==='attack'&&entry.id==='bite');assert.ok(bite);
+  assert.equal(spendActionExecution(c,state,bite),null);assert.equal(state.turn.attackAction?.remaining,1);assert.equal(spendActionExecution(c,state,bite),null);assert.equal(state.turn.attackAction,undefined);assert.match(actionExecutionError(c,state,bite)??'',/Action already used/);
+});
+
+test('Action Surge grants a fresh complete Extra Attack sequence',()=>{
+  const c=character({classes:[{name:'Fighter',level:5}],totalLevel:5});const state=createInitialState(c);const action=resolveSheet(c,state).actions.find(entry=>entry.id==='unarmed');assert.ok(action);
+  spendActionExecution(c,state,action);spendActionExecution(c,state,action);assert.equal(state.turn.attackAction,undefined);useActionSurge(c,state);assert.equal(spendActionExecution(c,state,action),null);assert.equal(state.turn.surgeActionsRemaining,0);assert.equal(state.turn.attackAction?.remaining,1);assert.equal(spendActionExecution(c,state,action),null);assert.match(actionExecutionError(c,state,action)??'',/Action already used/);
 });
 
 test('ending Polymorph clears its transformation THP',()=>{
