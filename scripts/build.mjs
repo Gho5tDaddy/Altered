@@ -68,6 +68,13 @@ const toolAssets=Object.fromEntries(await Promise.all(['pdf.bundle.js','tesserac
   `/${name}`,
   {type:'text/javascript; charset=utf-8',data:(await readFile(path.join(dist,name))).toString('base64')},
 ])));
+const downloadAssets=Object.fromEntries(await Promise.all([
+  ['Altered-Android-v0.27.10.apk','application/vnd.android.package-archive'],
+  ['Altered-Desktop-Mac-v0.27.10.zip','application/zip'],
+].map(async([name,type])=>[
+  `/downloads/${name}`,
+  {name,type,data:(await readFile(path.join(root,'public','downloads',name))).toString('base64')},
+])));
 const workerTemplate=await readFile(path.join(root,'scripts','hosted-worker.template.js'),'utf8');
 const hostedWorker=workerTemplate
   .replace('__ALTERED_PAGE_BASE64__',()=>JSON.stringify(hostedPage))
@@ -76,6 +83,7 @@ const hostedWorker=workerTemplate
   .replace('__ALTERED_SERVICE_WORKER__',()=>JSON.stringify(hostedServiceWorker))
   .replace('__ALTERED_ICONS__',()=>JSON.stringify(icons))
   .replace('__ALTERED_TOOL_ASSETS__',()=>JSON.stringify(toolAssets))
+  .replace('__ALTERED_DOWNLOAD_ASSETS__',()=>JSON.stringify(downloadAssets))
   .replace('__ALTERED_FORM_IMAGES__',()=>JSON.stringify(formImages));
 await writeFile(path.join(dist,'server','index.js'),hostedWorker);
 console.log(`Built ${dist}`);

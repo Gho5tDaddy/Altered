@@ -164,8 +164,10 @@ test('the exact hosted build executes before optional mobile storage hydration',
 });
 
 test('hosted release downloads use the platform static-asset binding',()=>{
-  const worker=readFileSync('scripts/hosted-worker.template.js','utf8');
+  const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const build=readFileSync('scripts/build.mjs','utf8');
   assert.match(worker,/async fetch\(request,env\)/);
+  assert.match(build,/__ALTERED_DOWNLOAD_ASSETS__/);assert.match(worker,/const DOWNLOAD_ASSETS=__ALTERED_DOWNLOAD_ASSETS__/);
+  assert.match(worker,/Content-Disposition.*attachment/);
   assert.match(worker,/url\.pathname\.startsWith\('\/downloads\/'\)&&env\?\.ASSETS\?\.fetch/);
 });
 

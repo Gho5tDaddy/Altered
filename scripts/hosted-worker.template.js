@@ -5,6 +5,7 @@ const SERVICE_WORKER=__ALTERED_SERVICE_WORKER__;
 const ICONS=__ALTERED_ICONS__;
 const FORM_IMAGES=__ALTERED_FORM_IMAGES__;
 const TOOL_ASSETS=__ALTERED_TOOL_ASSETS__;
+const DOWNLOAD_ASSETS=__ALTERED_DOWNLOAD_ASSETS__;
 const LOGIN_PAGE=`<!doctype html>
 <html lang="en">
 <head>
@@ -265,6 +266,11 @@ export default {
     if(url.pathname in TOOL_ASSETS){
       const asset=TOOL_ASSETS[url.pathname];
       return new Response(request.method==='HEAD'?null:decodeBase64(asset.data),{headers:headers(asset.type,'public, max-age=31536000, immutable')});
+    }
+    if(url.pathname in DOWNLOAD_ASSETS){
+      const asset=DOWNLOAD_ASSETS[url.pathname];
+      const bytes=decodeBase64(asset.data);
+      return new Response(request.method==='HEAD'?null:bytes,{headers:{...headers(asset.type,'public, max-age=31536000, immutable'),'Content-Disposition':`attachment; filename="${asset.name}"`,'Content-Length':String(bytes.byteLength)}});
     }
     if(url.pathname.startsWith('/downloads/')&&env?.ASSETS?.fetch)return env.ASSETS.fetch(request);
     if(url.pathname!=='/'&&url.pathname!=='/index.html')return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
