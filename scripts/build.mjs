@@ -1,4 +1,4 @@
-import {mkdir,readFile,readdir,copyFile,writeFile,rm} from 'node:fs/promises';
+import {mkdir,readFile,readdir,copyFile,writeFile,rm,cp} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {build as esbuild} from 'esbuild';
@@ -9,7 +9,7 @@ const dist=path.join(root,'dist');
 await rm(dist,{recursive:true,force:true});await mkdir(dist,{recursive:true});
 
 const publicNames=await readdir(path.join(root,'public'));
-for(const name of publicNames)await copyFile(path.join(root,'public',name),path.join(dist,name));
+for(const name of publicNames)await cp(path.join(root,'public',name),path.join(dist,name),{recursive:true});
 await mkdir(path.join(dist,'tests'),{recursive:true});
 await mkdir(path.join(dist,'src'),{recursive:true});
 for(const name of await readdir(path.join(build,'tests')))if(name.endsWith('.js'))await copyFile(path.join(build,'tests',name),path.join(dist,'tests',name));
