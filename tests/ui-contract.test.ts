@@ -102,6 +102,17 @@ test('arcane glow palette keeps secondary and disabled states luminous and legib
   assert.match(styles,/\.workspace-nav-button\.active\{[\s\S]*background:linear-gradient\(180deg,#3a2358,#171421\)/);
 });
 
+test('frequent core abilities expose rule-driven ready, blocked, and active states',()=>{
+  const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
+  assert.match(source,/type PriorityAbilityState=\{state:'ready'\|'blocked'\|'active';reason:string\}/);
+  assert.match(source,/feature\.id==='rage'[\s\S]*rageStartError\(character,state\)/);
+  assert.match(source,/feature\.id==='wild-shape'[\s\S]*availableTransformations\(character,state\)/);
+  assert.match(source,/title:'Core abilities'/);assert.match(source,/green is ready, red explains what blocks it/);
+  assert.match(styles,/\.priority-ability\.priority-ready/);assert.match(styles,/\.priority-ability\.priority-blocked/);assert.match(styles,/\.priority-ability\.priority-active/);
+  assert.match(styles,/\.priority-ability-control\.blocked,\.priority-ability-control\.blocked:disabled\{opacity:1/);
+  assert.match(styles,/@media\(prefers-reduced-motion:reduce\)\{\.priority-ability-control\.ready\{animation:none\}\}/);
+});
+
 test('the six current forms ship with app-ready artwork in both builds',()=>{
   const source=readFileSync('src/app.ts','utf8');
   const serviceWorker=readFileSync('public/sw.js','utf8');
