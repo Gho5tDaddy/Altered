@@ -116,7 +116,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.13';
+const APP_VERSION='0.29.14';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -1521,9 +1521,10 @@ function initializeControls(){
   window.addEventListener('beforeunload',persist);
   if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
     const hadController=Boolean(navigator.serviceWorker.controller);
+    const updateReloadKey=`altered-update-reload-${APP_VERSION}`;
     navigator.serviceWorker.addEventListener('controllerchange',()=>{
-      if(!hadController||sessionStorage.getItem('altered-update-reload')==='1')return;
-      sessionStorage.setItem('altered-update-reload','1');location.reload();
+      if(!hadController||sessionStorage.getItem(updateReloadKey)==='1')return;
+      sessionStorage.setItem(updateReloadKey,'1');location.reload();
     });
     navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});
   }

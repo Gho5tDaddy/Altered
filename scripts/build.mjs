@@ -72,8 +72,8 @@ const toolAssets=Object.fromEntries(await Promise.all(['pdf.bundle.js','pdf.work
   {type:'text/javascript; charset=utf-8',data:(await readFile(path.join(dist,name))).toString('base64')},
 ])));
 const downloadAssets=Object.fromEntries(await Promise.all([
-  ['Altered-Desktop-Mac-v0.29.13.zip','application/zip'],
-  ['Altered-Windows-Setup-v0.29.13.exe','application/octet-stream'],
+  ['Altered-Desktop-Mac-v0.29.14.zip','application/zip'],
+  ['Altered-Windows-Setup-v0.29.14.exe','application/octet-stream'],
 ].map(async([name,type])=>[
   `/downloads/${name}`,
   {name,type,data:(await readFile(path.join(root,'public','downloads',name))).toString('base64')},
