@@ -1,4 +1,4 @@
-const CACHE='altered-v0.29.10-character-pdf-scan';
+const CACHE='altered-v0.29.11-pdf-evidence';
 const ASSETS=['./','./index.html','./styles.css','./app.bundle.js','./pdf.bundle.js','./tesseract.bundle.js','./manifest.json','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./sample-character.json','./sample-characters.json','./form-brown-bear.jpg','./form-dire-wolf.jpg','./form-giant-octopus.jpg','./form-giant-spider.jpg','./form-lion.jpg','./form-tiger.jpg'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))));self.clients.claim();});

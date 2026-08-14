@@ -7,6 +7,8 @@ import {normalizeSrdCreature,parseSrdCatalogPage,parseSrdCatalogStatus} from './
 import type {SrdCatalogStatus} from './srd-catalog.js';
 import {characterFromPdfReview,parsePdfCharacterText} from './pdf-import.js';
 import type {PdfCharacterDraft} from './pdf-import.js';
+import {findPdfRuleEntry} from './pdf-match.js';
+import type {PdfTextItem} from './pdf-match.js';
 import {installExtensionPack,listExtensionPackRecords,loadArtOverride,loadBooleanSetting,loadJsonSetting,optimizePortrait,removeArtOverride,removeExtensionPack,removeSetting,saveArtOverride,saveBooleanSetting,saveJsonSetting} from './storage.js';
 import {SAMPLE_CHARACTERS} from './sample-data.js';
 import {FEROCITUS_CHARACTER} from './ferocitus-data.js';
@@ -113,7 +115,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.10';
+const APP_VERSION='0.29.11';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -535,9 +537,6 @@ function privatePdfCharacterTargets():PrivatePdfTarget[]{
   for(const item of character.items)if(item.equipped&&(item.mechanics==='reference-only'||item.mechanics==='review-required'))add({id:`item-${slug(item.id)}`,name:item.name,kind:'Equipped item',detail:'This equipped item needs private rules beyond the numeric totals already imported.'});
   return targets.slice(0,160);
 }
-function compactPdfMatchSummary(pageText:string,index:number,name:string){
-  const after=pageText.slice(index,index+650).replace(/\s+/g,' ').trim();const sentences=after.match(/[^.!?]{20,220}[.!?]/g)?.slice(0,3).join(' ')??after.slice(0,420);return sentences.replace(new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s*[:.—-]?\\s*`,'i'),'').slice(0,500).trim();
-}
 function activationFromPrivateText(value:string):ActionCost{const lower=value.toLowerCase();if(/\bbonus action\b/.test(lower))return'bonus';if(/\breaction\b/.test(lower))return'reaction';if(/\bmagic action\b/.test(lower))return'magic-action';if(/\bas an action\b|\btake the action\b/.test(lower))return'action';return'none';}
 async function hostedPrivatePdfDocument(record:PrivatePdfRecord){
   await loadImportScript('./pdf.bundle.js',()=>Boolean(externalWindow.pdfjsLib));const library=externalWindow.pdfjsLib;if(!library)throw new Error('PDF reader did not initialize.');
@@ -547,8 +546,8 @@ async function hostedPrivatePdfDocument(record:PrivatePdfRecord){
 async function findPrivatePdfCharacterMechanics(record:PrivatePdfRecord){
   const targets=privatePdfCharacterTargets();if(!targets.length)return {matches:[],searched:0,unmatched:[]};const unmatched=[...targets];const matches:PrivatePdfMatch[]=[];const pdf=await hostedPrivatePdfDocument(record);const pageLimit=Math.min(pdf.numPages,1200);
   for(let pageNumber=1;pageNumber<=pageLimit&&unmatched.length;pageNumber++){
-    privatePdfStatus(`Scanning only ${character.name}'s content · page ${pageNumber} of ${pageLimit}…`);const page=await pdf.getPage(pageNumber);const content=await page.getTextContent();const pageText=content.items.map(item=>item.str??'').join(' ').replace(/\s+/g,' ').trim();if(!pageText)continue;const lower=pageText.toLowerCase();
-    for(let index=unmatched.length-1;index>=0;index--){const target=unmatched[index]!;const offset=lower.indexOf(target.name.toLowerCase());if(offset<0)continue;const summary=compactPdfMatchSummary(pageText,offset,target.name)||`See ${target.name} on page ${pageNumber}.`;matches.push({...target,page:pageNumber,summary,activation:activationFromPrivateText(summary),selected:true});unmatched.splice(index,1);}
+    privatePdfStatus(`Scanning only ${character.name}'s content · page ${pageNumber} of ${pageLimit}…`);const page=await pdf.getPage(pageNumber);const content=await page.getTextContent();if(!content.items.length)continue;
+    for(let index=unmatched.length-1;index>=0;index--){const target=unmatched[index]!;const summary=findPdfRuleEntry(content.items,target.name,target.kind);if(!summary)continue;matches.push({...target,page:pageNumber,summary,activation:activationFromPrivateText(summary),selected:true});unmatched.splice(index,1);}
   }
   return {matches:matches.sort((a,b)=>a.kind.localeCompare(b.kind)||a.name.localeCompare(b.name)),searched:targets.length,unmatched};
 }
@@ -568,7 +567,7 @@ function recordSafeName(name:string){return name.length>48?`${name.slice(0,45)}�
 async function deletePrivatePdf(record:PrivatePdfRecord){
   if(!window.confirm(`Delete ${record.name} from your Altered account? This removes it from every device.`))return;privatePdfStatus(`Deleting ${record.name}…`);try{const response=await fetch(`/api/private-pdfs/${encodeURIComponent(record.id)}`,{method:'DELETE',headers:privatePdfRequestHeaders(),credentials:'same-origin'});if(!response.ok)throw new Error(await privatePdfError(response));await refreshPrivatePdfLibrary();privatePdfStatus(`${record.name} deleted from your account.`);}catch(error){privatePdfStatus(`Delete failed: ${error instanceof Error?error.message:'Unknown error'}`);}
 }
-type PdfPage={getTextContent:()=>Promise<{items:{str?:string}[]}>;getViewport:(options:{scale:number})=>{width:number;height:number};render:(options:{canvasContext:CanvasRenderingContext2D;viewport:{width:number;height:number}})=>{promise:Promise<void>}};
+type PdfPage={getTextContent:()=>Promise<{items:PdfTextItem[]}>;getViewport:(options:{scale:number})=>{width:number;height:number};render:(options:{canvasContext:CanvasRenderingContext2D;viewport:{width:number;height:number}})=>{promise:Promise<void>}};
 type PdfDocument={numPages:number;getPage:(page:number)=>Promise<PdfPage>;getFieldObjects?:()=>Promise<Record<string,{value?:unknown}[]>|null>};
 type PdfLibrary={GlobalWorkerOptions?:{workerSrc:string};getDocument:(options:{data?:Uint8Array;url?:string;disableWorker:boolean;withCredentials?:boolean;httpHeaders?:Record<string,string>;rangeChunkSize?:number;disableStream?:boolean;disableAutoFetch?:boolean})=>{promise:Promise<PdfDocument>}};
 type OcrWorker={recognize:(image:HTMLCanvasElement)=>Promise<{data:{text:string}}>;terminate:()=>Promise<void>};
