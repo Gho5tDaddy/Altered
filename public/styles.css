@@ -2231,3 +2231,45 @@ body::after{
 .app-shell.reduce-motion .quick-effect-button.tracked-active{animation:none!important;filter:none!important}
 @media(prefers-reduced-motion:reduce){.app-shell:not(.motion-forced) .quick-effect-button.tracked-active{animation:none!important;filter:none!important}}
 @media(forced-colors:active){.quick-effect-button.tracked-active{box-shadow:none;border:2px solid Highlight;color:CanvasText}}
+
+/* v0.29.20 fold-safe cockpit geometry.
+   The cockpit sizes to its real controls instead of clipping them inside a fixed row. */
+@media(max-width:700px){
+  .workspace,html[data-altered-workspace="forms"] .workspace,
+  .app-shell.form-active .workspace,html[data-altered-workspace="forms"] .app-shell.form-active .workspace{
+    grid-template-rows:auto minmax(96px,1fr)
+  }
+  .persistent-form-visual{
+    grid-template-columns:minmax(0,43%) minmax(0,57%)
+  }
+  .persistent-form-visual .form-art{min-width:0;min-height:0;height:auto;align-self:stretch}
+  .persistent-form-visual .main-form-art,.persistent-form-visual .main-form-art img{width:100%;height:100%;min-height:0;object-fit:cover}
+  .persistent-form-side{min-width:0;overflow:visible}
+  .persistent-form-copy.is-active{min-height:72px;padding-top:7px}
+  .persistent-action-economy{flex:0 0 auto}
+  .persistent-quick-effects{flex:0 0 auto}
+  .persistent-end-form{flex:0 0 auto}
+  .persistent-turn-controls{flex:0 0 auto}
+  .workspace-view{scroll-padding-block:12px 24px}
+  .next-step-target{scroll-margin-block:16px 24px}
+}
+
+/* The Fold's unfolded viewport uses a narrow portrait rail. Give every fast-play
+   control the full rail width so labels stay readable and tappable. */
+@media(min-width:701px) and (max-width:1180px) and (pointer:coarse){
+  .workspace{grid-template-columns:minmax(258px,29vw) minmax(0,1fr)}
+  html[data-altered-workspace="forms"] .workspace{grid-template-columns:minmax(280px,31vw) minmax(0,1fr)}
+  .persistent-quick-effects{grid-template-columns:1fr;padding-inline:8px}
+  .quick-initiative{grid-column:auto}
+  .quick-effect-button{min-height:44px;white-space:normal}
+  .persistent-form-visual .form-art{min-height:0}
+  .workspace-view{scroll-padding-block:16px 28px}
+  .next-step-target{scroll-margin-block:20px 28px}
+}
+
+@media(max-width:390px){
+  .persistent-form-visual{grid-template-columns:minmax(0,42%) minmax(0,58%)}
+  .persistent-form-copy.is-active.is-beast>strong{font-size:1.08rem;letter-spacing:.07em}
+  .persistent-form-copy.is-active.is-beast>strong::before,
+  .persistent-form-copy.is-active.is-beast>strong::after{margin-inline:.22em}
+}

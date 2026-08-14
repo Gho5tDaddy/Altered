@@ -129,7 +129,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.19';
+const APP_VERSION='0.29.20';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -209,6 +209,7 @@ function syncWorkspaceChrome(){
   const sheetSelected=currentWorkspace==='task'&&taskOrigin==='sheet';
   const activeNav=currentWorkspace==='forms'?'nav-forms':currentWorkspace==='more'?'nav-more':sheetSelected?'nav-sheet':'nav-play';
   for(const id of ['nav-play','nav-forms','nav-sheet','nav-more']){const node=$<HTMLButtonElement>(`#${id}`);const active=id===activeNav;node.classList.toggle('active',active);if(active)node.setAttribute('aria-current','page');else node.removeAttribute('aria-current');}
+  const returning=currentWorkspace!=='play';$('#nav-play-label').textContent=returning?'Back to Play':'Play';$<HTMLButtonElement>('#nav-play').setAttribute('aria-label',returning?'Back to Play dashboard':'Play dashboard');
   $('#task-view-title').textContent=TASK_TITLES[currentTab]??'Character Sheet';
   $('#task-abilities').hidden=currentTab!=='features';
   const urgentAbility=Boolean(state.pendingRelentlessRage||(state.hp===0&&!state.life.dead&&!state.life.stable)||state.concentrationChecks.length);
@@ -1314,6 +1315,13 @@ function renderActions(){
       else{const key=actionPrerequisiteKey(action),confirmed=!action.prerequisite||confirmedActionPrerequisites.has(key);if(action.prerequisite)c.options.append(toggleRow(`Confirm prerequisite: ${action.prerequisite}`,confirmed,checked=>{checked?confirmedActionPrerequisites.add(key):confirmedActionPrerequisites.delete(key);renderActions();renderNextStepGuide();}));collapseActionOptions(c.options);const label=limit.recharge?`Awaiting ${limit.recharge.min}–${limit.recharge.max}`:limit.remaining===0?'No uses remaining':economyError??`Use ${action.name}`;const use=button(label,()=>resolveAutomaticAction(action),blocked||!confirmed?'button secondary action-roll':'button primary action-roll');use.disabled=blocked||!confirmed;if(!confirmed)use.title='Confirm the visible prerequisite first.';c.actions.append(use);}appendAction(c.node,blocked);
     }
   }
+  for(const multiattack of sheet.actions.filter((candidate):candidate is Extract<CreatureAction,{type:'multiattack'}>=>candidate.type==='multiattack')){
+    const directCards=()=>Array.from(root.children).filter((node):node is HTMLElement=>node instanceof HTMLElement&&node.classList.contains('item-card'));
+    const main=directCards().find(node=>node.querySelector('.item-head strong')?.textContent===multiattack.name);if(!main)continue;
+    const componentNames=[...new Set([...(multiattack.sequence??[]),...(multiattack.variants??[]).flatMap(variant=>variant.sequence)])].map(id=>sheet.actions.find(candidate=>candidate.id===id)?.name).filter((name):name is string=>Boolean(name));
+    const componentNodes=componentNames.map(name=>directCards().find(node=>node.querySelector('.item-head strong')?.textContent===name)).filter((node):node is HTMLElement=>Boolean(node));if(!componentNodes.length)continue;
+    const choices=document.createElement('details');choices.className='action-choice-group multiattack-components';const summary=document.createElement('summary');summary.append(text('strong','Single attacks & alternatives'),text('small',`${componentNames.join(', ')} can also be used alone when legal`));const list=document.createElement('div');list.className='action-choice-list';componentNodes.forEach(node=>list.append(node));choices.append(summary,list);main.after(choices);
+  }
   if(unarmedCount){const choices=document.createElement('details');choices.className='action-choice-group';const summary=document.createElement('summary');summary.append(text('strong','Unarmed Strike'),text('small','Choose Damage, Grapple, or Shove'));choices.append(summary,unarmedChoices);root.append(choices);}
   if(unavailable.childElementCount){const details=document.createElement('details');details.className='unavailable-actions';details.open=availableCount===0;const summary=document.createElement('summary');summary.textContent=`Unavailable right now (${unavailable.childElementCount})`;details.append(summary,unavailable);root.append(details);}
 }
@@ -1504,8 +1512,14 @@ function revealNextStep(){
   if(!nextStepTarget)return;
   const reveal=nextStepReveal;let target=nextStepTarget;
   if(reveal){document.querySelectorAll<HTMLElement>('.next-step-target').forEach(control=>control.classList.remove('next-step-target'));target=reveal();nextStepTarget=target;nextStepReveal=null;}
-  target.closest('details')?.setAttribute('open','');target.classList.add('next-step-target');target.scrollIntoView({block:'center',behavior:reduceMotion?'auto':'smooth'});
-  window.setTimeout(()=>{if(!target.isConnected){renderNextStepGuide();target=nextStepTarget??$('#next-step-guide');}target.focus();},0);
+  target.closest('details')?.setAttribute('open','');target.classList.add('next-step-target');
+  // Once the requested destination is visible, the guide has completed its job.
+  // Reclaim its dashboard row so compact and folding displays can show the whole control.
+  $('#next-step-guide').hidden=true;
+  window.requestAnimationFrame(()=>{
+    target.scrollIntoView({block:'center',behavior:reduceMotion?'auto':'smooth'});
+    window.setTimeout(()=>{if(!target.isConnected){renderNextStepGuide();target=nextStepTarget??$('#next-step-guide');}target.focus({preventScroll:true});},reduceMotion?0:180);
+  });
 }
 function render(){sheet=resolveSheet(character,state);document.documentElement.dataset.alteredCharacter=character.name;syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderQuickReceivedEffects();renderResources();renderQuickFeatures();renderActiveEffects();renderTab();renderConditions();renderLog();renderNextStepGuide();persist();}
 

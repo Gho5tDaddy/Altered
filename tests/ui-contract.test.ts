@@ -302,8 +302,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.19\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.19\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.19\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.20\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.20\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.20\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
@@ -481,12 +481,14 @@ test('every primary workspace uses consistent names and phone-safe controls',()=
   assert.match(styles,/navigation clarity, touch safety, and active-overlay escape paths/);assert.match(styles,/\.persistent-turn-controls \.button[^}]*min-height:44px/);assert.match(styles,/\.app-shell\.form-active:not\(\.effects-disabled\) \.workspace-view\{overflow:auto\}/);
   assert.equal((html.match(/data-workspace-view="[^\"]+"[^>]*tabindex="0"/g)??[]).length,4);assert.match(styles,/@media\(pointer:coarse\)[\s\S]*min-block-size:44px/);
   assert.match(html,/class="brand-menu-cue"/);assert.match(styles,/\.file-button:focus-within/);assert.match(source,/document\.querySelector\('dialog\[open\]'\)/);
+  assert.match(html,/id="nav-play-label">Play</);assert.match(source,/returning\?'Back to Play':'Play'/);assert.match(source,/\$\('#next-step-guide'\)\.hidden=true/);
 });
 
 test('focused action pages prioritize executable controls without losing advanced choices',()=>{
   const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
   assert.match(source,/function collapseActionOptions/);assert.match(source,/Unavailable right now \(\$\{unavailable\.childElementCount\}\)/);
   assert.match(source,/c\.options\.append\(conditionalRollToggle/);assert.match(styles,/\.action-options-disclosure/);assert.match(styles,/\.unavailable-actions/);
+  assert.match(source,/Single attacks & alternatives/);assert.match(source,/multiattack-components/);
   assert.match(source,/Applied automatically'[\s\S]*open:false/);assert.match(source,/appendControlReason\(actions,toShape/);assert.match(styles,/\.control-block-reason/);
 });
 

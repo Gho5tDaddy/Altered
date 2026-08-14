@@ -1,4 +1,9 @@
-# Altered v0.29.19 release notes
+# Altered v0.29.20 release notes
+
+- Corrects Galaxy Fold folded and unfolded cockpit sizing so persistent artwork and fast-play controls remain visible without overlapping focused tools.
+- “Show me” now reclaims the guidance row after revealing and highlighting its destination, leaving more usable dashboard space.
+- Multiattack component actions are grouped into a clear “Single attacks & alternatives” submenu.
+- The persistent Play navigation changes to “Back to Play” outside the dashboard, providing one consistent escape route without adding another button.
 
 - Added compact next-attack battlefield facts for Pack Tactics and visibility; selections apply once and clear automatically after the attack.
 - Added explicit tracked-effect duration choices, including round, minute, ten-minute, hour, and manual endings. Finite effects expire from the turn counter.
