@@ -2168,6 +2168,7 @@ body::after{
 .ui-status.warning,.ui-status.requirements,.badge.conditional,.badge.warning{color:#fff1b5;border-color:var(--state-warning)}
 .ui-status.error,.ui-status.unavailable,.badge.priority-blocked{color:#ffd7dd;border-color:var(--state-blocked)}
 .ui-status.inactive,.ui-status.locked,.economy-chip.used,.badge.inactive{color:var(--state-inert);border-color:#596372;text-shadow:none;box-shadow:inset 0 0 0 1px rgba(134,145,163,.1)}
+.ui-status.reference{color:#eadfff;border-color:var(--state-passive);background:rgba(101,56,145,.2);text-shadow:none;box-shadow:inset 0 0 0 1px rgba(201,166,255,.14)}
 
 /* Both the OS preference and Altered's setting preserve static, high-contrast cues. */
 .app-shell.reduce-motion .turn-complete-cue,

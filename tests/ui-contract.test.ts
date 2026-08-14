@@ -72,7 +72,7 @@ test('form browsing and visual statuses explain availability without changing fo
   assert.match(source,/const displayedForm=activeForm\?\?previewForm/);
   assert.match(source,/previewing\?'FORM PREVIEW':'BASE FORM'/);
   assert.ok(!source.includes("chip.className='form-preview'"),'selected creature art must use the full portrait frame on narrow layouts');
-  for(const state of ['available','active','inactive','locked','unavailable','requirements','selected','favorite','new','importing','loading','success','warning','error'])assert.match(source,new RegExp(`${state}:\\{icon:`));
+  for(const state of ['available','active','inactive','locked','unavailable','requirements','selected','reference','favorite','new','importing','loading','success','warning','error'])assert.match(source,new RegExp(`${state}:\\{icon:`));
   assert.match(styles,/\.ui-status\.available/);
   assert.match(styles,/\.ui-status\.locked/);
   assert.match(styles,/\.main-form-art img\{/);
@@ -290,8 +290,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.14\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.14\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.14\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.15\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.15\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.15\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{

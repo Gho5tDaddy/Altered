@@ -1,3 +1,10 @@
+# Altered v0.29.15 release notes
+
+- PDF review now keeps the selected-content Add button above the scrolling match list so it remains obvious and reachable on phones.
+- Imported reference-only mechanics use a distinct **Reference** state instead of the alarming **Warning** label.
+- Weapon Mastery reference text now explains that the feature was found, attack and damage totals remain intact, and only the character's chosen mastery weapons could not be verified from structured import data.
+- Android, Windows, macOS/portable, hosted, and standalone builds remain data-compatible with existing characters, combat state, imports, private PDFs, and private packs.
+
 # Altered v0.29.3 release notes
 
 ## Moonlit state clarity and form identity
