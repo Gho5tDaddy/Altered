@@ -30,6 +30,7 @@ for(const name of moduleNames){
 const bundle=`(function(){\n'use strict';\nconst modules={${entries.join(',\n')}};\nconst cache={};\nfunction resolve(from,request){if(!request.startsWith('.'))return request;const parts=from.split('/');parts.pop();for(const part of request.split('/')){if(part==='.'||part==='')continue;if(part==='..')parts.pop();else parts.push(part);}return parts.join('/');}\nfunction load(id){if(cache[id])return cache[id].exports;if(!modules[id])throw new Error('Module not found: '+id);const module={exports:{}};cache[id]=module;const localRequire=request=>load(resolve(id,request));modules[id](localRequire,module,module.exports);return module.exports;}\nload('/src/app.js');\n})();\n`;
 await writeFile(path.join(dist,'app.bundle.js'),bundle);
 await esbuild({entryPoints:[path.join(root,'node_modules','pdfjs-dist','legacy','build','pdf.mjs')],bundle:true,minify:true,format:'iife',globalName:'pdfjsLib',platform:'browser',target:['es2022'],outfile:path.join(dist,'pdf.bundle.js'),logLevel:'silent'});
+await copyFile(path.join(root,'node_modules','pdfjs-dist','build','pdf.worker.min.mjs'),path.join(dist,'pdf.worker.min.mjs'));
 await copyFile(path.join(root,'node_modules','tesseract.js','dist','tesseract.min.js'),path.join(dist,'tesseract.bundle.js'));
 
 let hostedHtml=await readFile(path.join(dist,'index.html'),'utf8');
@@ -66,7 +67,7 @@ const formImages=Object.fromEntries(await Promise.all(publicNames.filter(name=>/
   `/${name}`,
   {type:'image/jpeg',data:(await readFile(path.join(root,'public',name))).toString('base64')},
 ])));
-const toolAssets=Object.fromEntries(await Promise.all(['pdf.bundle.js','tesseract.bundle.js'].map(async name=>[
+const toolAssets=Object.fromEntries(await Promise.all(['pdf.bundle.js','pdf.worker.min.mjs','tesseract.bundle.js'].map(async name=>[
   `/${name}`,
   {type:'text/javascript; charset=utf-8',data:(await readFile(path.join(dist,name))).toString('base64')},
 ])));

@@ -113,7 +113,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.8';
+const APP_VERSION='0.29.9';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -541,6 +541,7 @@ function compactPdfMatchSummary(pageText:string,index:number,name:string){
 function activationFromPrivateText(value:string):ActionCost{const lower=value.toLowerCase();if(/\bbonus action\b/.test(lower))return'bonus';if(/\breaction\b/.test(lower))return'reaction';if(/\bmagic action\b/.test(lower))return'magic-action';if(/\bas an action\b|\btake the action\b/.test(lower))return'action';return'none';}
 async function hostedPrivatePdfDocument(record:PrivatePdfRecord){
   await loadImportScript('./pdf.bundle.js',()=>Boolean(externalWindow.pdfjsLib));const library=externalWindow.pdfjsLib;if(!library)throw new Error('PDF reader did not initialize.');
+  if(library.GlobalWorkerOptions)library.GlobalWorkerOptions.workerSrc='./pdf.worker.min.mjs';
   return library.getDocument({url:`/api/private-pdfs/${encodeURIComponent(record.id)}`,disableWorker:true,withCredentials:true,httpHeaders:privatePdfRequestHeaders(),rangeChunkSize:256*1024,disableStream:true,disableAutoFetch:true}).promise;
 }
 async function findPrivatePdfCharacterMechanics(record:PrivatePdfRecord){
@@ -569,12 +570,12 @@ async function deletePrivatePdf(record:PrivatePdfRecord){
 }
 type PdfPage={getTextContent:()=>Promise<{items:{str?:string}[]}>;getViewport:(options:{scale:number})=>{width:number;height:number};render:(options:{canvasContext:CanvasRenderingContext2D;viewport:{width:number;height:number}})=>{promise:Promise<void>}};
 type PdfDocument={numPages:number;getPage:(page:number)=>Promise<PdfPage>;getFieldObjects?:()=>Promise<Record<string,{value?:unknown}[]>|null>};
-type PdfLibrary={getDocument:(options:{data?:Uint8Array;url?:string;disableWorker:boolean;withCredentials?:boolean;httpHeaders?:Record<string,string>;rangeChunkSize?:number;disableStream?:boolean;disableAutoFetch?:boolean})=>{promise:Promise<PdfDocument>}};
+type PdfLibrary={GlobalWorkerOptions?:{workerSrc:string};getDocument:(options:{data?:Uint8Array;url?:string;disableWorker:boolean;withCredentials?:boolean;httpHeaders?:Record<string,string>;rangeChunkSize?:number;disableStream?:boolean;disableAutoFetch?:boolean})=>{promise:Promise<PdfDocument>}};
 type OcrWorker={recognize:(image:HTMLCanvasElement)=>Promise<{data:{text:string}}>;terminate:()=>Promise<void>};
 type OcrLibrary={createWorker:(language:string,oem?:number,options?:{logger?:(message:{status?:string;progress?:number})=>void})=>Promise<OcrWorker>};
 const externalWindow=window as Window&{pdfjsLib?:PdfLibrary;Tesseract?:OcrLibrary};
 function loadImportScript(src:string,ready:()=>boolean){if(ready())return Promise.resolve();return new Promise<void>((resolve,reject)=>{const existing=document.querySelector<HTMLScriptElement>(`script[data-import-src="${src}"]`);if(existing){existing.addEventListener('load',()=>resolve(),{once:true});existing.addEventListener('error',()=>reject(new Error(`Could not load ${src}.`)),{once:true});return;}const script=document.createElement('script');script.src=src;script.defer=true;script.dataset.importSrc=src;script.onload=()=>resolve();script.onerror=()=>reject(new Error(`Could not load ${src}.`));document.head.append(script);});}
-async function pdfDocument(file:File){if(file.size>20*1024*1024)throw new Error('PDF exceeds the 20 MB safety limit.');await loadImportScript('./pdf.bundle.js',()=>Boolean(externalWindow.pdfjsLib));const library=externalWindow.pdfjsLib;if(!library)throw new Error('PDF reader did not initialize.');return library.getDocument({data:new Uint8Array(await file.arrayBuffer()),disableWorker:true}).promise;}
+async function pdfDocument(file:File){if(file.size>20*1024*1024)throw new Error('PDF exceeds the 20 MB safety limit.');await loadImportScript('./pdf.bundle.js',()=>Boolean(externalWindow.pdfjsLib));const library=externalWindow.pdfjsLib;if(!library)throw new Error('PDF reader did not initialize.');if(library.GlobalWorkerOptions)library.GlobalWorkerOptions.workerSrc='./pdf.worker.min.mjs';return library.getDocument({data:new Uint8Array(await file.arrayBuffer()),disableWorker:true}).promise;}
 async function embeddedPdfText(file:File){const document=await pdfDocument(file);if(document.numPages>20)throw new Error('PDF exceeds the 20-page import safety limit.');const chunks:string[]=[];const fields=await document.getFieldObjects?.();for(const [name,entries] of Object.entries(fields??{}))for(const entry of entries){const value=entry.value;if(typeof value==='string'&&value.trim())chunks.push(`${name}: ${value}`);}for(let pageNumber=1;pageNumber<=document.numPages;pageNumber++){const page=await document.getPage(pageNumber);const content=await page.getTextContent();chunks.push(content.items.map(item=>item.str??'').join(' '));}return chunks.join('\n');}
 function pdfClassLines(draft:PdfCharacterDraft){return draft.classes.map(entry=>`${entry.name} ${entry.level}${entry.subclass?` — ${entry.subclass}`:''}`).join('\n');}
 function renderPdfReview(draft:PdfCharacterDraft){pendingPdfDraft=draft;$('#pdf-import-review').hidden=false;$('#pdf-import-method').textContent=draft.method;$<HTMLInputElement>('#pdf-name').value=draft.name;$<HTMLInputElement>('#pdf-species').value=draft.species;$<HTMLTextAreaElement>('#pdf-classes').value=pdfClassLines(draft);for(const ability of ['str','dex','con','int','wis','cha'] as Ability[])$<HTMLInputElement>(`#pdf-${ability}`).value=draft.abilities[ability]?.toString()??'';$<HTMLInputElement>('#pdf-hp-current').value=draft.hp.current?.toString()??'';$<HTMLInputElement>('#pdf-hp-max').value=draft.hp.max?.toString()??'';$<HTMLInputElement>('#pdf-ac').value=draft.ac?.toString()??'';$<HTMLInputElement>('#pdf-speed').value=draft.speed?.toString()??'';$<HTMLSelectElement>('#pdf-ruleset').value=draft.ruleset;const warnings=$('#pdf-import-warnings');clear(warnings);draft.warnings.forEach(message=>warnings.append(text('div',`⚠ ${message}`)));$('#pdf-import-progress').textContent=`${draft.method} complete. Review and correct every field before importing.`;}
