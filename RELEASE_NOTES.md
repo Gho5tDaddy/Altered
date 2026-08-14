@@ -1,4 +1,9 @@
-# Altered v0.29.16 release notes
+# Altered v0.29.17 release notes
+
+- Added one-tap Guidance and Inspiration shortcuts beside the persistent character profile.
+- Quick Guidance waits for the next skill check and then locks to that chosen skill, preserving the 2024 spell rule without pausing play.
+- The Inspiration shortcut adds Heroic Inspiration, uses it when active, or uses an already-received Bardic Inspiration die.
+- The full Effects & Conditions controls remain available for Bless, specific Guidance skills, sources, and Bardic Inspiration die sizes.
 
 - Added a compact **Effects & Conditions** tracker for Guidance, Bless, Bardic Inspiration, Heroic Inspiration, and ordinary conditions. Active entries remain visibly highlighted until the player ends or uses them; ally-supplied effects never change the character's own Concentration state.
 - Guidance and Bless now add their eligible d4 automatically. Bardic and Heroic Inspiration remain explicit player choices and are consumed only through their labeled controls.

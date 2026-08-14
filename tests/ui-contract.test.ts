@@ -18,6 +18,7 @@ test('received effects stay compact and attacks separate hit from damage',()=>{
   const html=readFileSync('public/index.html','utf8'),source=readFileSync('src/app.ts','utf8'),styles=readFileSync('public/styles.css','utf8');
   assert.match(html,/Effects &amp; Conditions/);assert.match(html,/Guidance/);assert.match(html,/Bardic Inspiration/);
   assert.match(source,/receivedRollBonus\('attack'\)/);assert.match(source,/receivedRollBonus\('skill',/);assert.match(source,/queueDamageRoll/);assert.match(source,/Roll Damage/);assert.match(source,/Miss · Clear/);
+  assert.match(source,/quick-guidance/);assert.match(source,/quick-inspiration/);assert.match(source,/autoChooseSkill/);assert.match(source,/Guidance chose \$\{skill\}/);
   assert.match(styles,/alteredTrackedEffect/);assert.match(styles,/\.app-shell\.reduce-motion \.tracked-active/);
 });
 
@@ -298,8 +299,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.16\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.16\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.16\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.17\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.17\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.17\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{

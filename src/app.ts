@@ -125,7 +125,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.16';
+const APP_VERSION='0.29.17';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -297,7 +297,7 @@ function restore(){
       if(saved.rage&&typeof saved.rage==='object'&&typeof saved.rage.active==='boolean')clean.rage={active:saved.rage.active,endsAtTurn:boundedWhole(saved.rage.endsAtTurn,clean.rage.endsAtTurn,0,1_000_000),usedThisTurn:Boolean(saved.rage.usedThisTurn),recklessDeclared:Boolean(saved.rage.recklessDeclared),extendedThisTurn:Boolean(saved.rage.extendedThisTurn)};
       if(saved.concentration&&typeof saved.concentration.name==='string')clean.concentration={name:saved.concentration.name.slice(0,120),source:safeSavedText(saved.concentration.source,'Unknown',120)};
       if(Array.isArray(saved.activeSpellEffects))clean.activeSpellEffects=saved.activeSpellEffects.filter(effect=>effect&&typeof effect==='object'&&typeof effect.id==='string'&&typeof effect.name==='string'&&typeof effect.duration==='string'&&typeof effect.summary==='string').slice(0,20).map(effect=>({id:effect.id.slice(0,120),name:effect.name.slice(0,120),source:safeSavedText(effect.source,'Unknown',120),duration:effect.duration.slice(0,120),summary:effect.summary.slice(0,300),...(typeof effect.acMinimum==='number'?{acMinimum:boundedWhole(effect.acMinimum,10,1,40)}:{}),...(typeof effect.castLevel==='number'?{castLevel:boundedWhole(effect.castLevel,1,1,9)}:{})}));
-      if(Array.isArray(saved.receivedEffects))clean.receivedEffects=saved.receivedEffects.filter((effect):effect is ReceivedEffect=>Boolean(effect&&typeof effect==='object'&&typeof effect.id==='string'&&typeof effect.kind==='string'&&['guidance','bless','bardic-inspiration','heroic-inspiration'].includes(effect.kind)&&typeof effect.name==='string'&&typeof effect.duration==='string')).slice(0,12).map(effect=>({id:effect.id.slice(0,120),kind:effect.kind,name:effect.name.slice(0,120),source:safeSavedText(effect.source,'Another creature',80),addedTurn:boundedWhole(effect.addedTurn,clean.turn.number,1,1_000_000),duration:effect.duration.slice(0,120),...(typeof effect.skill==='string'?{skill:effect.skill.slice(0,80)}:{}),...([4,6,8,10,12].includes(Number(effect.die))?{die:Number(effect.die) as 4|6|8|10|12}:{})}));
+      if(Array.isArray(saved.receivedEffects))clean.receivedEffects=saved.receivedEffects.filter((effect):effect is ReceivedEffect=>Boolean(effect&&typeof effect==='object'&&typeof effect.id==='string'&&typeof effect.kind==='string'&&['guidance','bless','bardic-inspiration','heroic-inspiration'].includes(effect.kind)&&typeof effect.name==='string'&&typeof effect.duration==='string')).slice(0,12).map(effect=>({id:effect.id.slice(0,120),kind:effect.kind,name:effect.name.slice(0,120),source:safeSavedText(effect.source,'Another creature',80),addedTurn:boundedWhole(effect.addedTurn,clean.turn.number,1,1_000_000),duration:effect.duration.slice(0,120),...(typeof effect.skill==='string'?{skill:effect.skill.slice(0,80)}:{}),...(effect.autoChooseSkill===true?{autoChooseSkill:true}:{}),...([4,6,8,10,12].includes(Number(effect.die))?{die:Number(effect.die) as 4|6|8|10|12}:{})}));
       const legacyCheck=(saved as Partial<GameState>&{pendingConcentration?:unknown}).pendingConcentration;const normalizedLegacy=savedConcentrationCheck(legacyCheck);if(normalizedLegacy)clean.concentrationChecks=[normalizedLegacy];
       if(Array.isArray(saved.concentrationChecks))clean.concentrationChecks=saved.concentrationChecks.map(savedConcentrationCheck).filter((x):x is NonNullable<typeof x>=>Boolean(x)).slice(0,20);
       pendingActiveSnapshot=saved.activeTransform&&typeof saved.activeTransform==='object'?saved.activeTransform:undefined;const savedId=pendingActiveSnapshot?.option?.id;
@@ -985,15 +985,32 @@ type ReceivedRollKind='attack'|'save'|'skill';
 function receivedRollBonus(kind:ReceivedRollKind,skill?:string){
   const applied: string[]=[];let total=0;
   for(const effect of state.receivedEffects){
-    const eligible=effect.kind==='bless'&&(kind==='attack'||kind==='save')||effect.kind==='guidance'&&kind==='skill'&&effect.skill===skill;
+    const quickGuidance=effect.kind==='guidance'&&kind==='skill'&&effect.autoChooseSkill&&!effect.skill&&Boolean(skill);
+    const eligible=effect.kind==='bless'&&(kind==='attack'||kind==='save')||effect.kind==='guidance'&&kind==='skill'&&(effect.skill===skill||quickGuidance);
     if(!eligible)continue;const die=rollDice('1d4').total;total+=die;applied.push(`${effect.name} +${die} [1d4]`);
+    if(quickGuidance&&skill){effect.skill=skill;delete effect.autoChooseSkill;applied.push(`Guidance chose ${skill}`);queueMicrotask(()=>{renderQuickReceivedEffects();renderConditions();persist();});}
   }
   return {total,detail:applied.join(' · ')};
 }
-function receivedEffectSummary(effect:ReceivedEffect){const info=RECEIVED_EFFECTS[effect.kind];return [info.summary,effect.skill?`Chosen skill: ${effect.skill}.`:'',effect.die?`Die: d${effect.die}.`:'',`Duration: ${effect.duration}.`,effect.source?`Source: ${effect.source}.`:'' ].filter(Boolean).join(' ');}
+function receivedEffectSummary(effect:ReceivedEffect){const info=RECEIVED_EFFECTS[effect.kind];return [info.summary,effect.autoChooseSkill?'Waiting for your next skill check; Altered will choose that skill automatically.':'',effect.skill?`Chosen skill: ${effect.skill}.`:'',effect.die?`Die: d${effect.die}.`:'',`Duration: ${effect.duration}.`,effect.source?`Source: ${effect.source}.`:'' ].filter(Boolean).join(' ');}
 function consumeReceivedEffect(effect:ReceivedEffect){
   if(effect.kind==='bardic-inspiration'){const die=effect.die??6,result=rollDice(`1d${die}`).total;applyResult(endReceivedEffect(state,effect.id));showRoll(`+${result}`,`Add ${result} [1d${die}] to the failed D20 Test. Bardic Inspiration is now used.`,`Use ${effect.name}`,{tone:result===die?'exceptional':'high',label:'Received effect used'});return;}
   if(effect.kind==='heroic-inspiration'){const result=rollDice('1d20').total;applyResult(endReceivedEffect(state,effect.id));showRoll(result,`Use this as the new d20 result. Heroic Inspiration is now used.`, `Use ${effect.name}`,d20Presentation(result,result));}
+}
+function quickGuidance(){
+  const active=state.receivedEffects.find(effect=>effect.kind==='guidance');
+  if(active){applyResult(endReceivedEffect(state,active.id));return;}
+  applyResult(addReceivedEffect(state,{id:`received:guidance:${Date.now()}`,kind:'guidance',name:'Guidance',source:'Quick Play',addedTurn:state.turn.number,duration:RECEIVED_EFFECTS.guidance.duration,autoChooseSkill:true}));
+}
+function quickInspiration(){
+  const bardic=state.receivedEffects.find(effect=>effect.kind==='bardic-inspiration');if(bardic){consumeReceivedEffect(bardic);return;}
+  const heroic=state.receivedEffects.find(effect=>effect.kind==='heroic-inspiration');if(heroic){consumeReceivedEffect(heroic);return;}
+  applyResult(addReceivedEffect(state,{id:`received:heroic-inspiration:${Date.now()}`,kind:'heroic-inspiration',name:'Heroic Inspiration',source:'Quick Play',addedTurn:state.turn.number,duration:RECEIVED_EFFECTS['heroic-inspiration'].duration}));
+}
+function renderQuickReceivedEffects(){
+  const guidance=state.receivedEffects.find(effect=>effect.kind==='guidance'),bardic=state.receivedEffects.find(effect=>effect.kind==='bardic-inspiration'),heroic=state.receivedEffects.find(effect=>effect.kind==='heroic-inspiration');
+  const guidanceButton=$<HTMLButtonElement>('#quick-guidance');guidanceButton.classList.toggle('tracked-active',Boolean(guidance));guidanceButton.textContent=guidance?.autoChooseSkill?'Guidance · Next skill':guidance?.skill?`Guidance · ${guidance.skill}`:'Guidance';guidanceButton.setAttribute('aria-pressed',String(Boolean(guidance)));guidanceButton.setAttribute('aria-label',guidance?`End Guidance${guidance.skill?` for ${guidance.skill}`:' waiting for the next skill check'}`:'Add Guidance for the next skill check');
+  const inspirationButton=$<HTMLButtonElement>('#quick-inspiration');const inspiration=bardic??heroic;inspirationButton.classList.toggle('tracked-active',Boolean(inspiration));inspirationButton.textContent=bardic?`Use Inspiration d${bardic.die??6}`:heroic?'Use Inspiration':'Inspiration';inspirationButton.setAttribute('aria-pressed',String(Boolean(inspiration)));inspirationButton.setAttribute('aria-label',bardic?`Roll and use Bardic Inspiration d${bardic.die??6}`:heroic?'Reroll d20 and use Heroic Inspiration':'Add Heroic Inspiration');
 }
 function renderActiveEffects(){
   const root=$<HTMLDetailsElement>('#active-effects');const wasOpen=root.open;clear(root);const cards:HTMLElement[]=[];
@@ -1456,7 +1473,7 @@ function revealNextStep(){
   if(nextStepReveal){document.querySelectorAll<HTMLElement>('.next-step-target').forEach(control=>control.classList.remove('next-step-target'));nextStepTarget=nextStepReveal();nextStepTarget.classList.add('next-step-target');}
   nextStepTarget.scrollIntoView({block:'center',behavior:reduceMotion?'auto':'smooth'});nextStepTarget.focus({preventScroll:true});
 }
-function render(){sheet=resolveSheet(character,state);document.documentElement.dataset.alteredCharacter=character.name;syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderResources();renderQuickFeatures();renderActiveEffects();renderTab();renderConditions();renderLog();renderNextStepGuide();persist();}
+function render(){sheet=resolveSheet(character,state);document.documentElement.dataset.alteredCharacter=character.name;syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderQuickReceivedEffects();renderResources();renderQuickFeatures();renderActiveEffects();renderTab();renderConditions();renderLog();renderNextStepGuide();persist();}
 
 function endCurrentForm(){
   if(!state.activeTransform&&state.overlays.length){const options=availableTransformations(character,state);const overlay=[...options].reverse().find(option=>option.profile==='overlay'&&option.deactivate);if(overlay){selectedOptionId=overlay.id;applyResult(startTransformation(character,state,overlay));return;}}
@@ -1482,6 +1499,8 @@ function initializeControls(){
   $('#open-damage-view').addEventListener('click',()=>openMoreDrawer('Damage'));
   $('#open-conditions-view').addEventListener('click',()=>openMoreDrawer('Effects & Conditions'));
   $('#play-end-form').addEventListener('click',endCurrentForm);
+  $('#quick-guidance').addEventListener('click',quickGuidance);
+  $('#quick-inspiration').addEventListener('click',quickInspiration);
   $('#more-resume-setup').addEventListener('click',resumePrivateSetup);
   $('#more-delete-character').addEventListener('click',()=>{$('#delete-character-name').textContent=character.name;$('#delete-character-status').textContent=baseCharacters.length<=1?'Import or keep at least one other character before deleting this one.':'';$<HTMLDialogElement>('#delete-character-dialog').showModal();});
   $('#create-homebrew-ability').addEventListener('click',()=>openManualPrivateMechanic());

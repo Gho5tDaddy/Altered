@@ -53,6 +53,10 @@
           <small class="persistent-form-open">Open Forms &#8250;</small>
         </button>
         <div id="action-economy" class="action-economy persistent-action-economy" aria-label="Action economy"></div>
+        <div class="persistent-quick-effects" aria-label="Quick effects">
+          <button id="quick-guidance" class="button compact quick-effect-button" type="button">Guidance</button>
+          <button id="quick-inspiration" class="button compact quick-effect-button" type="button">Inspiration</button>
+        </div>
         <button id="play-end-form" class="button secondary compact persistent-end-form" type="button" hidden>End Form</button>
         <div class="persistent-turn-controls" aria-label="Always available turn controls">
           <button id="persistent-new-turn" class="button primary compact" type="button">New Turn</button>
@@ -231,7 +235,7 @@
             <details id="add-received-effect" class="compact-disclosure">
               <summary>Add a buff</summary>
               <div class="received-effect-form">
-                <div><label for="received-effect-kind">Effect</label><select id="received-effect-kind"><option value="guidance">Guidance</option><option value="bless">Bless</option><option value="bardic-inspiration">Bardic Inspiration</option><option value="heroic-inspiration">Heroic Inspiration</option></select></div>
+                <div><label for="received-effect-kind">Effect</label><select id="received-effect-kind"><option value="guidance">Guidance — chosen skill checks</option><option value="bless">Bless — attacks &amp; saves</option><option value="bardic-inspiration">Bardic Inspiration — failed D20 Test</option><option value="heroic-inspiration">Heroic Inspiration — reroll a die</option></select></div>
                 <div><label for="received-effect-source">From</label><input id="received-effect-source" type="text" maxlength="80" placeholder="Ally or source (optional)"></div>
                 <div id="received-effect-skill-field"><label for="received-effect-skill">Guided skill</label><select id="received-effect-skill"></select></div>
                 <div id="received-effect-die-field" hidden><label for="received-effect-die">Inspiration die</label><select id="received-effect-die"><option value="6">d6</option><option value="8">d8</option><option value="10">d10</option><option value="12">d12</option></select></div>

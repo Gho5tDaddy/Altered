@@ -130,7 +130,7 @@ export interface ActiveSpellEffect extends SpellActiveEffect {name:string;source
 export type ReceivedEffectKind='guidance'|'bless'|'bardic-inspiration'|'heroic-inspiration';
 export interface ReceivedEffect {
   id:string;kind:ReceivedEffectKind;name:string;source:string;addedTurn:number;
-  duration:string;remindAtTurn?:number;skill?:string;die?:4|6|8|10|12;
+  duration:string;remindAtTurn?:number;skill?:string;autoChooseSkill?:boolean;die?:4|6|8|10|12;
 }
 export interface ActiveTransform {option:TransformationOption;startedTurn:number;duration:string;tempHpSource:boolean;spellConcentration?:boolean;permanentUntilDispelled?:boolean}
 export interface ActionRecharge {name:string;min:number;max:number}

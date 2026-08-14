@@ -2202,3 +2202,13 @@ body::after{
 /* Keep the decisive PDF review action visible before the independently scrolling matches. */
 .private-pdf-review-actions{position:sticky;top:0;z-index:3;margin:0;padding:8px;border:1px solid color-mix(in srgb,var(--magic-cyan,#62e5df) 42%,var(--line));background:rgba(7,11,14,.96);box-shadow:0 8px 18px rgba(0,0,0,.32)}
 .private-pdf-review-actions .button{min-height:48px}
+
+/* Frequently used received effects stay one tap away without enlarging the Play dashboard. */
+.persistent-quick-effects{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px;padding:4px 8px 0}
+.quick-effect-button{min-width:0;min-height:36px;padding:5px 7px;font-size:.7rem;line-height:1.15;color:var(--state-inert);border-color:#596372;white-space:normal}
+.quick-effect-button.tracked-active{color:#efffff;border-color:var(--state-active);background:linear-gradient(180deg,rgba(33,101,116,.42),rgba(18,29,50,.9));box-shadow:inset 0 0 0 2px rgba(121,247,255,.23),0 0 12px rgba(121,247,255,.32);text-shadow:0 0 7px rgba(121,247,255,.62)}
+@media(pointer:coarse){.quick-effect-button{min-block-size:44px}}
+@media(max-width:340px){.persistent-quick-effects{gap:3px;padding-inline:5px}.quick-effect-button{font-size:.64rem;padding-inline:4px}}
+.app-shell.reduce-motion .quick-effect-button.tracked-active{animation:none!important;filter:none!important}
+@media(prefers-reduced-motion:reduce){.app-shell:not(.motion-forced) .quick-effect-button.tracked-active{animation:none!important;filter:none!important}}
+@media(forced-colors:active){.quick-effect-button.tracked-active{box-shadow:none;border:2px solid Highlight;color:CanvasText}}
