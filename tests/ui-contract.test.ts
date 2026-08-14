@@ -177,6 +177,14 @@ test('hosted release downloads use the platform static-asset binding',()=>{
   assert.match(worker,/url\.pathname\.startsWith\('\/downloads\/'\)&&env\?\.ASSETS\?\.fetch/);
 });
 
+test('private PDFs use account-scoped hosted storage without weakening structured pack validation',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const hosting=JSON.parse(readFileSync('.openai/hosting.json','utf8')) as {r2?:unknown};const owned=readFileSync('src/owned-content.ts','utf8');
+  for(const id of ['private-pdf-file','private-pdf-progress','private-pdf-status','private-pdf-list'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(html,/up to 100 MB/);assert.match(source,/PRIVATE_PDF_LIMIT=100\*1024\*1024/);assert.match(source,/Use for Setup/);assert.match(source,/credentials:'same-origin'/);
+  assert.equal(hosting.r2,'PRIVATE_FILES');assert.match(worker,/maxPrivatePdfBytes=100\*1024\*1024/);assert.match(worker,/privatePdfPrefix\(user\)/);assert.match(worker,/env\?\.PRIVATE_FILES/);assert.match(worker,/oai-authenticated-user-id/);assert.match(worker,/private, no-store/);
+  assert.match(owned,/raw\.length>2_000_000/);
+});
+
 test('account identity and focused workspace stay incremental and accessible',()=>{
   const html=readFileSync('public/index.html','utf8');
   const source=readFileSync('src/app.ts','utf8');

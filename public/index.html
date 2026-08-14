@@ -435,12 +435,21 @@
         </section>
         <section class="import-block">
           <h3>Owned-content pack</h3>
-          <p>Install private mechanics for subclasses, species, spells, magic items, creature forms, and other transformations. No account credentials or web scraping are used.</p>
+          <p>Install a structured Altered JSON pack, or keep an owned reference PDF in your signed-in private library. PDFs remain reference sources until you confirm the mechanics Altered should execute.</p>
           <label class="button primary file-button">Install Private Pack<input id="owned-pack-file" type="file" accept="application/json,.json"></label>
+          <p class="source-note">Private packs are validated JSON files and remain limited to 2 MB. Use the separate PDF control below for large reference documents.</p>
           <div class="inline-actions import-actions">
             <button id="download-pack-template" class="button secondary" type="button">Download Template</button>
             <button id="open-transform-builder" class="button secondary" type="button">Create Transformation</button>
           </div>
+          <section class="private-pdf-library" aria-labelledby="private-pdf-library-title">
+            <div class="section-title"><h4 id="private-pdf-library-title">Private PDF library</h4><span id="private-pdf-count"></span></div>
+            <p>Upload an owned PDF up to 100 MB. It is stored for your Altered login and is available on your other phones, tablets, and computers.</p>
+            <label class="button primary file-button">Upload Private PDF<input id="private-pdf-file" type="file" accept="application/pdf,.pdf"></label>
+            <progress id="private-pdf-progress" max="100" value="0" hidden aria-label="Private PDF upload progress"></progress>
+            <div id="private-pdf-status" class="status" role="status" aria-live="polite"></div>
+            <div id="private-pdf-list" class="private-pdf-list"></div>
+          </section>
         </section>
       </div>
       <section class="installed-packs-section">

@@ -29,7 +29,7 @@ const LOGIN_PAGE=`<!doctype html>
   <p>Rules-aware transformation character sheet</p>
   <p class="purpose">Sign in to open your table dashboard. New users can create a free ChatGPT account on the next screen.</p>
   <a href="/signin-with-chatgpt?return_to=%2F">Sign in or create account</a>
-  <p class="note">Altered never receives or stores your password. Character saves and private content remain on the device where you use them.</p>
+  <p class="note">Altered never receives or stores your password. Account PDFs are private to your sign-in; character saves and structured packs remain device-local.</p>
   <div class="seal"><b>Secure account access</b><span>managed by ChatGPT</span></div>
 </main></body></html>`;
 
@@ -44,6 +44,8 @@ const srdOrigin='https://api.open5e.com';
 const srdDocument='srd-2024';
 const srdVersion='5.2.1';
 const maxSrdResponseBytes=2*1024*1024;
+const maxPrivatePdfBytes=100*1024*1024;
+const privatePdfRoute=/^\/api\/private-pdfs(?:\/([A-Za-z0-9-]{8,80}))?$/;
 const srdDomains=Object.freeze({
   rules:56,classes:24,species:9,backgrounds:4,feats:17,items:203,magicitems:757,
   weapons:38,armor:13,creatures:331,spells:339,weaponproperties:17,
@@ -117,6 +119,34 @@ function guardApiRequest(request,kind,limit){
     if(oldest&&oldest!==key)apiRateWindows.delete(oldest);
   }
   return null;
+}
+
+function privatePdfPrefix(user){return `private-pdfs/${encodeURIComponent(user.id)}/`;}
+function privatePdfFilename(request){
+  const raw=request.headers.get('X-Altered-Filename')??'';let decoded='';try{decoded=decodeURIComponent(raw);}catch{}
+  const safe=identityText(decoded,180).replace(/[\\/:*?"<>|]+/g,'-').replace(/\.+$/,'').trim();
+  return safe.toLowerCase().endsWith('.pdf')?safe:`${safe||'private-reference'}.pdf`;
+}
+function privatePdfDisposition(filename){return `attachment; filename="${filename.replace(/["\\\r\n]/g,'_')}"`;}
+async function handlePrivatePdfs(request,env,user,id){
+  const bucket=env?.PRIVATE_FILES;if(!bucket)return json(503,{error:'Private account storage is not configured yet.'});
+  const prefix=privatePdfPrefix(user);const key=id?`${prefix}${id}`:'';
+  if(!id&&request.method==='GET'){
+    const listing=await bucket.list({prefix,limit:100,include:['customMetadata']});
+    const documents=listing.objects.map(object=>({id:object.key.slice(prefix.length),name:identityText(object.customMetadata?.filename,180)||'Private reference.pdf',size:object.size,uploadedAt:identityText(object.customMetadata?.uploadedAt,40)||object.uploaded?.toISOString?.()||new Date().toISOString()})).filter(record=>record.id).sort((a,b)=>b.uploadedAt.localeCompare(a.uploadedAt));
+    return json(200,{documents});
+  }
+  if(!id)return json(405,{error:'Unsupported private PDF operation.'},{Allow:'GET'});
+  if(request.method==='PUT'){
+    const declared=Number.parseInt(request.headers.get('content-length')??'',10);if(!Number.isFinite(declared)||declared<5)return json(400,{error:'The PDF upload has no valid size.'});if(declared>maxPrivatePdfBytes)return json(413,{error:'PDF exceeds the 100 MB account-storage limit.'});
+    if((request.headers.get('content-type')??'').split(';')[0].trim().toLowerCase()!=='application/pdf')return json(415,{error:'Choose a PDF file.'});if(!request.body)return json(400,{error:'The PDF upload is empty.'});
+    const filename=privatePdfFilename(request);const uploadedAt=new Date().toISOString();await bucket.put(key,request.body,{httpMetadata:{contentType:'application/pdf',contentDisposition:privatePdfDisposition(filename)},customMetadata:{filename,uploadedAt}});return json(201,{id,name:filename,size:declared,uploadedAt});
+  }
+  if(request.method==='GET'||request.method==='HEAD'){
+    const object=await bucket.get(key);if(!object)return json(404,{error:'That private PDF was not found for this account.'});const filename=identityText(object.customMetadata?.filename,180)||'Private reference.pdf';return new Response(request.method==='HEAD'?null:object.body,{headers:{...headers('application/pdf','private, no-store'),'Content-Disposition':privatePdfDisposition(filename),'Content-Length':String(object.size)}});
+  }
+  if(request.method==='DELETE'){await bucket.delete(key);return json(200,{deleted:true});}
+  return json(405,{error:'Unsupported private PDF operation.'},{Allow:'GET, HEAD, PUT, DELETE'});
 }
 
 async function boundedUpstreamJson(url,signal,maxBytes=maxSrdResponseBytes){
@@ -223,10 +253,13 @@ async function proxySrdCatalog(requestUrl){
 
 export default {
   async fetch(request,env){
-    if(request.method!=='GET'&&request.method!=='HEAD'){
-      return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
-    }
     const url=new URL(request.url);
+    const privatePdfMatch=url.pathname.match(privatePdfRoute);
+    if(privatePdfMatch){
+      const operation=request.method==='PUT'?'pdf-upload':request.method==='DELETE'?'pdf-delete':'pdf-read';const limit=request.method==='PUT'?8:60;const blocked=guardApiRequest(request,operation,limit);if(blocked)return blocked;const user=authenticatedUser(request);
+      try{return await handlePrivatePdfs(request,env,user,privatePdfMatch[1]);}catch(error){console.error('Altered private PDF failure',error instanceof Error?`${error.name}: ${error.message}`:'Unknown error');return json(500,{error:'Altered could not complete the private PDF operation.'});}
+    }
+    if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
     const ddbMatch=url.pathname.match(ddbRoute);
     if(ddbMatch?.[1]){
       const blocked=guardApiRequest(request,'ddb',12);
