@@ -1354,7 +1354,6 @@ function initializeControls(){
   $('#open-damage-view').addEventListener('click',()=>openMoreDrawer('Damage'));
   $('#open-conditions-view').addEventListener('click',()=>openMoreDrawer('Conditions'));
   $('#play-end-form').addEventListener('click',endCurrentForm);
-  $('#more-customize').addEventListener('click',()=>openMoreDrawer('Customize'));
   $('#more-resume-setup').addEventListener('click',resumePrivateSetup);
   $('#more-delete-character').addEventListener('click',()=>{$('#delete-character-name').textContent=character.name;$('#delete-character-status').textContent=baseCharacters.length<=1?'Import or keep at least one other character before deleting this one.':'';$<HTMLDialogElement>('#delete-character-dialog').showModal();});
   $('#create-homebrew-ability').addEventListener('click',()=>openManualPrivateMechanic());
