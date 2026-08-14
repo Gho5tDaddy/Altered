@@ -113,10 +113,10 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.6';
+const APP_VERSION='0.29.7';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
-const PRIVATE_PDF_PART_SIZE=10*1024*1024;
+const PRIVATE_PDF_PART_SIZE=5*1024*1024;
 interface PrivatePdfRecord{id:string;name:string;size:number;uploadedAt:string}
 type UiStatus='available'|'active'|'inactive'|'locked'|'unavailable'|'requirements'|'selected'|'favorite'|'new'|'importing'|'loading'|'success'|'warning'|'error';
 const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
@@ -472,7 +472,7 @@ function renderPrivatePdfLibrary(records:PrivatePdfRecord[]){
     const entry=document.createElement('article');entry.className='private-pdf-entry';const details=document.createElement('div');details.append(text('strong',record.name),text('small',`${formatFileSize(record.size)} · saved ${new Date(record.uploadedAt).toLocaleDateString()}`));
     const actions=document.createElement('div');actions.className='private-pdf-entry-actions';
     actions.append(
-      button('Use for Setup',()=>{$<HTMLDialogElement>('#import-dialog').close();openManualPrivateMechanic(`Private PDF: ${record.name}`);},'button primary compact'),
+      button('Read & Set Up',()=>void readPrivatePdfForCharacter(record),'button primary compact'),
       button('Download',()=>void downloadPrivatePdf(record),'button secondary compact'),
       button('Delete',()=>void deletePrivatePdf(record),'button danger compact'),
     );
@@ -516,6 +516,26 @@ async function uploadPrivatePdf(file:File){
 async function downloadPrivatePdf(record:PrivatePdfRecord){
   privatePdfStatus(`Preparing ${record.name}…`);try{const response=await fetch(`/api/private-pdfs/${encodeURIComponent(record.id)}`,{headers:privatePdfRequestHeaders(),credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error(await privatePdfError(response));const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=record.name;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);privatePdfStatus(`${record.name} downloaded.`);}catch(error){privatePdfStatus(`Download failed: ${error instanceof Error?error.message:'Unknown error'}`);}
 }
+async function readPrivatePdfForCharacter(record:PrivatePdfRecord){
+  privatePdfStatus(`Reading ${record.name} for mechanics that match ${character.name}…`);
+  try{
+    const response=await fetch(`/api/private-pdfs/${encodeURIComponent(record.id)}`,{headers:privatePdfRequestHeaders(),credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error(await privatePdfError(response));
+    const file=new File([await response.blob()],record.name,{type:'application/pdf'});const candidate=await findPrivatePdfCharacterMechanic(file);
+    $<HTMLDialogElement>('#import-dialog').close();openManualPrivateMechanic(`Private PDF: ${record.name}`);
+    if(candidate){$<HTMLInputElement>('#private-mechanic-name').value=candidate.name;$<HTMLTextAreaElement>('#private-mechanic-summary').value=candidate.summary;const lower=candidate.summary.toLowerCase();const activation=lower.includes('bonus action')?'bonus':lower.includes('reaction')?'reaction':/\baction\b/.test(lower)?'action':'none';$<HTMLSelectElement>('#private-mechanic-activation').value=activation;$('#private-mechanics-status').textContent=`Altered found “${candidate.name}” in this PDF because it matches the current character. Review the short mechanic below, choose how it behaves, then save it.`;}
+    else $('#private-mechanics-status').textContent='Altered did not find an exact feature-name match for this character in the readable PDF text. Enter the mechanic name, or use a scanned character PDF through Character PDF/OCR.';
+  }catch(error){privatePdfStatus(`Could not read this PDF: ${error instanceof Error?error.message:'Unknown error'}`);}
+}
+async function findPrivatePdfCharacterMechanic(file:File){
+  const targets=[...(pendingDdbImport?.setupNeeds.map(need=>need.label)??[]),...character.features.filter(feature=>feature.automation==='reference'||feature.automation==='unsupported').map(feature=>feature.name)].map(name=>name.trim()).filter((name,index,names)=>name.length>=3&&names.findIndex(value=>value.toLowerCase()===name.toLowerCase())===index);
+  if(!targets.length)return null;const pdf=await pdfDocument(file);const pageLimit=Math.min(pdf.numPages,300);
+  for(let pageNumber=1;pageNumber<=pageLimit;pageNumber++){
+    privatePdfStatus(`Reading ${recordSafeName(file.name)}: page ${pageNumber} of ${pageLimit}…`);const page=await pdf.getPage(pageNumber);const content=await page.getTextContent();const pageText=content.items.map(item=>item.str??'').join(' ').replace(/\s+/g,' ').trim();const lower=pageText.toLowerCase();
+    for(const name of targets){const index=lower.indexOf(name.toLowerCase());if(index<0)continue;const start=Math.max(0,index-100);const summary=pageText.slice(start,Math.min(pageText.length,index+name.length+900)).trim();return {name,summary:summary.slice(0,1000)};}
+  }
+  return null;
+}
+function recordSafeName(name:string){return name.length>48?`${name.slice(0,45)}…`:name;}
 async function deletePrivatePdf(record:PrivatePdfRecord){
   if(!window.confirm(`Delete ${record.name} from your Altered account? This removes it from every device.`))return;privatePdfStatus(`Deleting ${record.name}…`);try{const response=await fetch(`/api/private-pdfs/${encodeURIComponent(record.id)}`,{method:'DELETE',headers:privatePdfRequestHeaders(),credentials:'same-origin'});if(!response.ok)throw new Error(await privatePdfError(response));await refreshPrivatePdfLibrary();privatePdfStatus(`${record.name} deleted from your account.`);}catch(error){privatePdfStatus(`Delete failed: ${error instanceof Error?error.message:'Unknown error'}`);}
 }
@@ -1404,7 +1424,7 @@ function initializeControls(){
   $('#resume-private-setup').addEventListener('click',resumePrivateSetup);
   $('#start-new-import').addEventListener('click',()=>{void clearPendingDdbImport();$<HTMLInputElement>('#dndbeyond-source').value='';setImportStatus('Ready for a different public D&D Beyond character link or ID.');$<HTMLInputElement>('#dndbeyond-source').focus();});
   const closeDelete=()=>$<HTMLDialogElement>('#delete-character-dialog').close();$('#close-delete-character').addEventListener('click',closeDelete);$('#cancel-delete-character').addEventListener('click',closeDelete);$('#confirm-delete-character').addEventListener('click',deleteCurrentCharacter);
-  $('#owned-pack-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{const pack=safeOwnedContentParse(await file.text());const result=await installAndApplyPack(pack);setImportStatus(result.applied?`${pack.metadata.name} installed and applied to ${character.name}. ${packCounts(pack)}.`:`${pack.metadata.name} installed. It does not match ${character.name}, so the current sheet was not changed.`);renderSettings();}catch(error){setImportStatus(`Pack installation failed: ${error instanceof Error?error.message:'Unknown error'}`);}finally{input.value='';}});
+  $('#owned-pack-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf')){setImportStatus('That is a PDF. Use “Upload Owned PDF” below; Altered will store it privately and cross-reference it with the selected character.');$<HTMLInputElement>('#private-pdf-file').focus();return;}const pack=safeOwnedContentParse(await file.text());const result=await installAndApplyPack(pack);setImportStatus(result.applied?`${pack.metadata.name} installed and applied to ${character.name}. ${packCounts(pack)}.`:`${pack.metadata.name} installed. It does not match ${character.name}, so the current sheet was not changed.`);renderSettings();}catch(error){setImportStatus(`JSON rules-pack installation failed: ${error instanceof Error?error.message:'Unknown error'}`);}finally{input.value='';}});
   $('#private-pdf-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{await uploadPrivatePdf(file);await refreshPrivatePdfLibrary();}catch(error){privatePdfStatus(`Upload failed: ${error instanceof Error?error.message:'Unknown error'}`);}finally{input.value='';}});
   $('#download-pack-template').addEventListener('click',()=>downloadJson(ownedContentTemplate(character),`${slug(character.name)}-private-content-template.json`));
   $('#open-transform-builder').addEventListener('click',()=>{populateBuilderClassOptions();syncBuilderGuidance();setBuilderStatus('Start with Quick setup, then keep only mechanics confirmed by your source. Advanced fields are optional.');$<HTMLDialogElement>('#transform-builder-dialog').showModal();});

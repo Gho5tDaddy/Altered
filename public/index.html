@@ -346,7 +346,7 @@
         </details>
         <details class="help-topic" data-help-keywords="faq save offline paid content phone delete reset">
           <summary><span aria-hidden="true">?</span> FAQ</summary>
-          <p><strong>Does it save?</strong> Yes, locally. <strong>Does it work offline?</strong> The installed PWA keeps its validated built-in rules. <strong>Does it copy paid books?</strong> No; <strong>Needs Setup</strong> stores only your short private mechanical confirmations. <strong>Can I use a phone?</strong> Yes; use the hosted link from any current phone browser.</p>
+          <p><strong>Does it save?</strong> Characters and validated JSON rules packs stay on the device; owned PDFs are private to your Altered login across devices. <strong>Does it work offline?</strong> The installed PWA keeps its validated built-in rules. <strong>How do PDFs affect a sheet?</strong> Altered cross-references readable feature names with the linked character’s current class, subclass, species, and level, then asks you to confirm the short mechanic before applying it. <strong>Can I use a phone?</strong> Yes; use the hosted link from any current phone browser.</p>
         </details>
         <details class="help-topic" data-help-keywords="about version privacy legal rules 2024">
           <summary><span aria-hidden="true">A</span> About</summary>
@@ -368,7 +368,7 @@
   <dialog id="import-dialog" class="wide-dialog" aria-labelledby="import-dialog-title">
     <div class="dialog-card import-center">
       <div class="section-title"><h2 id="import-dialog-title">Import & Private Content</h2><button id="close-import-center" class="text-button" type="button">Close</button></div>
-      <p class="import-intro">Character data and private owned-content packs are kept separate. Packs stay on this device and are applied only when their character, class, subclass, level, or species match.</p>
+      <p class="import-intro">Start with the character sheet, then add only matching owned rules. JSON rules packs stay on this device. Owned PDFs stay private to your login and are cross-referenced against the selected character before any mechanic is applied.</p>
       <section id="import-resume-panel" class="import-resume-panel" aria-live="polite" hidden>
         <div><strong id="import-resume-title">Unfinished content setup saved</strong><small id="import-resume-detail">Return to the next unanswered mechanic.</small></div>
         <div class="inline-actions"><button id="resume-private-setup" class="button primary compact" type="button">Resume Setup</button><button id="start-new-import" class="button secondary compact" type="button">Start Different Import</button></div>
@@ -433,18 +433,18 @@
           </section>
         </section>
         <section class="import-block">
-          <h3>Owned-content pack</h3>
-          <p>Install a structured Altered JSON pack, or keep an owned reference PDF in your signed-in private library. PDFs remain reference sources until you confirm the mechanics Altered should execute.</p>
-          <label class="button primary file-button">Install Private Pack<input id="owned-pack-file" type="file" accept="application/json,.json"></label>
-          <p class="source-note">Private packs are validated JSON files and remain limited to 2 MB. Use the separate PDF control below for large reference documents.</p>
+          <h3>Add owned game content</h3>
+          <p><strong>Choose by file type:</strong> JSON installs already-structured rules. PDF stores your owned document, reads matching character features, and guides you through a short review before applying mechanics.</p>
+          <label class="button primary file-button">Install JSON Rules Pack<input id="owned-pack-file" type="file" accept="application/json,.json"></label>
+          <p class="source-note"><strong>JSON only:</strong> validated Altered rules packs up to 2 MB. For any PDF, use the clearly labeled PDF control below.</p>
           <div class="inline-actions import-actions">
             <button id="download-pack-template" class="button secondary" type="button">Download Template</button>
             <button id="open-transform-builder" class="button secondary" type="button">Create Transformation</button>
           </div>
           <section class="private-pdf-library" aria-labelledby="private-pdf-library-title">
-            <div class="section-title"><h4 id="private-pdf-library-title">Private PDF library</h4><span id="private-pdf-count"></span></div>
-            <p>Upload an owned PDF up to 500 MB. Altered transfers large files in reliable pieces, then stores one private copy for your login across phones, tablets, and computers.</p>
-            <label class="button primary file-button">Upload Private PDF<input id="private-pdf-file" type="file" accept="application/pdf,.pdf"></label>
+            <div class="section-title"><h4 id="private-pdf-library-title">Owned PDF — read &amp; apply</h4><span id="private-pdf-count"></span></div>
+            <p>Upload an owned PDF up to 500 MB. Altered stores it privately for your login, then <strong>Read &amp; Set Up</strong> matches readable feature names to the current character’s class, subclass, species, and level. You confirm mechanics before they change the sheet.</p>
+            <label class="button primary file-button">Upload Owned PDF<input id="private-pdf-file" type="file" accept="application/pdf,.pdf"></label>
             <progress id="private-pdf-progress" max="100" value="0" hidden aria-label="Private PDF upload progress"></progress>
             <div id="private-pdf-status" class="status" role="status" aria-live="polite"></div>
             <div id="private-pdf-list" class="private-pdf-list"></div>

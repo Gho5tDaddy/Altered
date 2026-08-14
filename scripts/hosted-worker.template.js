@@ -45,7 +45,7 @@ const srdDocument='srd-2024';
 const srdVersion='5.2.1';
 const maxSrdResponseBytes=2*1024*1024;
 const maxPrivatePdfBytes=500*1024*1024;
-const maxPrivatePdfPartBytes=10*1024*1024;
+const maxPrivatePdfPartBytes=5*1024*1024;
 const maxPrivatePdfParts=Math.ceil(maxPrivatePdfBytes/maxPrivatePdfPartBytes);
 const privatePdfRoute=/^\/api\/private-pdfs(?:\/([A-Za-z0-9-]{8,80}))?$/;
 const srdDomains=Object.freeze({
@@ -130,6 +130,16 @@ function privatePdfFilename(request){
   return safe.toLowerCase().endsWith('.pdf')?safe:`${safe||'private-reference'}.pdf`;
 }
 function privatePdfDisposition(filename){return `attachment; filename="${filename.replace(/["\\\r\n]/g,'_')}"`;}
+function privatePdfUploadId(url){
+  const value=url.searchParams.get('uploadId')??'';
+  return value&&value.length<=2048&&!/[\u0000-\u001f\u007f]/.test(value)?value:'';
+}
+function privatePdfOperationError(error){
+  const message=error instanceof Error?error.message:'';
+  if(/multipart upload does not exist|10024/i.test(message))return json(409,{error:'The secure upload session was not recognized. Start the PDF upload again.'});
+  if(/network connection lost/i.test(message))return json(503,{error:'The PDF connection was interrupted. Altered will retry each piece automatically.'});
+  return json(500,{error:'Altered could not complete the private PDF operation.'});
+}
 async function handlePrivatePdfs(request,env,user,id){
   const bucket=env?.PRIVATE_FILES;if(!bucket)return json(503,{error:'Private account storage is not configured yet.'});
   const prefix=privatePdfPrefix(user);const key=id?`${prefix}${id}`:'';const url=new URL(request.url);const action=url.searchParams.get('action')??'';
@@ -144,18 +154,18 @@ async function handlePrivatePdfs(request,env,user,id){
     const filename=privatePdfFilename(request);const uploadedAt=new Date().toISOString();const upload=await bucket.createMultipartUpload(key,{httpMetadata:{contentType:'application/pdf',contentDisposition:privatePdfDisposition(filename)},customMetadata:{filename,uploadedAt,declaredSize:String(declared)}});return json(201,{id,uploadId:upload.uploadId});
   }
   if(request.method==='PUT'&&action==='part'){
-    const uploadId=identityText(url.searchParams.get('uploadId'),256);const partNumber=Number.parseInt(url.searchParams.get('partNumber')??'',10);const declared=Number.parseInt(request.headers.get('X-Altered-Part-Size')??request.headers.get('content-length')??'',10);
-    if(!uploadId||!Number.isInteger(partNumber)||partNumber<1||partNumber>maxPrivatePdfParts)return json(400,{error:'The PDF upload part is invalid.'});if(!Number.isFinite(declared)||declared<1||declared>maxPrivatePdfPartBytes)return json(413,{error:'The PDF upload part exceeds 10 MB.'});if(!request.body)return json(400,{error:'The PDF upload part is empty.'});
+    const uploadId=privatePdfUploadId(url);const partNumber=Number.parseInt(url.searchParams.get('partNumber')??'',10);const declared=Number.parseInt(request.headers.get('X-Altered-Part-Size')??request.headers.get('content-length')??'',10);
+    if(!uploadId||!Number.isInteger(partNumber)||partNumber<1||partNumber>maxPrivatePdfParts)return json(400,{error:'The PDF upload part is invalid.'});if(!Number.isFinite(declared)||declared<1||declared>maxPrivatePdfPartBytes)return json(413,{error:'The PDF upload part exceeds 5 MB.'});if(!request.body)return json(400,{error:'The PDF upload part is empty.'});
     let value=request.body;if(partNumber===1){const bytes=new Uint8Array(await request.arrayBuffer());if(bytes.length<5||String.fromCharCode(...bytes.slice(0,5))!=='%PDF-')return json(415,{error:'Choose a valid PDF file.'});value=bytes;}
     const uploaded=await bucket.resumeMultipartUpload(key,uploadId).uploadPart(partNumber,value);return json(200,{partNumber:uploaded.partNumber,etag:uploaded.etag});
   }
   if(request.method==='POST'&&action==='complete'){
-    const uploadId=identityText(url.searchParams.get('uploadId'),256);if(!uploadId)return json(400,{error:'The PDF upload session is missing.'});const body=await request.json();const parts=Array.isArray(body?.parts)?body.parts:[];
+    const uploadId=privatePdfUploadId(url);if(!uploadId)return json(400,{error:'The PDF upload session is missing.'});const body=await request.json();const parts=Array.isArray(body?.parts)?body.parts:[];
     if(!parts.length||parts.length>maxPrivatePdfParts||new Set(parts.map(part=>part?.partNumber)).size!==parts.length||parts.some(part=>!Number.isInteger(part?.partNumber)||part.partNumber<1||part.partNumber>maxPrivatePdfParts||typeof part?.etag!=='string'||part.etag.length>256))return json(400,{error:'The PDF upload confirmation is invalid.'});
     const object=await bucket.resumeMultipartUpload(key,uploadId).complete(parts);if(object.size>maxPrivatePdfBytes){await bucket.delete(key);return json(413,{error:'PDF exceeds the 500 MB account-storage limit.'});}return json(201,{id,size:object.size});
   }
   if(request.method==='DELETE'&&action==='abort'){
-    const uploadId=identityText(url.searchParams.get('uploadId'),256);if(!uploadId)return json(400,{error:'The PDF upload session is missing.'});await bucket.resumeMultipartUpload(key,uploadId).abort();return json(200,{aborted:true});
+    const uploadId=privatePdfUploadId(url);if(!uploadId)return json(400,{error:'The PDF upload session is missing.'});try{await bucket.resumeMultipartUpload(key,uploadId).abort();}catch(error){if(!/multipart upload does not exist|10024/i.test(error instanceof Error?error.message:''))throw error;}return json(200,{aborted:true});
   }
   if(request.method==='GET'||request.method==='HEAD'){
     const object=await bucket.get(key);if(!object)return json(404,{error:'That private PDF was not found for this account.'});const filename=identityText(object.customMetadata?.filename,180)||'Private reference.pdf';return new Response(request.method==='HEAD'?null:object.body,{headers:{...headers('application/pdf','private, no-store'),'Content-Disposition':privatePdfDisposition(filename),'Content-Length':String(object.size)}});
@@ -272,7 +282,7 @@ export default {
     const privatePdfMatch=url.pathname.match(privatePdfRoute);
     if(privatePdfMatch){
       const operation=request.method==='PUT'?'pdf-upload-part':request.method==='POST'?'pdf-upload-control':request.method==='DELETE'?'pdf-delete':'pdf-read';const limit=request.method==='PUT'?180:60;const blocked=guardApiRequest(request,operation,limit);if(blocked)return blocked;const user=authenticatedUser(request);
-      try{return await handlePrivatePdfs(request,env,user,privatePdfMatch[1]);}catch(error){console.error('Altered private PDF failure',error instanceof Error?`${error.name}: ${error.message}`:'Unknown error');return json(500,{error:'Altered could not complete the private PDF operation.'});}
+      try{return await handlePrivatePdfs(request,env,user,privatePdfMatch[1]);}catch(error){console.error('Altered private PDF failure',error instanceof Error?`${error.name}: ${error.message}`:'Unknown error');return privatePdfOperationError(error);}
     }
     if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
     const ddbMatch=url.pathname.match(ddbRoute);
