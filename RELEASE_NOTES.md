@@ -1,3 +1,19 @@
+# Altered v0.29.19 release notes
+
+- Added compact next-attack battlefield facts for Pack Tactics and visibility; selections apply once and clear automatically after the attack.
+- Added explicit tracked-effect duration choices, including round, minute, ten-minute, hour, and manual endings. Finite effects expire from the turn counter.
+- Added a concise Rules Confidence panel that distinguishes audited 2024 mechanics, current character imports, and user-confirmed private material.
+- Preserved the v0.29.18 Initiative, Inspiration, Unarmed Strike, turn undo, Show Me, and Fold-layout improvements without adding an encounter mode.
+
+# Altered v0.29.18 release notes
+
+- Added persistent one-tap Initiative beside Guidance and Inspiration; rolling Initiative resets the combat tracker to Turn 1.
+- Heroic Inspiration can now be readied for the next d20 roll and is automatically consumed using the required new roll. Guidance remains correctly limited to its chosen skill check under the 2024 rules.
+- Grouped Unarmed Strike into a single Damage, Grapple, or Shove choice to reduce action-list clutter.
+- Added an eight-second Undo after New Turn or End Turn and automatic expiration for tracked round/minute spell and received effects.
+- Strengthened End Turn guidance and corrected Show Me so it reveals, highlights, scrolls to, and focuses the intended control.
+- Improved Fold-width action-economy labels and quick controls without changing saved character data or the rules engine architecture.
+
 # Altered v0.29.17 release notes
 
 - Added one-tap Guidance and Inspiration shortcuts beside the persistent character profile.

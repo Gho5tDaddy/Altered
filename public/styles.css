@@ -1291,6 +1291,7 @@ input{
 /* Received effects share the existing compact Conditions workflow. */
 .received-effect-list{display:grid;gap:7px;margin:7px 0}.received-effect-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:center;padding:10px;border:1px solid var(--state-active,#79f7ff);background:linear-gradient(135deg,rgba(16,39,42,.9),rgba(31,23,48,.88));clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
 .received-effect-entry strong,.received-effect-entry small{display:block}.received-effect-entry strong{color:#e9ffff}.received-effect-entry small{margin-top:3px;color:#c9e7ee;line-height:1.38}.received-effect-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px}.compact-disclosure{margin-top:8px;border:1px solid var(--line);background:rgba(8,12,15,.62)}.compact-disclosure>summary{min-height:44px;display:flex;align-items:center;padding:8px 10px;cursor:pointer;color:var(--accent-2);font-weight:800}.received-effect-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 10px 10px}.received-effect-form .button{grid-column:1/-1}.effect-help{margin:8px 0}.condition-heading{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}.compact-empty{margin:0;padding:8px}.condition-effect-card{border-color:var(--state-warning,#ffd36b)}
+.battlefield-facts{border-color:color-mix(in srgb,var(--state-warning,#ffd36b) 40%,var(--line));margin-bottom:.75rem}.battlefield-facts>summary{justify-content:space-between;gap:.75rem}.battlefield-facts>summary small{color:var(--muted);font-weight:600}.battlefield-facts.tracked-active{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--state-warning,#ffd36b) 65%,transparent),0 0 12px color-mix(in srgb,var(--state-warning,#ffd36b) 18%,transparent)}.battlefield-fact-grid{display:grid;gap:.55rem;padding:.7rem .65rem .25rem}.battlefield-fact-grid label{display:flex;align-items:flex-start;gap:.65rem;min-block-size:44px;padding:.55rem .65rem;border:1px solid var(--line);border-radius:.55rem;background:rgba(20,24,29,.72)}.battlefield-fact-grid input{flex:0 0 auto;margin-top:.15rem}.rules-confidence{display:grid;grid-template-columns:1fr auto;gap:.45rem .75rem;align-items:center}.rules-confidence p,.rules-confidence small{grid-column:1/-1;margin:0}
 .tracked-active{--tracked-glow:var(--state-active,#79f7ff);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--tracked-glow) 68%,transparent),0 0 15px color-mix(in srgb,var(--tracked-glow) 34%,transparent)}
 .condition-chip.tracked-active{--tracked-glow:var(--state-warning,#ffd36b)}
 .app-shell:not(.reduce-motion):not(.effects-disabled) .tracked-active{animation:alteredTrackedEffect 2.4s ease-in-out infinite}
@@ -2209,6 +2210,24 @@ body::after{
 .quick-effect-button.tracked-active{color:#efffff;border-color:var(--state-active);background:linear-gradient(180deg,rgba(33,101,116,.42),rgba(18,29,50,.9));box-shadow:inset 0 0 0 2px rgba(121,247,255,.23),0 0 12px rgba(121,247,255,.32);text-shadow:0 0 7px rgba(121,247,255,.62)}
 @media(pointer:coarse){.quick-effect-button{min-block-size:44px}}
 @media(max-width:340px){.persistent-quick-effects{gap:3px;padding-inline:5px}.quick-effect-button{font-size:.64rem;padding-inline:4px}}
+
+/* Fast-play controls, turn recovery, and compact official choice groups. */
+.persistent-quick-effects{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.quick-initiative{grid-column:1/-1}
+.persistent-undo-turn{grid-column:1/-1;min-height:32px;color:var(--state-warning,#ffd36b);border:1px solid color-mix(in srgb,var(--state-warning,#ffd36b) 65%,transparent)}
+.action-choice-group{margin:10px 0;border:1px solid color-mix(in srgb,var(--accent-2) 55%,transparent);border-radius:12px;background:rgba(13,19,24,.86);overflow:hidden}
+.action-choice-group>summary{min-height:48px;padding:10px 14px;display:grid;gap:2px;align-content:center;cursor:pointer;list-style:none;box-shadow:inset 0 0 0 1px rgba(121,247,255,.12)}
+.action-choice-group>summary::-webkit-details-marker{display:none}
+.action-choice-group>summary::after{content:'+';grid-column:2;grid-row:1/3;align-self:center;justify-self:end;color:var(--accent-2);font-size:1.25rem}
+.action-choice-group[open]>summary::after{content:'−'}
+.action-choice-group>summary strong{font-size:1.05rem}.action-choice-group>summary small{color:var(--muted)}
+.action-choice-list{padding:8px;display:grid;gap:8px}
+#persistent-end-turn.turn-complete-cue,#persistent-end-turn.next-step-target{color:#efffff;border-color:#72f2ff;box-shadow:inset 0 0 0 2px rgba(114,242,255,.88),0 0 18px rgba(76,222,255,.62)!important;background:linear-gradient(180deg,rgba(14,89,99,.96),rgba(7,25,35,.98))}
+.app-shell.reduce-motion #persistent-end-turn.turn-complete-cue,.app-shell.reduce-motion #persistent-end-turn.next-step-target{animation:none!important;transform:none!important;filter:none!important}
+@media(prefers-reduced-motion:reduce){.app-shell:not(.motion-forced) #persistent-end-turn.turn-complete-cue,.app-shell:not(.motion-forced) #persistent-end-turn.next-step-target{animation:none!important;transform:none!important;filter:none!important}}
+@media(min-width:820px) and (max-width:1180px){.persistent-action-economy .economy-chip{white-space:normal;text-overflow:clip;line-height:1.15;min-height:29px}.persistent-quick-effects{padding-inline:5px}}
+@media(max-width:390px){.persistent-action-economy .economy-chip{font-size:.625rem;white-space:normal;text-overflow:clip;line-height:1.1}.quick-effect-button{min-height:40px}}
+@media(forced-colors:active){#persistent-end-turn.turn-complete-cue,#persistent-end-turn.next-step-target{animation:none!important;box-shadow:none!important;border:2px solid Highlight}.action-choice-group{border:1px solid CanvasText}}
 .app-shell.reduce-motion .quick-effect-button.tracked-active{animation:none!important;filter:none!important}
 @media(prefers-reduced-motion:reduce){.app-shell:not(.motion-forced) .quick-effect-button.tracked-active{animation:none!important;filter:none!important}}
 @media(forced-colors:active){.quick-effect-button.tracked-active{box-shadow:none;border:2px solid Highlight;color:CanvasText}}

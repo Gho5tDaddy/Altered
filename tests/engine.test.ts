@@ -5,7 +5,7 @@ import {CLASS_FEATURES,CREATURES,SPECIES_FEATURES,SUBCLASS_FEATURES} from '../sr
 import {parseCharacter} from '../src/schema.js';
 import {
   applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,criticalDiceExpression,criticalHitThreshold,deathSaveMode,declareRecklessAttack,
-  actionExecutionError,addReceivedEffect,clearConditions,declareAttack,endConcentration,endReceivedEffect,endSpellEffect,endTransformation,endTurn,extendRage,extraAttackCount,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,removeCondition,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,spendActionExecution,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
+  actionExecutionError,addReceivedEffect,clearConditions,declareAttack,endConcentration,endReceivedEffect,endSpellEffect,endTransformation,endTurn,extendRage,extraAttackCount,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,removeCondition,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,spendActionExecution,startCombat,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
 } from '../src/engine.js';
 
 function must<T>(value:T|undefined):T{if(value===undefined)throw new Error('Expected value was missing.');return value}
@@ -690,4 +690,13 @@ test('received effects initialize safely, replace duplicates, and end explicitly
 test('2024 Monk weapons use the Martial Arts die and magic bonus for attack and damage',()=>{
   const monk=character({classes:[{name:'Monk',level:6,subclass:'Warrior of the Elements'}],totalLevel:6,abilities:{str:10,dex:16,con:12,int:10,wis:16,cha:8},knownForms:[],seenForms:[],spells:[],spellSlots:{},equipment:{armorCategory:'none',shield:false,transformBehavior:'merge'},items:[{id:'staff-plus-one',name:'Quarterstaff, +1',type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d6',damageType:'Bludgeoning',proficient:true,properties:['Versatile'],magicBonus:1}}]});
   const staff=resolveSheet(monk,createInitialState(monk)).actions.find(action=>action.id==='item-attack-staff-plus-one');assert.ok(staff?.type==='attack');if(staff.type==='attack'){assert.equal(staff.ability,'dex');assert.equal(staff.attackBonus,7);assert.equal(staff.damage[0]?.expression,'1d8+4');assert.match(staff.notes??'',/magic weapon bonus to attack and damage/);assert.match(staff.notes??'',/Martial Arts 1d8/);}
+});
+
+test('initiative starts turn one and finite tracked effects expire at their turn duration',()=>{
+  const state=createInitialState(character());state.turn.number=8;state.turn.actionsRemaining=0;state.turn.bonusRemaining=0;
+  startCombat(state);assert.equal(state.turn.number,1);assert.equal(state.turn.actionsRemaining,1);assert.equal(state.turn.bonusRemaining,1);
+  state.activeSpellEffects.push({id:'minute-effect',name:'Minute Effect',source:'Test',duration:'Up to 1 minute',summary:'Test',startedTurn:1});
+  addReceivedEffect(state,{id:'round-effect',kind:'guidance',name:'Round Effect',source:'Test',addedTurn:1,duration:'1 round',skill:'Perception'});
+  const second=startNewTurn(state);assert.match(second.message,/Round Effect expired/);assert.equal(state.receivedEffects.length,0);assert.equal(state.activeSpellEffects.length,1);
+  for(let turn=0;turn<9;turn++)startNewTurn(state);assert.equal(state.turn.number,11);assert.equal(state.activeSpellEffects.length,0);
 });

@@ -538,6 +538,20 @@ function restoreTurnBudget(state:GameState,advance=false){
   state.turn={number:state.turn.number+(advance?1:0),actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,slotSpellCast:false,attackRollsMade:0,oncePerTurn:{}};
   state.rage.usedThisTurn=false;state.rage.recklessDeclared=false;state.rage.extendedThisTurn=false;
 }
+function finiteDurationTurns(duration:string){
+  const value=normalized(duration);const match=value.match(/(?:up to\s+)?(\d+)\s*(round|minute|hour)s?/);if(!match)return undefined;
+  const amount=boundedWhole(Number(match[1]),1,1,24*60);return match[2]==='round'?amount:match[2]==='minute'?amount*10:amount*600;
+}
+function expireTurnEffects(state:GameState){
+  const expired:string[]=[];
+  state.activeSpellEffects=state.activeSpellEffects.filter(effect=>{const turns=finiteDurationTurns(effect.duration);const ended=turns!==undefined&&effect.startedTurn!==undefined&&state.turn.number-effect.startedTurn>=turns;if(ended)expired.push(effect.name);return !ended;});
+  state.receivedEffects=state.receivedEffects.filter(effect=>{const turns=finiteDurationTurns(effect.duration);const ended=turns!==undefined&&state.turn.number-effect.addedTurn>=turns;if(ended)expired.push(effect.name);return !ended;});
+  if(state.concentration&&expired.includes(state.concentration.name))delete state.concentration;
+  return [...new Set(expired)];
+}
+export function startCombat(state:GameState):TransitionResult{
+  restoreTurnBudget(state);state.turn.number=1;return {state,message:'Initiative rolled; combat turn counter reset to Turn 1.'};
+}
 export function startNewTurn(state:GameState,rechargeRoll=()=>rollDice('1d6').total):TransitionResult{
   restoreTurnBudget(state,true);
   const rechargeMessages:string[]=[];
@@ -546,7 +560,8 @@ export function startNewTurn(state:GameState,rechargeRoll=()=>rollDice('1d6').to
     if(roll>=pending.min){delete state.recharges[key];rechargeMessages.push(`${pending.name} recharged on ${roll}.`);}
     else rechargeMessages.push(`${pending.name} recharge rolled ${roll}; it needs ${pending.min}–${pending.max}.`);
   }
-  return {state,message:`Turn ${state.turn.number} started.${rechargeMessages.length?` ${rechargeMessages.join(' ')}`:''}`};
+  const expired=expireTurnEffects(state);
+  return {state,message:`Turn ${state.turn.number} started.${expired.length?` ${expired.join(', ')} expired and were removed.`:''}${rechargeMessages.length?` ${rechargeMessages.join(' ')}`:''}`};
 }
 export function endTurn(character:Character,state:GameState):TransitionResult{
   if(state.rage.active&&classLevel(character,'Barbarian')<15&&state.turn.number>=state.rage.endsAtTurn)return endRage(state,'Rage ended because it was not extended.');
@@ -714,7 +729,7 @@ export function castSpell(character:Character,state:GameState,spellName:string,c
   spendActionCost(state,spell.castingTime,immunities);if(usedLevel>0){consumeSpellSlot(state,usedLevel);state.turn.slotSpellCast=true;}
   if((spell.components??'').toUpperCase().includes('V'))state.conditions=state.conditions.filter(condition=>condition!=='Hidden');
   if(spell.concentration){if(state.concentration)endConcentration(state,'A new Concentration spell was cast.',character);state.concentration={name:spell.name,source:spell.sourceClass,...(usedLevel?{castLevel:usedLevel}:{})};}
-  const activeEffect=spellActiveEffect(spell);if(activeEffect){state.activeSpellEffects=state.activeSpellEffects.filter(effect=>effect.id!==activeEffect.id);state.activeSpellEffects.push({...activeEffect,name:spell.name,source:spell.sourceClass,...(usedLevel?{castLevel:usedLevel}:{})});}
+  const activeEffect=spellActiveEffect(spell);if(activeEffect){state.activeSpellEffects=state.activeSpellEffects.filter(effect=>effect.id!==activeEffect.id);state.activeSpellEffects.push({...activeEffect,name:spell.name,source:spell.sourceClass,startedTurn:state.turn.number,...(usedLevel?{castLevel:usedLevel}:{})});}
   const timing=spell.castingTime==='bonus'?` Bonus Action spent; your Action remains available.${normalized(spell.name)==='barkskin'?' Wild Shape and Rage also require a Bonus Action, so they must wait until a later turn.':''}`:'';
   return {state,message:`Cast ${spell.name}${usedLevel>0?` using a level ${usedLevel} slot`:''}.${timing}`};
 }

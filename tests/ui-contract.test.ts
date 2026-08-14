@@ -19,6 +19,9 @@ test('received effects stay compact and attacks separate hit from damage',()=>{
   assert.match(html,/Effects &amp; Conditions/);assert.match(html,/Guidance/);assert.match(html,/Bardic Inspiration/);
   assert.match(source,/receivedRollBonus\('attack'\)/);assert.match(source,/receivedRollBonus\('skill',/);assert.match(source,/queueDamageRoll/);assert.match(source,/Roll Damage/);assert.match(source,/Miss · Clear/);
   assert.match(source,/quick-guidance/);assert.match(source,/quick-inspiration/);assert.match(source,/autoChooseSkill/);assert.match(source,/Guidance chose \$\{skill\}/);
+  assert.match(html,/id="quick-initiative"/);assert.match(html,/id="persistent-undo-turn"/);assert.match(source,/autoUseNextRoll/);assert.match(source,/Heroic Inspiration rerolled/);assert.match(source,/startCombat\(state\)/);assert.match(source,/Choose Damage, Grapple, or Shove/);
+  for(const id of ['battlefield-facts','fact-ally-near-target','fact-attacker-unseen','fact-target-unseen','received-effect-duration'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(source,/confirmed ally beside target/);assert.match(source,/nextAttackFacts\.clear\(\)/);assert.match(source,/Rules confidence/);
   assert.match(styles,/alteredTrackedEffect/);assert.match(styles,/\.app-shell\.reduce-motion \.tracked-active/);
 });
 
@@ -299,8 +302,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.17\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.17\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.17\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.19\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.19\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.19\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
@@ -482,7 +485,7 @@ test('every primary workspace uses consistent names and phone-safe controls',()=
 
 test('focused action pages prioritize executable controls without losing advanced choices',()=>{
   const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
-  assert.match(source,/function collapseActionOptions/);assert.match(source,/Unavailable right now \(\$\{unavailableCount\}\)/);
+  assert.match(source,/function collapseActionOptions/);assert.match(source,/Unavailable right now \(\$\{unavailable\.childElementCount\}\)/);
   assert.match(source,/c\.options\.append\(conditionalRollToggle/);assert.match(styles,/\.action-options-disclosure/);assert.match(styles,/\.unavailable-actions/);
   assert.match(source,/Applied automatically'[\s\S]*open:false/);assert.match(source,/appendControlReason\(actions,toShape/);assert.match(styles,/\.control-block-reason/);
 });
