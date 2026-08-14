@@ -2179,3 +2179,6 @@ body::after{
   .turn-complete-cue,.persistent-form-copy.is-active{animation:none!important;box-shadow:none!important;border:2px solid Highlight!important}
   .persistent-form-copy.is-active>strong{color:CanvasText;-webkit-text-stroke:0;text-shadow:none}
 }
+.chatgpt-assist{margin-top:14px;border:1px solid color-mix(in srgb,var(--accent) 34%,var(--line));background:rgba(12,18,24,.72)}
+.chatgpt-assist>summary{min-block-size:44px;padding:12px 14px;cursor:pointer}.chatgpt-assist>summary span{display:grid;gap:2px}.chatgpt-assist>summary small{color:var(--muted)}
+.chatgpt-assist>p,.chatgpt-assist>.inline-actions,.chatgpt-assist>.status{margin-inline:14px}.chatgpt-assist>.status{margin-bottom:14px}

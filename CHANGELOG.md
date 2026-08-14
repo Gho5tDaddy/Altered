@@ -349,3 +349,9 @@ See earlier release materials for the rules-engine hardening history.
 - Renamed the combat input panel to **Damage Received & Healing**.
 - Renamed **Apply Damage** to **Take Damage**.
 - Added helper text clarifying that this control records incoming damage, while outgoing attacks and spells roll from their own action buttons.
+# v0.29.12
+
+- Added optional, character-scoped ChatGPT assistance for unresolved private mechanics.
+- Assistant proposals can include applicable abilities, spells, equipped items, forms, and enhancements, but remain review-first and schema-validated.
+- Enforced D&D 5e 2024-only assistant instructions, exact-character locking, and a verification record using official D&D/Wizards, SRD 5.2.1, or user-owned sources.
+- Kept ChatGPT outside the deterministic combat engine; it cannot silently change a character or bypass class, subclass, species, level, form, or import validation.

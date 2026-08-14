@@ -342,3 +342,8 @@ Altered is a cross-platform local alpha for Android, Windows, and macOS browsers
 - Standalone and PWA generation: pass.
 - Live browser interaction coverage: transformations, rolls, damage/healing, conditions, turns/rests, spells/concentration, D&D Beyond success/privacy paths, imports/exports, private packs, settings persistence, artwork upload/reset, and Temporary HP choices.
 - Full live SRD creature normalization: 331/331 pass, including 91 Beast records and 989 executable actions.
+# Altered v0.29.12 release notes
+
+ChatGPT can now assist only when Altered finds an unresolved character mechanic. The app prepares a narrow request for the selected character, and it accepts only a reviewed JSON proposal locked to that character. Proposals may cover features, spells, equipped items, transformations, enhancements, and form stat blocks.
+
+Assistant results must identify their 2024 verification source. Public verification is restricted to official D&D/Wizards pages or the SRD 5.2.1 catalog; private paid mechanics can be verified from a source the user owns. Legacy, mixed-edition, wiki, forum, and unsourced rules are explicitly rejected by the request contract.

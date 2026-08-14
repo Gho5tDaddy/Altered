@@ -9,6 +9,7 @@ import {characterFromPdfReview,parsePdfCharacterText} from './pdf-import.js';
 import type {PdfCharacterDraft} from './pdf-import.js';
 import {findPdfRuleEntry} from './pdf-match.js';
 import type {PdfTextItem} from './pdf-match.js';
+import {assistantRequestText,parseAssistantProposal} from './assistant-proposal.js';
 import {installExtensionPack,listExtensionPackRecords,loadArtOverride,loadBooleanSetting,loadJsonSetting,optimizePortrait,removeArtOverride,removeExtensionPack,removeSetting,saveArtOverride,saveBooleanSetting,saveJsonSetting} from './storage.js';
 import {SAMPLE_CHARACTERS} from './sample-data.js';
 import {FEROCITUS_CHARACTER} from './ferocitus-data.js';
@@ -115,7 +116,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.11';
+const APP_VERSION='0.29.12';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -536,6 +537,28 @@ function privatePdfCharacterTargets():PrivatePdfTarget[]{
   for(const spell of character.spells)if(spell.resolution==='manual')add({id:`spell-${slug(spell.id??spell.name)}`,name:spell.name,kind:'Spell',detail:'This spell is on the selected character and currently resolves manually.'});
   for(const item of character.items)if(item.equipped&&(item.mechanics==='reference-only'||item.mechanics==='review-required'))add({id:`item-${slug(item.id)}`,name:item.name,kind:'Equipped item',detail:'This equipped item needs private rules beyond the numeric totals already imported.'});
   return targets.slice(0,160);
+}
+async function copyText(value:string){
+  if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(value);return;}
+  const field=document.createElement('textarea');field.value=value;field.readOnly=true;field.style.position='fixed';field.style.opacity='0';document.body.append(field);field.select();const copied=document.execCommand('copy');field.remove();if(!copied)throw new Error('Copy was blocked by this browser.');
+}
+async function copyChatGptRequest(source='Source supplied by the user in ChatGPT'){
+  const needs=(pendingPrivatePdfReview?.unmatched.length?pendingPrivatePdfReview.unmatched:privatePdfCharacterTargets()).map(({id,name,kind,detail})=>({id,name,kind,detail}));
+  const status=$('#assistant-proposal-status');
+  if(!needs.length){status.textContent=`${character.name} has no unresolved imported mechanics for ChatGPT to complete.`;return;}
+  try{
+    await copyText(assistantRequestText(baseCharacter,source,needs));
+    status.textContent=`Request copied for ${character.name}. Open ChatGPT, attach or quote only the source you own, paste the request, then return here to review the JSON proposal.`;
+    notify('Character-scoped ChatGPT request copied.');
+  }catch(error){status.textContent=`Could not copy the request: ${error instanceof Error?error.message:'Unknown error'}`;}
+}
+async function reviewAssistantProposal(file:File){
+  const status=$('#assistant-proposal-status');status.textContent=`Checking ${file.name} against ${character.name} and the D&D 5e 2024 pack schema…`;
+  try{
+    const pack=parseAssistantProposal(await file.text(),baseCharacter);const result=await installAndApplyPack(pack);
+    status.textContent=result.applied?`${pack.metadata.name} validated and added to ${character.name}. ${packCounts(pack)}. Review the visible controls against your 2024 source before play.`:`${pack.metadata.name} is valid but does not match ${character.name}; nothing changed.`;
+    renderSettings();
+  }catch(error){status.textContent=`Proposal rejected: ${error instanceof Error?error.message:'Unknown error'}`;}
 }
 function activationFromPrivateText(value:string):ActionCost{const lower=value.toLowerCase();if(/\bbonus action\b/.test(lower))return'bonus';if(/\breaction\b/.test(lower))return'reaction';if(/\bmagic action\b/.test(lower))return'magic-action';if(/\bas an action\b|\btake the action\b/.test(lower))return'action';return'none';}
 async function hostedPrivatePdfDocument(record:PrivatePdfRecord){
@@ -1444,6 +1467,9 @@ function initializeControls(){
   $('#cancel-private-pdf-review').addEventListener('click',()=>$<HTMLDialogElement>('#private-pdf-review-dialog').close());
   $('#apply-private-pdf-matches').addEventListener('click',()=>void applyPrivatePdfMatches());
   $('#private-pdf-manual-setup').addEventListener('click',()=>{const review=pendingPrivatePdfReview;if(!review)return;$<HTMLDialogElement>('#private-pdf-review-dialog').close();openManualPrivateMechanic(`Private PDF: ${review.record.name}`);});
+  $('#copy-chatgpt-request').addEventListener('click',()=>void copyChatGptRequest());
+  $('#private-pdf-chatgpt-help').addEventListener('click',()=>{const review=pendingPrivatePdfReview;if(!review)return;void copyChatGptRequest(`Private PDF: ${review.record.name}`);});
+  $('#assistant-proposal-file').addEventListener('change',event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(file)void reviewAssistantProposal(file).finally(()=>{input.value='';});});
   $('#private-mechanic-need').addEventListener('change',syncPrivateMechanicFields);
   $('#private-mechanic-mode').addEventListener('change',syncPrivateMechanicMode);
   $('#private-mechanics-form').addEventListener('submit',event=>{event.preventDefault();void (async()=>{try{await savePrivateMechanic();}catch(error){$('#private-mechanics-status').textContent=`Could not save mechanic: ${error instanceof Error?error.message:'Unknown error'}`;}})();});

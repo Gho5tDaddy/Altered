@@ -449,6 +449,17 @@
             <div id="private-pdf-status" class="status" role="status" aria-live="polite"></div>
             <div id="private-pdf-list" class="private-pdf-list"></div>
           </section>
+          <details class="chatgpt-assist">
+            <summary><span><strong>ChatGPT help when needed</strong><small>Optional · proposals are reviewed before use</small></span></summary>
+            <p>If Altered cannot confidently structure a rule, copy a character-scoped request and paste it into ChatGPT with the relevant source you own. ChatGPT proposes concise mechanics; Altered validates the returned JSON before anything is added.</p>
+            <div class="inline-actions import-actions">
+              <button id="copy-chatgpt-request" class="button secondary" type="button">Copy Request for ChatGPT</button>
+              <a class="button secondary" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer">Open ChatGPT</a>
+              <label class="button primary file-button">Review ChatGPT Proposal<input id="assistant-proposal-file" type="file" accept="application/json,.json"></label>
+            </div>
+            <p class="source-note">Share only the source or excerpt you choose. ChatGPT cannot change Altered directly. Proposals may include applicable abilities, spells, items, forms, and enhancements for the selected character and level.</p>
+            <div id="assistant-proposal-status" class="status" role="status" aria-live="polite"></div>
+          </details>
         </section>
       </div>
       <section class="installed-packs-section">
@@ -470,6 +481,7 @@
         <summary>Advanced setup</summary>
         <p>Use this only when a rule is not listed or needs a complex custom effect. The normal character-content matches above require no technical setup.</p>
         <button id="private-pdf-manual-setup" class="button secondary" type="button">Set Up One Rule Manually</button>
+        <button id="private-pdf-chatgpt-help" class="button secondary" type="button">Copy Request for ChatGPT</button>
       </details>
       <div class="dialog-actions"><button id="cancel-private-pdf-review" class="button secondary" type="button">Not Now</button><button id="apply-private-pdf-matches" class="button primary" type="button">Add Selected Content</button></div>
     </div>

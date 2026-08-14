@@ -1,4 +1,4 @@
-const CACHE='altered-hosted-v0.29.11';
+const CACHE='altered-hosted-v0.29.12';
 const ASSETS=['./manifest.json','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./pdf.bundle.js','./tesseract.bundle.js'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))));self.clients.claim();});

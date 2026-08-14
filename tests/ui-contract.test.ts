@@ -285,7 +285,7 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.6\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.6\.zip/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.12\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.12\.zip/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
@@ -487,4 +487,11 @@ test('additive forms always expose an end path while preserving workspace scroll
 test('every static form control has an accessible name',()=>{
   const html=readFileSync('public/index.html','utf8');
   for(const match of html.matchAll(/<(input|select|textarea)\b([^>]*)>/g)){const id=/\bid="([^"]+)"/.exec(match[2]??'')?.[1];if(!id)continue;const lineStart=html.lastIndexOf('\n',match.index)+1;const lineEnd=html.indexOf('\n',match.index);const line=html.slice(lineStart,lineEnd<0?html.length:lineEnd);const before=line.slice(0,line.indexOf(match[0]));const named=new RegExp(`for="${id}"`).test(html)||/aria-label=/.test(match[2]??'')||/<label\b/.test(before);assert.ok(named,`${id} has no accessible label`);}
+});
+
+test('ChatGPT assistance is optional, character-scoped, and review-first',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const assistant=readFileSync('src/assistant-proposal.ts','utf8');
+  for(const id of ['copy-chatgpt-request','assistant-proposal-file','assistant-proposal-status','private-pdf-chatgpt-help'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(html,/ChatGPT cannot change Altered directly/);assert.match(source,/assistantRequestText\(baseCharacter/);assert.match(source,/parseAssistantProposal/);
+  assert.match(assistant,/Reject 2014, legacy, mixed/);assert.match(assistant,/official D&D Beyond or Wizards source/);assert.match(assistant,/characterId===character\.id/);
 });

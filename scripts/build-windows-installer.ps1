@@ -1,4 +1,4 @@
-param([string]$Version = '0.29.6')
+param([string]$Version = '0.29.12')
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -16,6 +16,7 @@ New-Item -ItemType Directory -Force -Path $stageDir,$downloadDir | Out-Null
 Get-ChildItem -LiteralPath $stageDir -Force | Remove-Item -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $distDir 'altered-standalone.html') -Destination (Join-Path $stageDir "Altered-v$Version.html")
 Copy-Item -LiteralPath (Join-Path $distDir 'pdf.bundle.js') -Destination $stageDir
+Copy-Item -LiteralPath (Join-Path $distDir 'pdf.worker.min.mjs') -Destination $stageDir
 Copy-Item -LiteralPath (Join-Path $distDir 'tesseract.bundle.js') -Destination $stageDir
 Copy-Item -LiteralPath (Join-Path $projectRoot 'INSTALL.md') -Destination (Join-Path $stageDir 'INSTALL.txt')
 Copy-Item -LiteralPath (Join-Path $projectRoot 'RELEASE_NOTES.md') -Destination (Join-Path $stageDir 'RELEASE_NOTES.txt')
