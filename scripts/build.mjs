@@ -7,6 +7,8 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const build=path.join(root,'build');
 const dist=path.join(root,'dist');
 await rm(dist,{recursive:true,force:true});await mkdir(dist,{recursive:true});
+await mkdir(path.join(dist,'.openai'),{recursive:true});
+await copyFile(path.join(root,'.openai','hosting.json'),path.join(dist,'.openai','hosting.json'));
 
 const publicNames=await readdir(path.join(root,'public'));
 for(const name of publicNames)await cp(path.join(root,'public',name),path.join(dist,name),{recursive:true});

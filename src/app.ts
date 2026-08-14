@@ -113,9 +113,10 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.5';
+const APP_VERSION='0.29.6';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
-const PRIVATE_PDF_LIMIT=100*1024*1024;
+const PRIVATE_PDF_LIMIT=500*1024*1024;
+const PRIVATE_PDF_PART_SIZE=10*1024*1024;
 interface PrivatePdfRecord{id:string;name:string;size:number;uploadedAt:string}
 type UiStatus='available'|'active'|'inactive'|'locked'|'unavailable'|'requirements'|'selected'|'favorite'|'new'|'importing'|'loading'|'success'|'warning'|'error';
 const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
@@ -485,11 +486,32 @@ async function refreshPrivatePdfLibrary(){
   catch(error){renderPrivatePdfLibrary([]);privatePdfStatus(error instanceof Error&&/not found|status 404/i.test(error.message)?'Account PDF storage is available in the hosted Altered app.':`Private PDF library unavailable: ${error instanceof Error?error.message:'Unknown error'}`);}
 }
 function privatePdfId(){return typeof crypto.randomUUID==='function'?crypto.randomUUID():`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,14)}`;}
-function uploadPrivatePdf(file:File){
-  if(file.size>PRIVATE_PDF_LIMIT)return Promise.reject(new Error('PDF exceeds the 100 MB account-storage limit.'));
-  if(file.type&&file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf'))return Promise.reject(new Error('Choose a PDF file.'));
-  const progress=$<HTMLProgressElement>('#private-pdf-progress');progress.hidden=false;progress.value=0;privatePdfStatus(`Uploading ${file.name}…`);
-  return new Promise<void>((resolve,reject)=>{const request=new XMLHttpRequest();request.open('PUT',`/api/private-pdfs/${privatePdfId()}`);request.responseType='json';request.setRequestHeader('Content-Type','application/pdf');request.setRequestHeader('X-Altered-Request','app');request.setRequestHeader('X-Altered-Filename',encodeURIComponent(file.name));request.upload.addEventListener('progress',event=>{if(event.lengthComputable)progress.value=Math.round(event.loaded/event.total*100);});request.addEventListener('load',()=>{progress.hidden=true;if(request.status>=200&&request.status<300){privatePdfStatus(`${file.name} saved to your private Altered account.`);resolve();return;}const payload=request.response as {error?:unknown}|null;reject(new Error(payload&&typeof payload.error==='string'?payload.error:`Upload failed with status ${request.status}.`));});request.addEventListener('error',()=>{progress.hidden=true;reject(new Error('The upload connection failed.'));});request.addEventListener('abort',()=>{progress.hidden=true;reject(new Error('Upload canceled.'));});request.send(file);});
+async function privatePdfUploadRequest(url:string,options:RequestInit,retries=3){
+  let lastError:Error|null=null;
+  for(let attempt=1;attempt<=retries;attempt++){
+    try{const response=await fetch(url,{...options,credentials:'same-origin',headers:{...privatePdfRequestHeaders(),...(options.headers??{})}});if(response.ok)return response;const message=await privatePdfError(response);if(response.status<500&&response.status!==429)throw new Error(message);lastError=new Error(message);}
+    catch(error){lastError=error instanceof Error?error:new Error('The upload connection failed.');}
+    if(attempt<retries)await new Promise(resolve=>window.setTimeout(resolve,attempt*750));
+  }
+  throw lastError??new Error('The upload connection failed.');
+}
+async function uploadPrivatePdf(file:File){
+  if(file.size>PRIVATE_PDF_LIMIT)throw new Error('PDF exceeds the 500 MB account-storage limit.');
+  if(file.type&&file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf'))throw new Error('Choose a PDF file.');
+  const progress=$<HTMLProgressElement>('#private-pdf-progress');progress.hidden=false;progress.value=0;const id=privatePdfId();let uploadId='';privatePdfStatus(`Preparing ${file.name} for a secure chunked upload…`);
+  try{
+    const created=await privatePdfUploadRequest(`/api/private-pdfs/${id}?action=create`,{method:'POST',headers:{'X-Altered-Filename':encodeURIComponent(file.name),'X-Altered-Size':String(file.size)}});
+    const createPayload=await created.json() as {uploadId?:unknown};if(typeof createPayload.uploadId!=='string'||!createPayload.uploadId)throw new Error('Private storage did not start the upload.');uploadId=createPayload.uploadId;
+    const parts:{partNumber:number;etag:string}[]=[];const totalParts=Math.ceil(file.size/PRIVATE_PDF_PART_SIZE);
+    for(let index=0;index<totalParts;index++){
+      const partNumber=index+1;const chunk=file.slice(index*PRIVATE_PDF_PART_SIZE,Math.min(file.size,(index+1)*PRIVATE_PDF_PART_SIZE));privatePdfStatus(`Uploading ${file.name}: part ${partNumber} of ${totalParts}…`);
+      const uploaded=await privatePdfUploadRequest(`/api/private-pdfs/${id}?action=part&uploadId=${encodeURIComponent(uploadId)}&partNumber=${partNumber}`,{method:'PUT',headers:{'Content-Type':'application/octet-stream','X-Altered-Part-Size':String(chunk.size)},body:chunk});
+      const part=await uploaded.json() as {partNumber?:unknown;etag?:unknown};if(typeof part.partNumber!=='number'||typeof part.etag!=='string')throw new Error(`Part ${partNumber} was not confirmed by private storage.`);parts.push({partNumber:part.partNumber,etag:part.etag});progress.value=Math.round(partNumber/totalParts*100);
+    }
+    await privatePdfUploadRequest(`/api/private-pdfs/${id}?action=complete&uploadId=${encodeURIComponent(uploadId)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts})});privatePdfStatus(`${file.name} saved to your private Altered account.`);
+  }catch(error){
+    if(uploadId)void fetch(`/api/private-pdfs/${id}?action=abort&uploadId=${encodeURIComponent(uploadId)}`,{method:'DELETE',headers:privatePdfRequestHeaders(),credentials:'same-origin'});throw error;
+  }finally{progress.hidden=true;}
 }
 async function downloadPrivatePdf(record:PrivatePdfRecord){
   privatePdfStatus(`Preparing ${record.name}…`);try{const response=await fetch(`/api/private-pdfs/${encodeURIComponent(record.id)}`,{headers:privatePdfRequestHeaders(),credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error(await privatePdfError(response));const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=record.name;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);privatePdfStatus(`${record.name} downloaded.`);}catch(error){privatePdfStatus(`Download failed: ${error instanceof Error?error.message:'Unknown error'}`);}
