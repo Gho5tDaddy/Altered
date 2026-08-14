@@ -1,4 +1,4 @@
-import type {Ability,AttackAction,AutomaticActionChoice,Character,ConditionEffect,CreatureAction,DamagePacket,DamageType,EvaluatedFeature,GameState,OwnedContentMatch,OwnedContentPack,ResolvedSheet,Spell,TransformationEffects,TransformationOption,TransitionResult} from './types.js';
+import type {Ability,ActionCost,AttackAction,AutomaticActionChoice,Character,ConditionEffect,CreatureAction,DamagePacket,DamageType,EvaluatedFeature,GameState,OwnedContentMatch,OwnedContentPack,ResolvedSheet,Spell,TransformationEffects,TransformationOption,TransitionResult} from './types.js';
 import {CONDITIONS,CREATURES,classLevel,contentRegistrySnapshot} from './content-registry.js';
 import {parseCharacter,safeJsonParse} from './schema.js';
 import {applyDdbSrdCreatures,ddbCoverageLabel,ddbSetupPackId,extractDdbCharacterId,importDdbCharacter} from './dndbeyond.js';
@@ -113,11 +113,15 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.7';
+const APP_VERSION='0.29.8';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
 interface PrivatePdfRecord{id:string;name:string;size:number;uploadedAt:string}
+type PrivatePdfTargetKind='Class or subclass'|'Species'|'Feat'|'Spell'|'Equipped item'|'Character feature';
+interface PrivatePdfTarget{id:string;name:string;kind:PrivatePdfTargetKind;detail:string}
+interface PrivatePdfMatch extends PrivatePdfTarget{page:number;summary:string;activation:ActionCost;selected:boolean}
+let pendingPrivatePdfReview:{record:PrivatePdfRecord;matches:PrivatePdfMatch[];searched:number;unmatched:PrivatePdfTarget[]}|null=null;
 type UiStatus='available'|'active'|'inactive'|'locked'|'unavailable'|'requirements'|'selected'|'favorite'|'new'|'importing'|'loading'|'success'|'warning'|'error';
 const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
   available:{icon:'✓',label:'Available'},active:{icon:'✦',label:'Active'},inactive:{icon:'○',label:'Inactive'},
@@ -472,7 +476,7 @@ function renderPrivatePdfLibrary(records:PrivatePdfRecord[]){
     const entry=document.createElement('article');entry.className='private-pdf-entry';const details=document.createElement('div');details.append(text('strong',record.name),text('small',`${formatFileSize(record.size)} · saved ${new Date(record.uploadedAt).toLocaleDateString()}`));
     const actions=document.createElement('div');actions.className='private-pdf-entry-actions';
     actions.append(
-      button('Read & Set Up',()=>void readPrivatePdfForCharacter(record),'button primary compact'),
+      button('Scan for this character',()=>void readPrivatePdfForCharacter(record),'button primary compact'),
       button('Download',()=>void downloadPrivatePdf(record),'button secondary compact'),
       button('Delete',()=>void deletePrivatePdf(record),'button danger compact'),
     );
@@ -517,23 +521,47 @@ async function downloadPrivatePdf(record:PrivatePdfRecord){
   privatePdfStatus(`Preparing ${record.name}…`);try{const response=await fetch(`/api/private-pdfs/${encodeURIComponent(record.id)}`,{headers:privatePdfRequestHeaders(),credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error(await privatePdfError(response));const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=record.name;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);privatePdfStatus(`${record.name} downloaded.`);}catch(error){privatePdfStatus(`Download failed: ${error instanceof Error?error.message:'Unknown error'}`);}
 }
 async function readPrivatePdfForCharacter(record:PrivatePdfRecord){
-  privatePdfStatus(`Reading ${record.name} for mechanics that match ${character.name}…`);
+  privatePdfStatus(`Comparing ${record.name} with ${character.name}…`);
   try{
-    const response=await fetch(`/api/private-pdfs/${encodeURIComponent(record.id)}`,{headers:privatePdfRequestHeaders(),credentials:'same-origin',cache:'no-store'});if(!response.ok)throw new Error(await privatePdfError(response));
-    const file=new File([await response.blob()],record.name,{type:'application/pdf'});const candidate=await findPrivatePdfCharacterMechanic(file);
-    $<HTMLDialogElement>('#import-dialog').close();openManualPrivateMechanic(`Private PDF: ${record.name}`);
-    if(candidate){$<HTMLInputElement>('#private-mechanic-name').value=candidate.name;$<HTMLTextAreaElement>('#private-mechanic-summary').value=candidate.summary;const lower=candidate.summary.toLowerCase();const activation=lower.includes('bonus action')?'bonus':lower.includes('reaction')?'reaction':/\baction\b/.test(lower)?'action':'none';$<HTMLSelectElement>('#private-mechanic-activation').value=activation;$('#private-mechanics-status').textContent=`Altered found “${candidate.name}” in this PDF because it matches the current character. Review the short mechanic below, choose how it behaves, then save it.`;}
-    else $('#private-mechanics-status').textContent='Altered did not find an exact feature-name match for this character in the readable PDF text. Enter the mechanic name, or use a scanned character PDF through Character PDF/OCR.';
+    const review=await findPrivatePdfCharacterMechanics(record);pendingPrivatePdfReview={record,...review};renderPrivatePdfReview();$<HTMLDialogElement>('#import-dialog').close();$<HTMLDialogElement>('#private-pdf-review-dialog').showModal();
   }catch(error){privatePdfStatus(`Could not read this PDF: ${error instanceof Error?error.message:'Unknown error'}`);}
 }
-async function findPrivatePdfCharacterMechanic(file:File){
-  const targets=[...(pendingDdbImport?.setupNeeds.map(need=>need.label)??[]),...character.features.filter(feature=>feature.automation==='reference'||feature.automation==='unsupported').map(feature=>feature.name)].map(name=>name.trim()).filter((name,index,names)=>name.length>=3&&names.findIndex(value=>value.toLowerCase()===name.toLowerCase())===index);
-  if(!targets.length)return null;const pdf=await pdfDocument(file);const pageLimit=Math.min(pdf.numPages,300);
-  for(let pageNumber=1;pageNumber<=pageLimit;pageNumber++){
-    privatePdfStatus(`Reading ${recordSafeName(file.name)}: page ${pageNumber} of ${pageLimit}…`);const page=await pdf.getPage(pageNumber);const content=await page.getTextContent();const pageText=content.items.map(item=>item.str??'').join(' ').replace(/\s+/g,' ').trim();const lower=pageText.toLowerCase();
-    for(const name of targets){const index=lower.indexOf(name.toLowerCase());if(index<0)continue;const start=Math.max(0,index-100);const summary=pageText.slice(start,Math.min(pageText.length,index+name.length+900)).trim();return {name,summary:summary.slice(0,1000)};}
+function privatePdfCharacterTargets():PrivatePdfTarget[]{
+  const targets:PrivatePdfTarget[]=[];const add=(target:PrivatePdfTarget)=>{const name=target.name.trim();if(name.length<3||targets.some(entry=>entry.name.toLowerCase()===name.toLowerCase()))return;targets.push({...target,name});};
+  if(pendingDdbImport?.character.id===baseCharacter.id)for(const need of pendingDdbImport.setupNeeds)add({id:need.id,name:need.label,kind:need.kind==='subclass'?'Class or subclass':need.kind==='species'?'Species':need.kind==='feat'?'Feat':need.kind==='spell'?'Spell':need.kind==='item'?'Equipped item':'Character feature',detail:need.detail});
+  for(const feature of character.features)if(feature.automation==='reference'||feature.automation==='unsupported')add({id:`feature-${slug(feature.id)}`,name:feature.name,kind:'Character feature',detail:'This feature is on the character sheet but does not yet have complete executable rules.'});
+  for(const feat of character.feats){const evaluated=sheet.features.find(feature=>feature.name.toLowerCase()===feat.toLowerCase());if(evaluated?.status==='ruling')add({id:`feat-${slug(feat)}`,name:feat,kind:'Feat',detail:'This feat is on the selected character but still has reference-only mechanics.'});}
+  for(const spell of character.spells)if(spell.resolution==='manual')add({id:`spell-${slug(spell.id??spell.name)}`,name:spell.name,kind:'Spell',detail:'This spell is on the selected character and currently resolves manually.'});
+  for(const item of character.items)if(item.equipped&&(item.mechanics==='reference-only'||item.mechanics==='review-required'))add({id:`item-${slug(item.id)}`,name:item.name,kind:'Equipped item',detail:'This equipped item needs private rules beyond the numeric totals already imported.'});
+  return targets.slice(0,160);
+}
+function compactPdfMatchSummary(pageText:string,index:number,name:string){
+  const after=pageText.slice(index,index+650).replace(/\s+/g,' ').trim();const sentences=after.match(/[^.!?]{20,220}[.!?]/g)?.slice(0,3).join(' ')??after.slice(0,420);return sentences.replace(new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s*[:.—-]?\\s*`,'i'),'').slice(0,500).trim();
+}
+function activationFromPrivateText(value:string):ActionCost{const lower=value.toLowerCase();if(/\bbonus action\b/.test(lower))return'bonus';if(/\breaction\b/.test(lower))return'reaction';if(/\bmagic action\b/.test(lower))return'magic-action';if(/\bas an action\b|\btake the action\b/.test(lower))return'action';return'none';}
+async function hostedPrivatePdfDocument(record:PrivatePdfRecord){
+  await loadImportScript('./pdf.bundle.js',()=>Boolean(externalWindow.pdfjsLib));const library=externalWindow.pdfjsLib;if(!library)throw new Error('PDF reader did not initialize.');
+  return library.getDocument({url:`/api/private-pdfs/${encodeURIComponent(record.id)}`,disableWorker:true,withCredentials:true,httpHeaders:privatePdfRequestHeaders(),rangeChunkSize:256*1024,disableStream:true,disableAutoFetch:true}).promise;
+}
+async function findPrivatePdfCharacterMechanics(record:PrivatePdfRecord){
+  const targets=privatePdfCharacterTargets();if(!targets.length)return {matches:[],searched:0,unmatched:[]};const unmatched=[...targets];const matches:PrivatePdfMatch[]=[];const pdf=await hostedPrivatePdfDocument(record);const pageLimit=Math.min(pdf.numPages,1200);
+  for(let pageNumber=1;pageNumber<=pageLimit&&unmatched.length;pageNumber++){
+    privatePdfStatus(`Scanning only ${character.name}'s content · page ${pageNumber} of ${pageLimit}…`);const page=await pdf.getPage(pageNumber);const content=await page.getTextContent();const pageText=content.items.map(item=>item.str??'').join(' ').replace(/\s+/g,' ').trim();if(!pageText)continue;const lower=pageText.toLowerCase();
+    for(let index=unmatched.length-1;index>=0;index--){const target=unmatched[index]!;const offset=lower.indexOf(target.name.toLowerCase());if(offset<0)continue;const summary=compactPdfMatchSummary(pageText,offset,target.name)||`See ${target.name} on page ${pageNumber}.`;matches.push({...target,page:pageNumber,summary,activation:activationFromPrivateText(summary),selected:true});unmatched.splice(index,1);}
   }
-  return null;
+  return {matches:matches.sort((a,b)=>a.kind.localeCompare(b.kind)||a.name.localeCompare(b.name)),searched:targets.length,unmatched};
+}
+function renderPrivatePdfReview(){
+  const review=pendingPrivatePdfReview;if(!review)return;$('#private-pdf-review-title').textContent=`Content for ${character.name}`;$('#private-pdf-review-intro').textContent=`Altered compared ${review.record.name} only with content already present on ${character.name}'s character sheet. It will not add unrelated book options or duplicate imported totals.`;
+  $('#private-pdf-review-summary').textContent=review.matches.length?`${review.matches.length} exact match${review.matches.length===1?'':'es'} found. Selected entries will be added as playable reminders or controls.`:`No exact readable matches were found for the ${review.searched} character entries checked. Nothing has been changed.`;
+  const list=$('#private-pdf-review-list');clear(list);for(const match of review.matches){const row=document.createElement('label');row.className='private-pdf-match';const input=document.createElement('input');input.type='checkbox';input.checked=match.selected;input.addEventListener('change',()=>{match.selected=input.checked;syncPrivatePdfReviewButton();});const copy=document.createElement('span');const heading=document.createElement('span');heading.className='private-pdf-match-heading';heading.append(text('strong',match.name),text('span',`${match.kind} · page ${match.page}`,'ui-status selected'));copy.append(heading,text('small',match.activation==='none'?'Adds a rules reminder; existing imported totals stay unchanged.':`Adds a ${match.activation.replace('-',' ')} control; existing imported totals stay unchanged.`),text('p',match.summary));row.append(input,copy);list.append(row);}
+  if(!review.matches.length)list.append(text('div','The PDF may be image-only, use different wording, or may not contain this character’s unresolved options. Open Advanced setup only if you need to add a specific rule manually.','private-pdf-empty'));syncPrivatePdfReviewButton();
+}
+function syncPrivatePdfReviewButton(){const review=pendingPrivatePdfReview;const count=review?.matches.filter(match=>match.selected).length??0;const apply=$<HTMLButtonElement>('#apply-private-pdf-matches');apply.disabled=count===0;apply.textContent=count?`Add ${count} Selected ${count===1?'Entry':'Entries'}`:'No Matches Selected';}
+async function applyPrivatePdfMatches(){
+  const review=pendingPrivatePdfReview;if(!review)return;const selected=review.matches.filter(match=>match.selected);if(!selected.length)return;const apply=$<HTMLButtonElement>('#apply-private-pdf-matches');apply.disabled=true;apply.textContent='Adding content…';
+  for(const match of selected){const pack=privateMechanicPack(baseCharacter,{packId:`pdf-${slug(review.record.id)}-${slug(match.id)}`.slice(0,120),name:match.name,source:`Private PDF: ${review.record.name}, page ${match.page}`,summary:match.summary,mode:match.activation==='none'?'reference':'conditional',retainInWildShape:true,activation:match.activation});await installExtensionPack(pack);}
+  installedPacks=await loadValidatedInstalledPacks();rebuildEffectiveCharacterLibrary(true);renderInstalledPacks();renderSettings();render();$<HTMLDialogElement>('#private-pdf-review-dialog').close();privatePdfStatus(`${selected.length} matching ${selected.length===1?'entry':'entries'} added to ${character.name}.`);notify(`Private content added to ${character.name}.`);pendingPrivatePdfReview=null;
 }
 function recordSafeName(name:string){return name.length>48?`${name.slice(0,45)}…`:name;}
 async function deletePrivatePdf(record:PrivatePdfRecord){
@@ -541,7 +569,7 @@ async function deletePrivatePdf(record:PrivatePdfRecord){
 }
 type PdfPage={getTextContent:()=>Promise<{items:{str?:string}[]}>;getViewport:(options:{scale:number})=>{width:number;height:number};render:(options:{canvasContext:CanvasRenderingContext2D;viewport:{width:number;height:number}})=>{promise:Promise<void>}};
 type PdfDocument={numPages:number;getPage:(page:number)=>Promise<PdfPage>;getFieldObjects?:()=>Promise<Record<string,{value?:unknown}[]>|null>};
-type PdfLibrary={getDocument:(options:{data:Uint8Array;disableWorker:boolean})=>{promise:Promise<PdfDocument>}};
+type PdfLibrary={getDocument:(options:{data?:Uint8Array;url?:string;disableWorker:boolean;withCredentials?:boolean;httpHeaders?:Record<string,string>;rangeChunkSize?:number;disableStream?:boolean;disableAutoFetch?:boolean})=>{promise:Promise<PdfDocument>}};
 type OcrWorker={recognize:(image:HTMLCanvasElement)=>Promise<{data:{text:string}}>;terminate:()=>Promise<void>};
 type OcrLibrary={createWorker:(language:string,oem?:number,options?:{logger?:(message:{status?:string;progress?:number})=>void})=>Promise<OcrWorker>};
 const externalWindow=window as Window&{pdfjsLib?:PdfLibrary;Tesseract?:OcrLibrary};
@@ -1412,6 +1440,10 @@ function initializeControls(){
   $('#dndbeyond-source').addEventListener('keydown',event=>{if((event as KeyboardEvent).key==='Enter'){event.preventDefault();void fetchDdbCharacter();}});
   $('#open-private-mechanics').addEventListener('click',()=>openPrivateMechanics());
   $('#close-private-mechanics').addEventListener('click',()=>$<HTMLDialogElement>('#private-mechanics-dialog').close());
+  $('#close-private-pdf-review').addEventListener('click',()=>$<HTMLDialogElement>('#private-pdf-review-dialog').close());
+  $('#cancel-private-pdf-review').addEventListener('click',()=>$<HTMLDialogElement>('#private-pdf-review-dialog').close());
+  $('#apply-private-pdf-matches').addEventListener('click',()=>void applyPrivatePdfMatches());
+  $('#private-pdf-manual-setup').addEventListener('click',()=>{const review=pendingPrivatePdfReview;if(!review)return;$<HTMLDialogElement>('#private-pdf-review-dialog').close();openManualPrivateMechanic(`Private PDF: ${review.record.name}`);});
   $('#private-mechanic-need').addEventListener('change',syncPrivateMechanicFields);
   $('#private-mechanic-mode').addEventListener('change',syncPrivateMechanicMode);
   $('#private-mechanics-form').addEventListener('submit',event=>{event.preventDefault();void (async()=>{try{await savePrivateMechanic();}catch(error){$('#private-mechanics-status').textContent=`Could not save mechanic: ${error instanceof Error?error.message:'Unknown error'}`;}})();});

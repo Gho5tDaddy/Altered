@@ -443,7 +443,7 @@
           </div>
           <section class="private-pdf-library" aria-labelledby="private-pdf-library-title">
             <div class="section-title"><h4 id="private-pdf-library-title">Owned PDF — read &amp; apply</h4><span id="private-pdf-count"></span></div>
-            <p>Upload an owned PDF up to 500 MB. Altered stores it privately for your login, then <strong>Read &amp; Set Up</strong> matches readable feature names to the current character’s class, subclass, species, and level. You confirm mechanics before they change the sheet.</p>
+            <p><strong>1.</strong> Upload your owned PDF up to 500 MB. <strong>2.</strong> Press <strong>Scan for this character</strong>. Altered finds only content matching the selected character’s class, subclass, species, level, feats, spells, and equipped items. <strong>3.</strong> Review the short match list and add it.</p>
             <label class="button primary file-button">Upload Owned PDF<input id="private-pdf-file" type="file" accept="application/pdf,.pdf"></label>
             <progress id="private-pdf-progress" max="100" value="0" hidden aria-label="Private PDF upload progress"></progress>
             <div id="private-pdf-status" class="status" role="status" aria-live="polite"></div>
@@ -456,6 +456,22 @@
         <div id="installed-pack-list" class="installed-pack-list"></div>
       </section>
       <div id="import-status" class="status" role="status" aria-live="polite"></div>
+    </div>
+  </dialog>
+
+  <dialog id="private-pdf-review-dialog" class="wide-dialog" aria-labelledby="private-pdf-review-title">
+    <div class="dialog-card private-pdf-review-card">
+      <div class="section-title"><h2 id="private-pdf-review-title">Character Content Review</h2><button id="close-private-pdf-review" class="text-button" type="button">Close</button></div>
+      <p id="private-pdf-review-intro" class="import-intro"></p>
+      <div class="pdf-scan-steps" aria-label="PDF setup progress"><span class="complete">1 · Uploaded</span><span class="complete">2 · Matched</span><span class="active">3 · Review &amp; add</span></div>
+      <div id="private-pdf-review-summary" class="status" role="status" aria-live="polite"></div>
+      <div id="private-pdf-review-list" class="private-pdf-review-list"></div>
+      <details class="advanced-builder private-pdf-advanced">
+        <summary>Advanced setup</summary>
+        <p>Use this only when a rule is not listed or needs a complex custom effect. The normal character-content matches above require no technical setup.</p>
+        <button id="private-pdf-manual-setup" class="button secondary" type="button">Set Up One Rule Manually</button>
+      </details>
+      <div class="dialog-actions"><button id="cancel-private-pdf-review" class="button secondary" type="button">Not Now</button><button id="apply-private-pdf-matches" class="button primary" type="button">Add Selected Content</button></div>
     </div>
   </dialog>
 

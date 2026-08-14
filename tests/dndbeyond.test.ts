@@ -214,6 +214,12 @@ test('identifies unsupported paid subclass features without copying descriptions
   assert.ok(!JSON.stringify(setup).includes('description'));
 });
 
+test('identifies only level-eligible traits for a non-SRD species',()=>{
+  const payload=structuredClone(ferocitusPayload) as any;payload.data.race={fullName:'Astral Wanderer',sizeId:4,weightSpeeds:{normal:{walk:30}},racialTraits:[{definition:{name:'Astral Arms',requiredLevel:1}},{definition:{name:'Astral Flight',requiredLevel:10}}]};
+  const report=importDdbCharacter(payload,'152187683');const setup=report.setupNeeds.filter(need=>need.kind==='species');
+  assert.deepEqual(setup.map(need=>need.label),['Astral Arms']);assert.ok(setup[0]?.detail.includes('Astral Wanderer'));
+});
+
 test('blocks clearly legacy or mixed D&D Beyond characters from the 2024-only engine',()=>{
   const payload=structuredClone(ferocitusPayload);const first=payload.data.classes[0];assert.ok(first);first.definition.isLegacy=true;
   const report=importDdbCharacter(payload,'152187683');assert.equal(report.blocked,true);assert.equal(report.character.provenance.ruleset,'mixed');assert.match(report.blockReason??'',/2024 rules only/);assert.ok(report.warnings.some(item=>item.code==='non-2024-ruleset'));

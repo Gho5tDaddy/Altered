@@ -1,5 +1,5 @@
 import type {Ability,ActionCost,Character,CharacterItem,CharacterRuleset,Creature,DamagePacket,DamageType,ProficiencyRank,ResourcePool,Spell} from './types.js';
-import {CREATURES,MOON_FORM_SPELL_LEVELS,SUBCLASS_FEATURES} from './content-registry.js';
+import {CREATURES,MOON_FORM_SPELL_LEVELS,SPECIES_FEATURES,SUBCLASS_FEATURES} from './content-registry.js';
 import {parseCharacter} from './schema.js';
 import {DDB_FEAT_SELECTION_EVIDENCE} from './data-migrations.js';
 
@@ -18,7 +18,7 @@ export interface DdbImportCoverage {
   detail:string;
 }
 
-export type DdbSetupKind='subclass'|'feat'|'item'|'spell'|'homebrew';
+export type DdbSetupKind='subclass'|'species'|'feat'|'item'|'spell'|'homebrew';
 export interface DdbSetupNeed {
   id:string;
   kind:DdbSetupKind;
@@ -551,6 +551,7 @@ function setupNeeds(data:JsonObject,classes:Character['classes'],feats:string[],
     if(featureNames.length){for(const feature of featureNames)add({id:`subclass-${slug(subclassName)}-${slug(feature.name)}`,kind:'subclass',label:feature.name,detail:`${subclassName} ${className} feature${feature.required>1?` (level ${feature.required})`:''}; confirm only its playable mechanics from your authorized D&D Beyond source.`});}
     else add({id:`subclass-${slug(subclassName)}`,kind:'subclass',label:subclassName,detail:`This subclass is not included in Altered's shared SRD rules pack. Add its transformation-relevant features from your authorized D&D Beyond source.`});
   }
+  const race=object(data.race),speciesName=string(race.fullName)||string(race.baseRaceName);if(speciesName&&!Object.keys(SPECIES_FEATURES).some(name=>name.toLowerCase()===speciesName.toLowerCase())){const traits=array(race.racialTraits).flatMap(raw=>{const definition=object(object(raw).definition);const name=string(definition.name)||string(object(raw).name);const required=whole(definition.requiredLevel??definition.level,1);return name&&required<=classes.reduce((sum,entry)=>sum+entry.level,0)?[name]:[];});if(traits.length)for(const trait of traits)add({id:`species-${slug(speciesName)}-${slug(trait)}`,kind:'species',label:trait,detail:`${speciesName} species trait on this character; confirm only its playable mechanics from your owned source.`});else add({id:`species-${slug(speciesName)}`,kind:'species',label:speciesName,detail:'This species is not included in Altered’s shared SRD rules pack. Add only the traits present on this character.'});}
   for(const feat of feats)if(!BUILT_IN_FEAT_MECHANICS.has(feat.toLowerCase())&&!/ability score improvement/i.test(feat))add({id:`feat-${slug(feat)}`,kind:'feat',label:feat,detail:'Altered imported the feat choice, but its situation-specific mechanics need a private confirmation before they can affect play.'});
   for(const item of items)if(item.equipped&&item.requiresAttunement&&item.attuned)add({id:`item-${slug(item.id)}`,kind:'item',label:item.name,detail:'Numeric sheet totals are already imported. Add only special actions, conditions, or transformation interactions so bonuses are not counted twice.'});
   for(const spell of spells)if(spell.resolution==='manual')add({id:`spell-${slug(spell.id??spell.name)}`,kind:'spell',label:spell.name,detail:'The spell is available, but its conditional effect remains manual until you confirm a supported private mechanic.'});
