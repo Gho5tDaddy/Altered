@@ -5,7 +5,7 @@ import {CLASS_FEATURES,CREATURES,SPECIES_FEATURES,SUBCLASS_FEATURES} from '../sr
 import {parseCharacter} from '../src/schema.js';
 import {
   applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,criticalDiceExpression,criticalHitThreshold,deathSaveMode,declareRecklessAttack,
-  actionExecutionError,clearConditions,declareAttack,endConcentration,endSpellEffect,endTransformation,endTurn,extendRage,extraAttackCount,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,removeCondition,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,spendActionExecution,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
+  actionExecutionError,addReceivedEffect,clearConditions,declareAttack,endConcentration,endReceivedEffect,endSpellEffect,endTransformation,endTurn,extendRage,extraAttackCount,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,removeCondition,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,spendActionExecution,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
 } from '../src/engine.js';
 
 function must<T>(value:T|undefined):T{if(value===undefined)throw new Error('Expected value was missing.');return value}
@@ -676,4 +676,18 @@ test('private overlays substitute roll abilities, add activation saves, and can 
   const c=character({classes:[{name:'Monk',level:5,subclass:'Warrior of the Elements'}],totalLevel:5,abilities:{str:8,dex:14,con:12,int:10,wis:18,cha:10},proficiencies:{saves:{str:1,dex:1},skills:{Athletics:1}},transformationGrants:[{id:'astral-test',label:'Astral Arms',profile:'overlay',formIds:[],source:'Owned content',actionCost:'bonus',endActionCost:'none',effects:{checkAbilitySubstitution:{str:'wis'},saveAbilitySubstitution:{str:'wis'},attackAbilityOverride:{ability:'wis',appliesTo:['unarmed']},actions:[{id:'astral-summon',name:'Astral Arms summon',type:'save',cost:'none',saveAbility:'dex',dc:15,damageOnFail:[{expression:'2d6',type:'Force'}]}]}}]});
   const state=createInitialState(c);const option=availableTransformations(c,state).find(entry=>entry.grantId==='astral-test');assert.ok(option);startTransformation(c,state,option);const sheet=resolveSheet(c,state);assert.equal(sheet.skills.Athletics?.modifier,7);assert.equal(sheet.saves.str.modifier,7);const strike=sheet.actions.find(action=>action.id==='monk-unarmed');assert.ok(strike?.type==='attack');assert.equal(strike.attackBonus,7);assert.equal(strike.ability,'wis');assert.match(strike.damage[0]?.expression??'',/\+4$/);assert.ok(sheet.actions.some(action=>action.id==='astral-summon'));
   const end=availableTransformations(c,state).find(entry=>entry.grantId==='astral-test'&&entry.deactivate);assert.ok(end);startTransformation(c,state,end);assert.equal(state.overlays.includes('astral-test'),false);
+});
+
+test('received effects initialize safely, replace duplicates, and end explicitly',()=>{
+  const state=createInitialState(character());assert.deepEqual(state.receivedEffects,[]);
+  addReceivedEffect(state,{id:'guidance-1',kind:'guidance',name:'Guidance',source:'Cleric',addedTurn:1,duration:'Up to 1 minute',skill:'Perception'});
+  assert.equal(state.receivedEffects.length,1);assert.equal(state.receivedEffects[0]?.skill,'Perception');
+  const replaced=addReceivedEffect(state,{id:'guidance-2',kind:'guidance',name:'Guidance',source:'Druid',addedTurn:2,duration:'Up to 1 minute',skill:'Stealth'});
+  assert.equal(state.receivedEffects.length,1);assert.equal(state.receivedEffects[0]?.source,'Druid');assert.match(replaced.message,/do not stack/);
+  assert.match(endReceivedEffect(state,'guidance-2').message,/ended/);assert.deepEqual(state.receivedEffects,[]);
+});
+
+test('2024 Monk weapons use the Martial Arts die and magic bonus for attack and damage',()=>{
+  const monk=character({classes:[{name:'Monk',level:6,subclass:'Warrior of the Elements'}],totalLevel:6,abilities:{str:10,dex:16,con:12,int:10,wis:16,cha:8},knownForms:[],seenForms:[],spells:[],spellSlots:{},equipment:{armorCategory:'none',shield:false,transformBehavior:'merge'},items:[{id:'staff-plus-one',name:'Quarterstaff, +1',type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d6',damageType:'Bludgeoning',proficient:true,properties:['Versatile'],magicBonus:1}}]});
+  const staff=resolveSheet(monk,createInitialState(monk)).actions.find(action=>action.id==='item-attack-staff-plus-one');assert.ok(staff?.type==='attack');if(staff.type==='attack'){assert.equal(staff.ability,'dex');assert.equal(staff.attackBonus,7);assert.equal(staff.damage[0]?.expression,'1d8+4');assert.match(staff.notes??'',/magic weapon bonus to attack and damage/);assert.match(staff.notes??'',/Martial Arts 1d8/);}
 });

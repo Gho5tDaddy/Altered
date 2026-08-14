@@ -205,6 +205,12 @@ test('imports equipped weapon structure into executable base-form attacks',()=>{
   assert.ok(item?.attack);assert.equal(item.attack.damage,'1d12');assert.equal(item.attack.damageType,'Slashing');assert.equal(item.attack.proficient,true);
 });
 
+test('infers an explicit magic weapon bonus from a D&D Beyond item name when numeric fields are absent',()=>{
+  const payload=structuredClone(ferocitusPayload) as any;payload.data.modifiers.class.push({type:'proficiency',subType:'simple-weapons',componentId:112,isGranted:true});
+  payload.data.inventory.push({id:502,equipped:true,isAttuned:false,definition:{id:202,name:'Quarterstaff, +1',type:'Quarterstaff',filterType:'Weapon',categoryId:1,attackType:1,damage:{diceString:'1d6'},damageType:'Bludgeoning',properties:[{name:'Versatile'}]}});
+  const item=importDdbCharacter(payload,'152187683').character.items.find(entry=>entry.name==='Quarterstaff, +1');assert.equal(item?.attack?.magicBonus,1);
+});
+
 test('identifies unsupported paid subclass features without copying descriptions',()=>{
   const payload=JSON.parse(JSON.stringify(ferocitusPayload)) as any;const druid=payload.data.classes[1];assert.ok(druid);
   druid.subclassDefinition={name:'Circle of Stars',classFeatures:[{name:'Starry Form',requiredLevel:3},{name:'Cosmic Omen',requiredLevel:6}]};

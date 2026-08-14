@@ -127,10 +127,15 @@ export interface ConcentrationState {name:string;source:string;castLevel?:number
 export interface PendingRelentlessRage {dc:number;damage:number;source:DamageType}
 export interface LifeState {dead:boolean;stable:boolean;deathSaveSuccesses:number;deathSaveFailures:number}
 export interface ActiveSpellEffect extends SpellActiveEffect {name:string;source:string;castLevel?:number}
+export type ReceivedEffectKind='guidance'|'bless'|'bardic-inspiration'|'heroic-inspiration';
+export interface ReceivedEffect {
+  id:string;kind:ReceivedEffectKind;name:string;source:string;addedTurn:number;
+  duration:string;remindAtTurn?:number;skill?:string;die?:4|6|8|10|12;
+}
 export interface ActiveTransform {option:TransformationOption;startedTurn:number;duration:string;tempHpSource:boolean;spellConcentration?:boolean;permanentUntilDispelled?:boolean}
 export interface ActionRecharge {name:string;min:number;max:number}
 export interface GameState {
-  stateVersion:5;hp:number;tempHp:number;life:LifeState;exhaustionLevel:number;relentlessRageDc:number;pendingRelentlessRage?:PendingRelentlessRage;tempHpSource?:string;activeTransform?:ActiveTransform;concentration?:ConcentrationState;activeSpellEffects:ActiveSpellEffect[];
+  stateVersion:5;hp:number;tempHp:number;life:LifeState;exhaustionLevel:number;relentlessRageDc:number;pendingRelentlessRage?:PendingRelentlessRage;tempHpSource?:string;activeTransform?:ActiveTransform;concentration?:ConcentrationState;activeSpellEffects:ActiveSpellEffect[];receivedEffects:ReceivedEffect[];
   concentrationChecks:{dc:number;damage:number;source:string}[];
   rage:RageState;turn:TurnState;resources:Record<string,ResourcePool>;spellSlots:Record<string,{current:number;max:number}>;
   conditions:string[];equipment:EquipmentState;overlays:string[];recharges:Record<string,ActionRecharge>;actionUses:Record<string,number>;log:string[];

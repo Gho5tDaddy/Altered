@@ -1,6 +1,6 @@
 import type {
   Ability,AcCandidate,ActionCost,Character,CreatureAction,DamagePacket,DamageType,
-  DerivedRoll,EvaluatedFeature,GameState,ImportedFeatureRule,ProficiencyRank,ResolvedSheet,ResourcePool,RetentionPolicy,
+  DerivedRoll,EvaluatedFeature,GameState,ImportedFeatureRule,ProficiencyRank,ReceivedEffect,ResolvedSheet,ResourcePool,RetentionPolicy,
   Spell,TransformProfile,TransformationEffects,TransformationOption,TransitionResult
 } from './types.js';
 import {
@@ -169,7 +169,7 @@ export function createInitialState(character:Character):GameState{
     turn:{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,slotSpellCast:false,attackRollsMade:0,oncePerTurn:{}},
     resources:Object.fromEntries(character.resources.map(r=>[r.id,cloneResource(r)])),
     spellSlots:Object.fromEntries(Object.entries(character.spellSlots).map(([k,v])=>[k,{...v}])),
-    concentrationChecks:[],activeSpellEffects:[],conditions:[],equipment:{...character.equipment},overlays:[],recharges:{},actionUses:{},log:[]
+    concentrationChecks:[],activeSpellEffects:[],receivedEffects:[],conditions:[],equipment:{...character.equipment},overlays:[],recharges:{},actionUses:{},log:[]
   };
 }
 
@@ -296,9 +296,14 @@ function resolveInitiative(character:Character,state:GameState,option:Transforma
   modifier-=exhaustionPenalty(state);if(state.exhaustionLevel>0)sources.push(`minus ${exhaustionPenalty(state)} from Exhaustion ${state.exhaustionLevel}`);
   return {name:'Initiative',modifier,source:sources.join(' + '),proficiency,...(advantageSources.length?{advantageSources}:{}),...(disadvantageSources.length?{disadvantageSources}:{}),...(conditionalSources.length?{conditionalSources}:{})};
 }
+const SIMPLE_MONK_WEAPONS=new Set(['club','dagger','greatclub','handaxe','javelin','light hammer','mace','quarterstaff','sickle','spear']);
+const MARTIAL_LIGHT_MONK_WEAPONS=new Set(['scimitar','shortsword']);
+function baseWeaponName(name:string){return normalized(name).replace(/[,\s]*[+-]\d+\s*$/,'').trim();}
+function monkWeaponEligible(name:string,properties:string[],range:number|undefined){const base=baseWeaponName(name);return range===undefined&&(SIMPLE_MONK_WEAPONS.has(base)||MARTIAL_LIGHT_MONK_WEAPONS.has(base)&&properties.some(property=>sameText(property,'Light')));}
+function largerWeaponDie(weapon:string,martial:string){const weaponMatch=weapon.match(/^1d(\d+)$/i),martialMatch=martial.match(/^1d(\d+)$/i);if(!weaponMatch||!martialMatch)return weapon;return Number(martialMatch[1])>Number(weaponMatch[1])?martial:weapon;}
 function baseActions(character:Character,abilities:Character['abilities'],size:string):CreatureAction[]{
   const mod=abilityMod(abilities.str),pb=proficiencyBonus(character.totalLevel),dc=8+pb+mod,targetSizeMax=shiftedSize(size,1);
-  const weapons:CreatureAction[]=character.items.filter(item=>item.equipped&&(!item.requiresAttunement||item.attuned)&&item.attack).map(item=>{const attack=item.attack!;const abilityModifier=abilityMod(abilities[attack.ability]);const bonus=abilityModifier+(attack.proficient?pb:0)+attack.magicBonus;const damageModifier=abilityModifier+attack.magicBonus;const range=attack.range!==undefined?attack.longRange&&attack.longRange!==attack.range?`${attack.range}/${attack.longRange} ft.`:`${attack.range} ft.`:undefined;return {id:`item-attack-${item.id}`,name:item.name,type:'attack',cost:'action',attackBonus:bonus,ability:attack.ability,kind:'weapon',damage:[{expression:`${attack.damage}${damageModifier>0?`+${damageModifier}`:damageModifier<0?String(damageModifier):''}`,type:attack.damageType}],...(range?{range}:{}),notes:[attack.proficient?'Proficient':'Not proficient',attack.properties.join(', '),item.mechanics==='included-in-imported-totals'?'Equipped item; imported character totals are not applied twice.':''].filter(Boolean).join(' · ')};});
+  const monk=classLevel(character,'Monk');const weapons:CreatureAction[]=character.items.filter(item=>item.equipped&&(!item.requiresAttunement||item.attuned)&&item.attack).map(item=>{const attack=item.attack!,monkWeapon=monk>=1&&monkWeaponEligible(item.name,attack.properties,attack.range),ability:Ability=monkWeapon&&abilities.dex>abilities[attack.ability]?'dex':attack.ability,abilityModifier=abilityMod(abilities[ability]),bonus=abilityModifier+(attack.proficient?pb:0)+attack.magicBonus,damageModifier=abilityModifier+attack.magicBonus,damageDie=monkWeapon?largerWeaponDie(attack.damage,monkDie(monk)):attack.damage;const range=attack.range!==undefined?attack.longRange&&attack.longRange!==attack.range?`${attack.range}/${attack.longRange} ft.`:`${attack.range} ft.`:undefined;return {id:`item-attack-${item.id}`,name:item.name,type:'attack',cost:'action',attackBonus:bonus,ability,kind:'weapon',damage:[{expression:`${damageDie}${damageModifier>0?`+${damageModifier}`:damageModifier<0?String(damageModifier):''}`,type:attack.damageType}],...(range?{range}:{}),notes:[attack.proficient?'Proficient':'Not proficient',attack.magicBonus?`${attack.magicBonus>0?'+':''}${attack.magicBonus} magic weapon bonus to attack and damage`:'',monkWeapon?`Monk weapon · Martial Arts ${monkDie(monk)} die and Dexterity available`:'',attack.properties.join(', '),item.mechanics==='included-in-imported-totals'?'Equipped item; imported character totals are not applied twice.':''].filter(Boolean).join(' · ')};});
   return [...weapons,
     {id:'unarmed',name:'Unarmed Strike — Damage',type:'attack',cost:'action',attackBonus:pb+mod,ability:'str',kind:'unarmed',reach:5,damage:[{expression:String(Math.max(1,1+mod)),type:'Bludgeoning'}]},
     {id:'unarmed-grapple',name:'Unarmed Strike — Grapple',type:'save',cost:'action',saveAbility:'str',saveAbilityOptions:['str','dex'],dc,range:'5 ft.',effectsOnFail:[{condition:'Grappled',escapeDc:dc,targetSizeMax,note:'Requires a free hand.'}],notes:'The target chooses a Strength or Dexterity save. It must be no more than one size larger than you.'},
@@ -546,6 +551,16 @@ export function startNewTurn(state:GameState,rechargeRoll=()=>rollDice('1d6').to
 export function endTurn(character:Character,state:GameState):TransitionResult{
   if(state.rage.active&&classLevel(character,'Barbarian')<15&&state.turn.number>=state.rage.endsAtTurn)return endRage(state,'Rage ended because it was not extended.');
   return {state,message:`Turn ${state.turn.number} ended.`};
+}
+export function addReceivedEffect(state:GameState,effect:ReceivedEffect):TransitionResult{
+  const replaced=state.receivedEffects.find(active=>active.kind===effect.kind);
+  state.receivedEffects=state.receivedEffects.filter(active=>active.kind!==effect.kind);
+  state.receivedEffects.push({...effect});
+  return {state,message:`${effect.name} added${effect.source?` from ${effect.source}`:''}.${replaced?' The previous instance was replaced; duplicate effects of the same name do not stack.':''}`};
+}
+export function endReceivedEffect(state:GameState,effectId:string):TransitionResult{
+  const active=state.receivedEffects.find(effect=>effect.id===effectId);if(!active)return {state,message:'That received effect is not active.'};
+  state.receivedEffects=state.receivedEffects.filter(effect=>effect.id!==effectId);return {state,message:`${active.name} ended.`};
 }
 function expiresDuringShortRest(duration:string){const value=normalized(duration);return value.includes('round')||value.includes('minute')||/(^|\D)1 hour(\D|$)/.test(value)}
 export function shortRest(state:GameState):TransitionResult{

@@ -1,3 +1,11 @@
+# Altered v0.29.16 release notes
+
+- Added a compact **Effects & Conditions** tracker for Guidance, Bless, Bardic Inspiration, Heroic Inspiration, and ordinary conditions. Active entries remain visibly highlighted until the player ends or uses them; ally-supplied effects never change the character's own Concentration state.
+- Guidance and Bless now add their eligible d4 automatically. Bardic and Heroic Inspiration remain explicit player choices and are consumed only through their labeled controls.
+- Attack rolls and damage rolls are now separate. Altered queues damage after each possible hit—including every Multiattack component—so the player confirms the hit before rolling damage or clears it as a miss.
+- Corrected equipped magic-weapon handling so an explicit `+1` contributes to both attack and damage. Qualifying 2024 Monk weapons use Dexterity when better and the Martial Arts die when it is larger; a level-6 Monk's quarterstaff now uses d8.
+- Existing characters, combat state, imports, private PDFs, private packs, transformations, artwork, and settings remain compatible.
+
 # Altered v0.29.15 release notes
 
 - PDF review now keeps the selected-content Add button above the scrolling match list so it remains obvious and reachable on phones.

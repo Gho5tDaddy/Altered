@@ -8,9 +8,17 @@ test('static shell exposes accessible tabs, dialogs, and condition input',()=>{
   assert.equal((html.match(/role="tab"/g)??[]).length,6);
   assert.match(html,/id="tab-content"[^>]*role="tabpanel"[^>]*aria-labelledby="tab-actions"/);
   assert.match(html,/for="condition-select">Condition<\/label>/);
+  for(const id of ['received-effect-kind','received-effect-source','received-effect-skill','add-received-effect-button','received-effect-list'])assert.match(html,new RegExp(`id="${id}"`));
   for(const id of ['help-dialog','import-dialog','private-mechanics-dialog','transform-builder-dialog','settings-dialog','temp-hp-dialog','delete-character-dialog']){
     assert.match(html,new RegExp(`<dialog id="${id}"[^>]*aria-labelledby="${id.replace(/-dialog$/,'')}(?:-dialog)?-title"`));
   }
+});
+
+test('received effects stay compact and attacks separate hit from damage',()=>{
+  const html=readFileSync('public/index.html','utf8'),source=readFileSync('src/app.ts','utf8'),styles=readFileSync('public/styles.css','utf8');
+  assert.match(html,/Effects &amp; Conditions/);assert.match(html,/Guidance/);assert.match(html,/Bardic Inspiration/);
+  assert.match(source,/receivedRollBonus\('attack'\)/);assert.match(source,/receivedRollBonus\('skill',/);assert.match(source,/queueDamageRoll/);assert.match(source,/Roll Damage/);assert.match(source,/Miss · Clear/);
+  assert.match(styles,/alteredTrackedEffect/);assert.match(styles,/\.app-shell\.reduce-motion \.tracked-active/);
 });
 
 test('paid mechanics use a compact private completion flow without credentials or copied rules text',()=>{
@@ -290,8 +298,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.15\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.15\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.15\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.16\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.16\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.16\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
@@ -304,9 +312,9 @@ test('combat state and spell availability are explained before a click',()=>{
   assert.match(source,/Action still available: use it for an attack, another non-spell action, or a cantrip/);
   assert.match(source,/Barkskin, Wild Shape, and Rage each use a Bonus Action/);
   assert.match(source,/attack roll: \$\{attackRollDetail\(attack/);
-  assert.match(source,/Potential damage if every attack hits and every save fails/);
+  assert.match(source,/Confirm each hit, then use its separate Roll Damage control/);
   assert.match(source,/natural 20, automatic hit and CRITICAL HIT/);
-  assert.match(source,/On a hit, apply: \$\{effectsText\(hitEffects\)\}/);
+  assert.match(source,/On a hit: \$\{effectsText\(hitEffects\)\}/);
   assert.match(source,/Add Advantage/);
   assert.match(source,/Multiattack option/);
   assert.match(source,/Spell effect: \$\{spell\.summary\}/);
