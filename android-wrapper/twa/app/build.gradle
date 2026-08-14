@@ -57,8 +57,8 @@ android {
         applicationId "com.ghostdaddy.altered"
         minSdkVersion 21
         targetSdkVersion 36
-        versionCode 47
-        versionName "0.29.1"
+        versionCode 48
+        versionName "0.29.14"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name

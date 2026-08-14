@@ -290,6 +290,7 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
   assert.match(build,/Altered-Windows-Setup-v0\.29\.14\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.14\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.14\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
