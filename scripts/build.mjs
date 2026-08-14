@@ -74,11 +74,14 @@ const toolAssets=Object.fromEntries(await Promise.all(['pdf.bundle.js','pdf.work
 const downloadAssets=Object.fromEntries(await Promise.all([
   ['Altered-Desktop-Mac-v0.29.14.zip','application/zip'],
   ['Altered-Windows-Setup-v0.29.14.exe','application/octet-stream'],
-  ['Altered-Android-v0.29.14.apk','application/vnd.android.package-archive'],
 ].map(async([name,type])=>[
   `/downloads/${name}`,
   {name,type,data:(await readFile(path.join(root,'public','downloads',name))).toString('base64')},
 ])));
+// Android is distributed through the public GitHub release. Reading it here
+// keeps the local release audit strict without embedding a 6.5 MB APK in the
+// Worker bundle, which would exceed the hosting platform's script-size limit.
+await readFile(path.join(root,'public','downloads','Altered-Android-v0.29.14.apk'));
 const workerTemplate=await readFile(path.join(root,'scripts','hosted-worker.template.js'),'utf8');
 const hostedWorker=workerTemplate
   .replace('__ALTERED_PAGE_BASE64__',()=>JSON.stringify(hostedPage))
