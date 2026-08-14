@@ -284,7 +284,7 @@ export default {
     const url=new URL(request.url);
     const privatePdfMatch=url.pathname.match(privatePdfRoute);
     if(privatePdfMatch){
-      const operation=request.method==='PUT'?'pdf-upload-part':request.method==='POST'?'pdf-upload-control':request.method==='DELETE'?'pdf-delete':'pdf-read';const limit=request.method==='PUT'?180:60;const blocked=guardApiRequest(request,operation,limit);if(blocked)return blocked;const user=authenticatedUser(request);
+      const rangeRead=request.method==='GET'&&Boolean(request.headers.get('Range'));const operation=request.method==='PUT'?'pdf-upload-part':request.method==='POST'?'pdf-upload-control':request.method==='DELETE'?'pdf-delete':rangeRead?'pdf-range-read':'pdf-read';const limit=request.method==='PUT'?180:rangeRead?2400:60;const blocked=guardApiRequest(request,operation,limit);if(blocked)return blocked;const user=authenticatedUser(request);
       try{return await handlePrivatePdfs(request,env,user,privatePdfMatch[1]);}catch(error){console.error('Altered private PDF failure',error instanceof Error?`${error.name}: ${error.message}`:'Unknown error');return privatePdfOperationError(error);}
     }
     if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
