@@ -2183,3 +2183,7 @@ body::after{
 .chatgpt-assist{margin-top:14px;border:1px solid color-mix(in srgb,var(--accent) 34%,var(--line));background:rgba(12,18,24,.72)}
 .chatgpt-assist>summary{min-block-size:44px;padding:12px 14px;cursor:pointer}.chatgpt-assist>summary span{display:grid;gap:2px}.chatgpt-assist>summary small{color:var(--muted)}
 .chatgpt-assist>p,.chatgpt-assist>.inline-actions,.chatgpt-assist>.status{margin-inline:14px}.chatgpt-assist>.status{margin-bottom:14px}
+
+/* Keep the decisive PDF review action visible before the independently scrolling matches. */
+.private-pdf-review-actions{position:sticky;top:0;z-index:3;margin:0;padding:8px;border:1px solid color-mix(in srgb,var(--magic-cyan,#62e5df) 42%,var(--line));background:rgba(7,11,14,.96);box-shadow:0 8px 18px rgba(0,0,0,.32)}
+.private-pdf-review-actions .button{min-height:48px}
