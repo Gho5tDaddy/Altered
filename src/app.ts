@@ -116,7 +116,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.12';
+const APP_VERSION='0.29.13';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -124,7 +124,8 @@ interface PrivatePdfRecord{id:string;name:string;size:number;uploadedAt:string}
 type PrivatePdfTargetKind='Class or subclass'|'Species'|'Feat'|'Spell'|'Equipped item'|'Character feature';
 interface PrivatePdfTarget{id:string;name:string;kind:PrivatePdfTargetKind;detail:string}
 interface PrivatePdfMatch extends PrivatePdfTarget{page:number;summary:string;activation:ActionCost;selected:boolean}
-let pendingPrivatePdfReview:{record:PrivatePdfRecord;matches:PrivatePdfMatch[];searched:number;unmatched:PrivatePdfTarget[]}|null=null;
+let pendingPrivatePdfReview:{record:PrivatePdfRecord;matches:PrivatePdfMatch[];searched:number;pages:number;unmatched:PrivatePdfTarget[]}|null=null;
+let pendingPrivatePdfResultRecord:PrivatePdfRecord|null=null;
 type UiStatus='available'|'active'|'inactive'|'locked'|'unavailable'|'requirements'|'selected'|'favorite'|'new'|'importing'|'loading'|'success'|'warning'|'error';
 const UI_STATUS:Record<UiStatus,{icon:string;label:string}>={
   available:{icon:'✓',label:'Available'},active:{icon:'✦',label:'Active'},inactive:{icon:'○',label:'Inactive'},
@@ -228,6 +229,8 @@ function filterHelpTopics(){
 
 function addActivity(message:string){state.log.unshift(message);state.log=state.log.slice(0,25);persist();}
 function notify(message:string){$('#status-message').textContent=message;$('#play-status').textContent=message;addActivity(message);}
+function setStatus(message:string){$('#status-message').textContent=message;$('#play-status').textContent=message;}
+function isLegacyStartupActivity(message:string){return /^Altered loaded for .+\. (?:Built-in rules and forms are ready\.|\d+ private content packs? available\..*)$/.test(message);}
 function persist(){try{localStorage.setItem('altered-v0.18',JSON.stringify({baseCharacters,currentCharacterId:baseCharacter.id,state,deletedCharacterIds:[...deletedCharacterIds]}));}catch{/* storage is optional */}}
 function safeSavedText(value:unknown,fallback:string,max=200){return typeof value==='string'?value.slice(0,max):fallback;}
 function savedOncePerTurn(value:unknown){
@@ -280,7 +283,7 @@ function restore(){
       if(Array.isArray(saved.overlays))clean.overlays=saved.overlays.filter((x):x is string=>typeof x==='string'&&x.length<=120).slice(0,20);
       clean.recharges=savedActionRecharges(saved.recharges);
       clean.actionUses=savedActionUses(saved.actionUses);
-      if(Array.isArray(saved.log))clean.log=saved.log.filter((x):x is string=>typeof x==='string').slice(0,25).map(x=>x.slice(0,500));
+      if(Array.isArray(saved.log))clean.log=saved.log.filter((x):x is string=>typeof x==='string'&&!isLegacyStartupActivity(x)).slice(0,25).map(x=>x.slice(0,500));
       if(saved.turn&&typeof saved.turn==='object'){const sequence=saved.turn.attackAction&&typeof saved.turn.attackAction==='object'?{remaining:boundedWhole(saved.turn.attackAction.remaining,0,0,3),total:boundedWhole(saved.turn.attackAction.total,1,1,4),source:typeof saved.turn.attackAction.source==='string'?saved.turn.attackAction.source.slice(0,80):'Extra Attack'}:undefined;clean.turn={number:boundedWhole(saved.turn.number,clean.turn.number,1,1_000_000),actionsRemaining:boundedWhole(saved.turn.actionsRemaining,clean.turn.actionsRemaining,0,1),surgeActionsRemaining:boundedWhole(saved.turn.surgeActionsRemaining,clean.turn.surgeActionsRemaining,0,1),bonusRemaining:boundedWhole(saved.turn.bonusRemaining,clean.turn.bonusRemaining,0,1),reactionRemaining:boundedWhole(saved.turn.reactionRemaining,clean.turn.reactionRemaining,0,1),slotSpellCast:Boolean(saved.turn.slotSpellCast),attackRollsMade:boundedWhole(saved.turn.attackRollsMade,clean.turn.attackRollsMade,0,100),...(sequence&&sequence.remaining>0&&sequence.remaining<sequence.total?{attackAction:sequence}:{}),oncePerTurn:savedOncePerTurn(saved.turn.oncePerTurn)};}
       if(saved.rage&&typeof saved.rage==='object'&&typeof saved.rage.active==='boolean')clean.rage={active:saved.rage.active,endsAtTurn:boundedWhole(saved.rage.endsAtTurn,clean.rage.endsAtTurn,0,1_000_000),usedThisTurn:Boolean(saved.rage.usedThisTurn),recklessDeclared:Boolean(saved.rage.recklessDeclared),extendedThisTurn:Boolean(saved.rage.extendedThisTurn)};
       if(saved.concentration&&typeof saved.concentration.name==='string')clean.concentration={name:saved.concentration.name.slice(0,120),source:safeSavedText(saved.concentration.source,'Unknown',120)};
@@ -470,6 +473,9 @@ async function loadHostedAccount(){
 }
 function setImportStatus(message:string){$('#import-status').textContent=message;}
 function privatePdfStatus(message:string){$('#private-pdf-status').textContent=message;}
+function showPrivatePdfResult(title:string,summary:string,items:string[],record:PrivatePdfRecord|null=null){
+  pendingPrivatePdfResultRecord=record;$('#private-pdf-result-title').textContent=title;$('#private-pdf-result-summary').textContent=summary;const list=$('#private-pdf-result-list');clear(list);for(const item of items)list.append(text('li',item));$<HTMLButtonElement>('#scan-private-pdf-result').hidden=!record;$<HTMLDialogElement>('#private-pdf-result-dialog').showModal();
+}
 function formatFileSize(bytes:number){if(bytes>=1024*1024)return `${(bytes/(1024*1024)).toFixed(bytes>=10*1024*1024?1:2)} MB`;return `${Math.max(1,Math.ceil(bytes/1024))} KB`;}
 function privatePdfRequestHeaders(){return {'X-Altered-Request':'app'};}
 function renderPrivatePdfLibrary(records:PrivatePdfRecord[]){
@@ -502,7 +508,7 @@ async function privatePdfUploadRequest(url:string,options:RequestInit,retries=3)
   }
   throw lastError??new Error('The upload connection failed.');
 }
-async function uploadPrivatePdf(file:File){
+async function uploadPrivatePdf(file:File):Promise<PrivatePdfRecord>{
   if(file.size>PRIVATE_PDF_LIMIT)throw new Error('PDF exceeds the 500 MB account-storage limit.');
   if(file.type&&file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf'))throw new Error('Choose a PDF file.');
   const progress=$<HTMLProgressElement>('#private-pdf-progress');progress.hidden=false;progress.value=0;const id=privatePdfId();let uploadId='';privatePdfStatus(`Preparing ${file.name} for a secure chunked upload…`);
@@ -515,7 +521,7 @@ async function uploadPrivatePdf(file:File){
       const uploaded=await privatePdfUploadRequest(`/api/private-pdfs/${id}?action=part&uploadId=${encodeURIComponent(uploadId)}&partNumber=${partNumber}`,{method:'PUT',headers:{'Content-Type':'application/octet-stream','X-Altered-Part-Size':String(chunk.size)},body:chunk});
       const part=await uploaded.json() as {partNumber?:unknown;etag?:unknown};if(typeof part.partNumber!=='number'||typeof part.etag!=='string')throw new Error(`Part ${partNumber} was not confirmed by private storage.`);parts.push({partNumber:part.partNumber,etag:part.etag});progress.value=Math.round(partNumber/totalParts*100);
     }
-    await privatePdfUploadRequest(`/api/private-pdfs/${id}?action=complete&uploadId=${encodeURIComponent(uploadId)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts})});privatePdfStatus(`${file.name} saved to your private Altered account.`);
+    const completed=await privatePdfUploadRequest(`/api/private-pdfs/${id}?action=complete&uploadId=${encodeURIComponent(uploadId)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parts})});const payload=await completed.json() as {size?:unknown};const size=typeof payload.size==='number'?payload.size:file.size;privatePdfStatus(`${file.name} saved to your private Altered account.`);return {id,name:file.name,size,uploadedAt:new Date().toISOString()};
   }catch(error){
     if(uploadId)void fetch(`/api/private-pdfs/${id}?action=abort&uploadId=${encodeURIComponent(uploadId)}`,{method:'DELETE',headers:privatePdfRequestHeaders(),credentials:'same-origin'});throw error;
   }finally{progress.hidden=true;}
@@ -567,16 +573,16 @@ async function hostedPrivatePdfDocument(record:PrivatePdfRecord){
   return library.getDocument({url:`/api/private-pdfs/${encodeURIComponent(record.id)}`,disableWorker:true,withCredentials:true,httpHeaders:privatePdfRequestHeaders(),rangeChunkSize:256*1024,disableStream:true,disableAutoFetch:true}).promise;
 }
 async function findPrivatePdfCharacterMechanics(record:PrivatePdfRecord){
-  const targets=privatePdfCharacterTargets();if(!targets.length)return {matches:[],searched:0,unmatched:[]};const unmatched=[...targets];const matches:PrivatePdfMatch[]=[];const pdf=await hostedPrivatePdfDocument(record);const pageLimit=Math.min(pdf.numPages,1200);
+  const targets=privatePdfCharacterTargets();if(!targets.length)return {matches:[],searched:0,pages:0,unmatched:[]};const unmatched=[...targets];const matches:PrivatePdfMatch[]=[];const pdf=await hostedPrivatePdfDocument(record);const pageLimit=Math.min(pdf.numPages,1200);
   for(let pageNumber=1;pageNumber<=pageLimit&&unmatched.length;pageNumber++){
     privatePdfStatus(`Scanning only ${character.name}'s content · page ${pageNumber} of ${pageLimit}…`);const page=await pdf.getPage(pageNumber);const content=await page.getTextContent();if(!content.items.length)continue;
     for(let index=unmatched.length-1;index>=0;index--){const target=unmatched[index]!;const summary=findPdfRuleEntry(content.items,target.name,target.kind);if(!summary)continue;matches.push({...target,page:pageNumber,summary,activation:activationFromPrivateText(summary),selected:true});unmatched.splice(index,1);}
   }
-  return {matches:matches.sort((a,b)=>a.kind.localeCompare(b.kind)||a.name.localeCompare(b.name)),searched:targets.length,unmatched};
+  return {matches:matches.sort((a,b)=>a.kind.localeCompare(b.kind)||a.name.localeCompare(b.name)),searched:targets.length,pages:pageLimit,unmatched};
 }
 function renderPrivatePdfReview(){
-  const review=pendingPrivatePdfReview;if(!review)return;$('#private-pdf-review-title').textContent=`Content for ${character.name}`;$('#private-pdf-review-intro').textContent=`Altered compared ${review.record.name} only with content already present on ${character.name}'s character sheet. It will not add unrelated book options or duplicate imported totals.`;
-  $('#private-pdf-review-summary').textContent=review.matches.length?`${review.matches.length} exact match${review.matches.length===1?'':'es'} found. Selected entries will be added as playable reminders or controls.`:`No exact readable matches were found for the ${review.searched} character entries checked. Nothing has been changed.`;
+  const review=pendingPrivatePdfReview;if(!review)return;$('#private-pdf-review-title').textContent=review.matches.length?`Review matches for ${character.name}`:'Scan complete — no matches';$('#private-pdf-review-intro').textContent=`Altered compared ${review.record.name} only with content already present on ${character.name}'s character sheet. It will not add unrelated book options or duplicate imported totals.`;
+  $('#private-pdf-review-summary').textContent=review.matches.length?`Scanned ${review.pages} pages and found ${review.matches.length} exact match${review.matches.length===1?'':'es'} among ${review.searched} character entries. Nothing changes until you press Add.`:`Scanned ${review.pages} pages and checked ${review.searched} character ${review.searched===1?'entry':'entries'}. No exact readable matches were found, so nothing was added or changed.`;
   const list=$('#private-pdf-review-list');clear(list);for(const match of review.matches){const row=document.createElement('label');row.className='private-pdf-match';const input=document.createElement('input');input.type='checkbox';input.checked=match.selected;input.addEventListener('change',()=>{match.selected=input.checked;syncPrivatePdfReviewButton();});const copy=document.createElement('span');const heading=document.createElement('span');heading.className='private-pdf-match-heading';heading.append(text('strong',match.name),text('span',`${match.kind} · page ${match.page}`,'ui-status selected'));copy.append(heading,text('small',match.activation==='none'?'Adds a rules reminder; existing imported totals stay unchanged.':`Adds a ${match.activation.replace('-',' ')} control; existing imported totals stay unchanged.`),text('p',match.summary));row.append(input,copy);list.append(row);}
   if(!review.matches.length)list.append(text('div','The PDF may be image-only, use different wording, or may not contain this character’s unresolved options. Open Advanced setup only if you need to add a specific rule manually.','private-pdf-empty'));syncPrivatePdfReviewButton();
 }
@@ -584,7 +590,7 @@ function syncPrivatePdfReviewButton(){const review=pendingPrivatePdfReview;const
 async function applyPrivatePdfMatches(){
   const review=pendingPrivatePdfReview;if(!review)return;const selected=review.matches.filter(match=>match.selected);if(!selected.length)return;const apply=$<HTMLButtonElement>('#apply-private-pdf-matches');apply.disabled=true;apply.textContent='Adding content…';
   for(const match of selected){const pack=privateMechanicPack(baseCharacter,{packId:`pdf-${slug(review.record.id)}-${slug(match.id)}`.slice(0,120),name:match.name,source:`Private PDF: ${review.record.name}, page ${match.page}`,summary:match.summary,mode:match.activation==='none'?'reference':'conditional',retainInWildShape:true,activation:match.activation});await installExtensionPack(pack);}
-  installedPacks=await loadValidatedInstalledPacks();rebuildEffectiveCharacterLibrary(true);renderInstalledPacks();renderSettings();render();$<HTMLDialogElement>('#private-pdf-review-dialog').close();privatePdfStatus(`${selected.length} matching ${selected.length===1?'entry':'entries'} added to ${character.name}.`);notify(`Private content added to ${character.name}.`);pendingPrivatePdfReview=null;
+  installedPacks=await loadValidatedInstalledPacks();rebuildEffectiveCharacterLibrary(true);renderInstalledPacks();renderSettings();render();$<HTMLDialogElement>('#private-pdf-review-dialog').close();privatePdfStatus(`${selected.length} matching ${selected.length===1?'entry':'entries'} added to ${character.name}.`);notify(`Private content added to ${character.name}.`);showPrivatePdfResult('Content added',`${selected.length} matching ${selected.length===1?'entry was':'entries were'} added to ${character.name}.`,[...selected.map(match=>`${match.name} — ${match.kind}, page ${match.page}`),`${installedPacks.length} private ${installedPacks.length===1?'pack is':'packs are'} now installed on this device.`]);pendingPrivatePdfReview=null;
 }
 function recordSafeName(name:string){return name.length>48?`${name.slice(0,45)}…`:name;}
 async function deletePrivatePdf(record:PrivatePdfRecord){
@@ -1466,6 +1472,10 @@ function initializeControls(){
   $('#close-private-pdf-review').addEventListener('click',()=>$<HTMLDialogElement>('#private-pdf-review-dialog').close());
   $('#cancel-private-pdf-review').addEventListener('click',()=>$<HTMLDialogElement>('#private-pdf-review-dialog').close());
   $('#apply-private-pdf-matches').addEventListener('click',()=>void applyPrivatePdfMatches());
+  const closePrivatePdfResult=()=>{pendingPrivatePdfResultRecord=null;$<HTMLDialogElement>('#private-pdf-result-dialog').close();};
+  $('#close-private-pdf-result').addEventListener('click',closePrivatePdfResult);
+  $('#done-private-pdf-result').addEventListener('click',closePrivatePdfResult);
+  $('#scan-private-pdf-result').addEventListener('click',()=>{const record=pendingPrivatePdfResultRecord;closePrivatePdfResult();if(record)void readPrivatePdfForCharacter(record);});
   $('#private-pdf-manual-setup').addEventListener('click',()=>{const review=pendingPrivatePdfReview;if(!review)return;$<HTMLDialogElement>('#private-pdf-review-dialog').close();openManualPrivateMechanic(`Private PDF: ${review.record.name}`);});
   $('#copy-chatgpt-request').addEventListener('click',()=>void copyChatGptRequest());
   $('#private-pdf-chatgpt-help').addEventListener('click',()=>{const review=pendingPrivatePdfReview;if(!review)return;void copyChatGptRequest(`Private PDF: ${review.record.name}`);});
@@ -1483,7 +1493,7 @@ function initializeControls(){
   $('#start-new-import').addEventListener('click',()=>{void clearPendingDdbImport();$<HTMLInputElement>('#dndbeyond-source').value='';setImportStatus('Ready for a different public D&D Beyond character link or ID.');$<HTMLInputElement>('#dndbeyond-source').focus();});
   const closeDelete=()=>$<HTMLDialogElement>('#delete-character-dialog').close();$('#close-delete-character').addEventListener('click',closeDelete);$('#cancel-delete-character').addEventListener('click',closeDelete);$('#confirm-delete-character').addEventListener('click',deleteCurrentCharacter);
   $('#owned-pack-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf')){setImportStatus('That is a PDF. Use “Upload Owned PDF” below; Altered will store it privately and cross-reference it with the selected character.');$<HTMLInputElement>('#private-pdf-file').focus();return;}const pack=safeOwnedContentParse(await file.text());const result=await installAndApplyPack(pack);setImportStatus(result.applied?`${pack.metadata.name} installed and applied to ${character.name}. ${packCounts(pack)}.`:`${pack.metadata.name} installed. It does not match ${character.name}, so the current sheet was not changed.`);renderSettings();}catch(error){setImportStatus(`JSON rules-pack installation failed: ${error instanceof Error?error.message:'Unknown error'}`);}finally{input.value='';}});
-  $('#private-pdf-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{await uploadPrivatePdf(file);await refreshPrivatePdfLibrary();}catch(error){privatePdfStatus(`Upload failed: ${error instanceof Error?error.message:'Unknown error'}`);}finally{input.value='';}});
+  $('#private-pdf-file').addEventListener('change',async event=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{const record=await uploadPrivatePdf(file);await refreshPrivatePdfLibrary();$<HTMLDialogElement>('#import-dialog').close();showPrivatePdfResult('PDF saved — scan next',`${record.name} is safely stored in your Altered account. No character rules were added yet.`,[`Saved ${formatFileSize(record.size)} for this login across devices.`,`Next: scan it against ${character.name}, review any exact matches, then choose what to add.`],record);}catch(error){privatePdfStatus(`Upload failed: ${error instanceof Error?error.message:'Unknown error'}`);}finally{input.value='';}});
   $('#download-pack-template').addEventListener('click',()=>downloadJson(ownedContentTemplate(character),`${slug(character.name)}-private-content-template.json`));
   $('#open-transform-builder').addEventListener('click',()=>{populateBuilderClassOptions();syncBuilderGuidance();setBuilderStatus('Start with Quick setup, then keep only mechanics confirmed by your source. Advanced fields are optional.');$<HTMLDialogElement>('#transform-builder-dialog').showModal();});
   $('#close-transform-builder').addEventListener('click',()=>$<HTMLDialogElement>('#transform-builder-dialog').close());
@@ -1525,7 +1535,7 @@ async function boot(){
   // browsers can delay storage initialization after an authenticated redirect;
   // the core app must remain usable while private packs and settings hydrate.
   initializeControls();filterHelpTopics();renderSettings();renderInstalledPacks();
-  notify(`Altered loaded for ${character.name}. Built-in rules and forms are ready.`);render();
+  setStatus(`Altered loaded for ${character.name}. Built-in rules and forms are ready.`);render();
   document.documentElement.dataset.alteredReady='true';
   void loadHostedAccount();
   installedPacks=await loadValidatedInstalledPacks();
@@ -1539,7 +1549,7 @@ async function boot(){
   const walkthroughCompleted=await loadBooleanSetting(WALKTHROUGH_SETTING,false);
   renderSettings();renderInstalledPacks();
   const repairNote=invalidPackCount?` ${invalidPackCount} damaged private pack${invalidPackCount===1?' was':'s were'} removed safely.`:'';const migrationNote=restoredDataRepairs.length?` ${restoredDataRepairs.join(' ')}`:'';
-  notify(`Altered loaded for ${character.name}. ${installedPacks.length} private content pack${installedPacks.length===1?'':'s'} available.${repairNote}${migrationNote}`);render();
+  setStatus(`Altered loaded for ${character.name}. ${installedPacks.length} private content pack${installedPacks.length===1?'':'s'} available.${repairNote}${migrationNote}`);render();
   if(!walkthroughCompleted)startWalkthrough();
   void refreshSrdCatalogStatus();
   void refreshLinkedCharacter(false,true);

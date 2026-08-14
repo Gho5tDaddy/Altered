@@ -145,7 +145,10 @@ test('the exact hosted build executes before optional mobile storage hydration',
   const build=readFileSync('scripts/build.mjs','utf8');
   const worker=readFileSync('scripts/hosted-worker.template.js','utf8');
   const pkg=JSON.parse(readFileSync('package.json','utf8')) as {scripts?:Record<string,string>};
-  assert.match(source,/Built-in rules and forms are ready\.`\);render\(\);\s*document\.documentElement\.dataset\.alteredReady='true';\s*void loadHostedAccount\(\);\s*installedPacks=await/);
+  assert.match(source,/setStatus\(`Altered loaded for \$\{character\.name\}\. Built-in rules and forms are ready\.`\);render\(\);\s*document\.documentElement\.dataset\.alteredReady='true';\s*void loadHostedAccount\(\);\s*installedPacks=await/);
+  assert.match(source,/function isLegacyStartupActivity/);
+  assert.match(source,/!isLegacyStartupActivity\(x\)/);
+  assert.equal(/notify\(`Altered loaded for/.test(source),false);
   assert.match(build,/replace\('<script src="app\.bundle\.js"><\/script>',\(\)=>/);
   assert.equal(pkg.scripts?.['browser:audit'],'node scripts/browser-audit.mjs');
   assert.ok(worker.includes(String.raw`\/api\/dndbeyond\/character`));
@@ -179,9 +182,10 @@ test('hosted release downloads use the platform static-asset binding',()=>{
 
 test('private PDFs use account-scoped hosted storage without weakening structured pack validation',()=>{
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const hosting=JSON.parse(readFileSync('.openai/hosting.json','utf8')) as {r2?:unknown};const owned=readFileSync('src/owned-content.ts','utf8');
-  for(const id of ['private-pdf-file','private-pdf-progress','private-pdf-status','private-pdf-list'])assert.match(html,new RegExp(`id="${id}"`));
+  for(const id of ['private-pdf-file','private-pdf-progress','private-pdf-status','private-pdf-list','private-pdf-result-dialog','private-pdf-result-summary','private-pdf-result-list','scan-private-pdf-result'])assert.match(html,new RegExp(`id="${id}"`));
   assert.match(html,/up to 500 MB/);assert.match(html,/Install JSON Rules Pack/);assert.match(html,/Owned PDF — read &amp; apply/);assert.match(html,/Scan for this character/);assert.match(html,/private-pdf-review-dialog/);assert.match(html,/Add Selected Content/);assert.match(source,/PRIVATE_PDF_LIMIT=500\*1024\*1024/);assert.match(source,/PRIVATE_PDF_PART_SIZE=5\*1024\*1024/);assert.match(source,/action=create/);assert.match(source,/action=part/);assert.match(source,/action=complete/);assert.match(source,/findPrivatePdfCharacterMechanics/);assert.match(source,/hostedPrivatePdfDocument/);assert.match(source,/pdf\.worker\.min\.mjs/);assert.match(source,/disableAutoFetch:true/);assert.match(source,/credentials:'same-origin'/);
   assert.equal(hosting.r2,'PRIVATE_FILES');assert.match(worker,/maxPrivatePdfBytes=500\*1024\*1024/);assert.match(worker,/maxPrivatePdfPartBytes=5\*1024\*1024/);assert.match(worker,/createMultipartUpload/);assert.match(worker,/resumeMultipartUpload/);assert.match(worker,/privatePdfUploadId/);assert.match(worker,/maxPrivatePdfParts/);assert.match(worker,/privatePdfPrefix\(user\)/);assert.match(worker,/env\?\.PRIVATE_FILES/);assert.match(worker,/oai-authenticated-user-id/);assert.match(worker,/private, no-store/);assert.match(worker,/'Accept-Ranges':'bytes'/);assert.match(worker,/Content-Range/);assert.match(worker,/range:\{offset:start,length\}/);assert.match(worker,/rangeRead\?2400:60/);
+  assert.match(source,/showPrivatePdfResult\('PDF saved — scan next'/);assert.match(source,/showPrivatePdfResult\('Content added'/);assert.match(source,/Scanned \$\{review\.pages\} pages/);
   assert.match(owned,/raw\.length>2_000_000/);
 });
 
@@ -285,7 +289,7 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.12\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.12\.zip/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.13\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.13\.zip/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
