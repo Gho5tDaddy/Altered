@@ -74,14 +74,11 @@ const toolAssets=Object.fromEntries(await Promise.all(['pdf.bundle.js','pdf.work
 const downloadAssets=Object.fromEntries(await Promise.all([
   ['Altered-Desktop-Mac-v0.29.14.zip','application/zip'],
   ['Altered-Windows-Setup-v0.29.14.exe','application/octet-stream'],
+  ['Altered-Android-v0.29.14.apk','application/vnd.android.package-archive'],
 ].map(async([name,type])=>[
   `/downloads/${name}`,
   {name,type,data:(await readFile(path.join(root,'public','downloads',name))).toString('base64')},
 ])));
-// Keep the legacy APK in the portable release folder for archival builds. The
-// hosted app uses browser installation on Android, while the smaller desktop
-// packages retain a Worker fallback for Sites deployments without ASSETS.
-await readFile(path.join(root,'public','downloads','Altered-Android-v0.29.14.apk'));
 const workerTemplate=await readFile(path.join(root,'scripts','hosted-worker.template.js'),'utf8');
 const hostedWorker=workerTemplate
   .replace('__ALTERED_PAGE_BASE64__',()=>JSON.stringify(hostedPage))
