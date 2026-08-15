@@ -54,6 +54,7 @@ export interface Spell {
   castingTime:ActionCost;concentration?:boolean;components?:string;materialCost?:boolean;materialConsumed?:boolean;
   attackBonus?:number;saveDc?:number;saveAbility?:Ability;damage?:DamagePacket[];healing?:string;halfOnSave?:boolean;resolution?:'save'|'automatic'|'manual';slotLevel?:number;summary?:string;
   specialAccess?:'circle-of-the-moon';higherSlotDamage?:DamagePacket[];higherSlotHealing?:string;
+  freeCastResourceId?:string;freeCastResourceCost?:number;
   activeEffect?:SpellActiveEffect;
 }
 export interface SpellActiveEffect {id:string;duration:string;summary:string;acMinimum?:number}
@@ -77,6 +78,8 @@ export interface TransformationEffects {
   checkAbilitySubstitution?:Partial<Record<Ability,Ability>>;
   saveAbilitySubstitution?:Partial<Record<Ability,Ability>>;
   attackAbilityOverride?:{ability:Ability;appliesTo:('weapon'|'unarmed')[]};
+  attackDamageTypeOverride?:{type:DamageType;appliesTo:('weapon'|'unarmed')[]};
+  attackReachMinimum?:{feet:number;appliesTo:('weapon'|'unarmed')[]};
   checkAdvantage?:Ability[];checkDisadvantage?:Ability[];saveAdvantage?:Ability[];saveDisadvantage?:Ability[];
   conditionImmunities?:string[];canSpeak?:boolean;canCast?:boolean;canConcentrate?:boolean;canAttack?:boolean;canManipulateObjects?:boolean;endsAtZeroHp?:boolean;endsAtZeroTemporaryHp?:boolean;endsOnIncapacitated?:boolean;
   attackDamageModifier?:{expression:string;mode:'add'|'subtract';appliesTo:('weapon'|'unarmed')[];minimumDamage?:number};

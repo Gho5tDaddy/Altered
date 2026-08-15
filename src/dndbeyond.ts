@@ -1,4 +1,4 @@
-import type {Ability,ActionCost,Character,CharacterItem,CharacterRuleset,Creature,DamagePacket,DamageType,ProficiencyRank,ResourcePool,Spell} from './types.js';
+import type {Ability,ActionCost,Character,CharacterItem,CharacterRuleset,Creature,DamagePacket,DamageType,ProficiencyRank,ResourcePool,Spell,TransformationGrant} from './types.js';
 import {CREATURES,MOON_FORM_SPELL_LEVELS,SPECIES_FEATURES,SUBCLASS_FEATURES} from './content-registry.js';
 import {parseCharacter} from './schema.js';
 import {DDB_FEAT_SELECTION_EVIDENCE} from './data-migrations.js';
@@ -338,6 +338,8 @@ function hasConditionalDamage(definition:JsonObject):boolean{
   return array(definition.modifiers).map(object).some(entry=>string(entry.type)==='damage'&&string(entry.restriction)!=='');
 }
 
+function spellFreeCastResourceId(raw:JsonObject,definition:JsonObject,name:string){return `ddb-spell-use-${whole(raw.id)||whole(definition.id)||slug(name)}`.slice(0,120)}
+
 function parseSpells(data:JsonObject,abilities:Character['abilities'],level:number):Spell[]{
   const classesById=new Map<number,JsonObject>();for(const raw of array(data.classes)){const entry=object(raw);classesById.set(whole(entry.id),entry);const definitionId=whole(object(entry.definition).id);if(definitionId)classesById.set(definitionId,entry);}
   const candidates:{spell:JsonObject;parent:JsonObject;granted:boolean}[]=[];
@@ -360,6 +362,8 @@ function parseSpells(data:JsonObject,abilities:Character['abilities'],level:numb
     const components=array(definition.components).map(value=>whole(value)===1?'V':whole(value)===2?'S':whole(value)===3?'M':'').filter(Boolean).join(', ');
     const damage=spellDamage(definition);const conditionalDamage=damage.length>0&&hasConditionalDamage(definition);const healing=spellHealing(definition,modifier(abilities[ability]));
     const entry:Spell={id:`ddb-spell-${whole(definition.id)||slug(name)}`,name,level:spellLevel,sourceClass,ability,prepared:true,castingTime:spellAction(raw),summary:'Imported from D&D Beyond; verify full spell text in your source.'};
+    const limited=object(raw.limitedUse);const freeUses=Math.max(0,whole(limited.maxUses));
+    if(spellLevel>0&&raw.usesSpellSlot===false&&freeUses>0){entry.freeCastResourceId=spellFreeCastResourceId(raw,definition,name);entry.freeCastResourceCost=1;}
     if(name.toLowerCase()==='barkskin')entry.activeEffect={id:'barkskin',duration:'1 hour',acMinimum:17,summary:'The target has Armor Class 17 if its AC would otherwise be lower.'};
     if(Boolean(definition.concentration))entry.concentration=true;
     if(components)entry.components=components;
@@ -528,14 +532,33 @@ function parseResources(data:JsonObject,level:number):ResourcePool[]{
         'large form':{id:'goliath-large-form',name:'Large Form'},
         'activate large form':{id:'goliath-large-form',name:'Large Form'},
         'wild resurgence: regain spell slot':{id:'wild-resurgence-slot',name:'Wild Resurgence Slot Exchange'},
+        focus:{id:'focus-points',name:'Focus Points'},
+        'focus points':{id:'focus-points',name:'Focus Points'},
       };
       const alias=aliases[name.toLowerCase()];const id=alias?.id??slug(name);const displayName=alias?.name??name;const reset=whole(limited.resetType);
       const recovery:ResourcePool['recovery']=id==='wild-shape'||id==='rage'?'short-one':reset===1?'short-all':reset===2?'long-all':'manual';
       const current=Math.max(0,max-Math.max(0,whole(limited.numberUsed)));
-      const existing=result.find(entry=>entry.id===id);if(existing){existing.max=Math.max(existing.max,max);existing.current=Math.max(existing.current,current);}else result.push({id,name:displayName,current,max,recovery});
+      const existing=result.find(entry=>entry.id===id);if(existing){existing.max=Math.max(existing.max,max);existing.current=id==='focus-points'?Math.min(existing.current,current):Math.max(existing.current,current);}else result.push({id,name:displayName,current,max,recovery});
+    }
+  }
+  for(const rawGroup of Object.values(object(data.spells))){
+    for(const rawValue of array(rawGroup)){
+      const raw=object(rawValue),definition=object(raw.definition),name=string(definition.name),spellLevel=whole(definition.level),limited=object(raw.limitedUse);
+      let max=Math.max(0,whole(limited.maxUses));if(Boolean(limited.useProficiencyBonus))max+=pb;
+      if(!name||spellLevel<=0||raw.usesSpellSlot!==false||max<=0||max>999)continue;
+      const id=spellFreeCastResourceId(raw,definition,name),reset=whole(limited.resetType);const recovery:ResourcePool['recovery']=reset===1?'short-all':reset===2?'long-all':'manual';
+      const current=Math.max(0,max-Math.max(0,whole(limited.numberUsed)));const existing=result.find(entry=>entry.id===id);
+      if(existing){existing.max=Math.max(existing.max,max);existing.current=Math.max(existing.current,current);}else result.push({id,name:`${name} free cast`,current,max,recovery});
     }
   }
   return result;
+}
+
+function ddbAstralEnhancements(data:JsonObject,classes:Character['classes'],abilities:Character['abilities']):TransformationGrant[]{
+  const monk=classes.find(entry=>entry.name.toLowerCase()==='monk');if(!monk||monk.level<3||!/(way of the )?astral self/i.test(monk.subclass??''))return [];
+  const actions=array(object(data.actions).class).map(object);const summon=actions.find(action=>/^arms of the astral self: summon$/i.test(string(action.name)));if(!summon)return [];
+  const pb=proficiencyBonus(classes.reduce((sum,entry)=>sum+entry.level,0)),wis=modifier(abilities.wis),martialDie=monk.level>=17?12:monk.level>=11?10:monk.level>=5?8:6;const fixedDc=finite(summon.fixedSaveDc);const dc=fixedDc??8+pb+wis;
+  return [{id:'ddb-astral-arms',label:'Astral Arms',profile:'overlay',formIds:[],source:'D&D Beyond character enhancement',actionCost:'bonus',endActionCost:'none',duration:'10 minutes',resourceId:'focus-points',resourceCost:1,effects:{checkAbilitySubstitution:{str:'wis'},saveAbilitySubstitution:{str:'wis'},attackAbilityOverride:{ability:'wis',appliesTo:['unarmed']},attackDamageTypeOverride:{type:'Force',appliesTo:['unarmed']},attackReachMinimum:{feet:10,appliesTo:['unarmed']},actions:[{id:'astral-arms-summon',name:'Astral Arms Summon',type:'save',cost:'none',saveAbility:'dex',dc,range:'10 ft.',damageOnFail:[{expression:`2d${martialDie}`,type:'Force'}],notes:'Resolve this saving throw when the enhancement is summoned.'}]}}];
 }
 
 function homebrewCount(data:JsonObject):number{
@@ -554,7 +577,7 @@ function setupNeeds(data:JsonObject,classes:Character['classes'],feats:string[],
     const entry=object(rawClass),subclass=object(entry.subclassDefinition),subclassName=string(subclass.name);if(!subclassName||knownSubclasses.has(subclassName.toLowerCase()))continue;
     const className=string(object(entry.definition).name)||classes.find(candidate=>candidate.subclass?.toLowerCase()===subclassName.toLowerCase())?.name||'Class';const classLevel=whole(entry.level);
     const featureNames=array(subclass.classFeatures).flatMap(raw=>{const feature=object(raw),name=string(feature.name);const required=whole(feature.requiredLevel??feature.level,1);return name&&required<=classLevel?[{name,required}]:[];});
-    if(featureNames.length){for(const feature of featureNames)add({id:`subclass-${slug(subclassName)}-${slug(feature.name)}`,kind:'subclass',label:feature.name,detail:`${subclassName} ${className} feature${feature.required>1?` (level ${feature.required})`:''}; confirm only its playable mechanics from your authorized D&D Beyond source.`});}
+    if(featureNames.length){for(const feature of featureNames){if(/arms of the astral self/i.test(feature.name)&&/(way of the )?astral self/i.test(subclassName))continue;add({id:`subclass-${slug(subclassName)}-${slug(feature.name)}`,kind:'subclass',label:feature.name,detail:`${subclassName} ${className} feature${feature.required>1?` (level ${feature.required})`:''}; confirm only its playable mechanics from your authorized D&D Beyond source.`});}}
     else add({id:`subclass-${slug(subclassName)}`,kind:'subclass',label:subclassName,detail:`This subclass is not included in Altered's shared SRD rules pack. Add its transformation-relevant features from your authorized D&D Beyond source.`});
   }
   const race=object(data.race),speciesName=string(race.fullName)||string(race.baseRaceName);if(speciesName&&!Object.keys(SPECIES_FEATURES).some(name=>name.toLowerCase()===speciesName.toLowerCase())){const traits=array(race.racialTraits).flatMap(raw=>{const definition=object(object(raw).definition);const name=string(definition.name)||string(object(raw).name);const required=whole(definition.requiredLevel??definition.level,1);return name&&required<=classes.reduce((sum,entry)=>sum+entry.level,0)?[name]:[];});if(traits.length)for(const trait of traits)add({id:`species-${slug(speciesName)}-${slug(trait)}`,kind:'species',label:trait,detail:`${speciesName} species trait on this character; confirm only its playable mechanics from your owned source.`});else add({id:`species-${slug(speciesName)}`,kind:'species',label:speciesName,detail:'This species is not included in Altered’s shared SRD rules pack. Add only the traits present on this character.'});}
@@ -584,7 +607,7 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
   const defense=parseEquipmentAndAc(data,abilities,classes,modifiers);const formSelection=legalKnownForms(data,classes,warnings);const knownForms=formSelection.knownForms;
   const druid=classes.find(entry=>entry.name.toLowerCase()==='druid');
   if(druid&&druid.level>=2&&knownForms.length===0)warnings.push({code:'wild-shape-not-provided',severity:'warning',message:'D&D Beyond did not provide recognizable Wild Shape selections. No forms were guessed; add or review known forms in Altered before transforming.'});
-  const parsedSpells=parseSpells(data,abilities,totalLevel);const moonSpells=restoreMoonCircleSpells(parsedSpells,classes,abilities,totalLevel);const spells=moonSpells.spells;const featSelection=parseFeats(data);const feats=featSelection.feats;const resources=parseResources(data,totalLevel);const items=parseItems(data,abilities);
+  const parsedSpells=parseSpells(data,abilities,totalLevel);const moonSpells=restoreMoonCircleSpells(parsedSpells,classes,abilities,totalLevel);const spells=moonSpells.spells;const featSelection=parseFeats(data);const feats=featSelection.feats;const resources=parseResources(data,totalLevel);const items=parseItems(data,abilities);const transformationGrants=ddbAstralEnhancements(data,classes,abilities);
   if(featSelection.ignored.length)warnings.push({code:'incomplete-feat-choice',severity:'info',message:`Altered ignored ${featSelection.ignored.join(', ')} because D&D Beyond returned ${featSelection.ignored.length===1?'it as an unfinished feat choice':'them as unfinished feat choices'}, not selected character features.`});
   if(moonSpells.added)warnings.push({code:'circle-moon-spells-restored',severity:'info',message:`D&D Beyond omitted ${moonSpells.added} always-prepared Circle of the Moon spell${moonSpells.added===1?'':'s'} from its character payload. Altered restored the current 2024 Circle spell list for this Druid level.`});
   const activeItems=array(data.inventory).filter(raw=>Boolean(object(raw).equipped));
@@ -594,7 +617,7 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
   const raw={
     schemaVersion:1,id:`ddb-${sourceId}`,name:string(data.name)||`D&D Beyond ${sourceId}`,species:race.species,creatureType:'Humanoid',size:race.size,totalLevel,classes,abilities,hp,
     ac:defense.ac,speed:parseSpeed(data,race.speed,modifiers),proficiencies:proficiencies.proficiencies,skillBonuses:proficiencies.skillBonuses,saveBonuses:proficiencies.saveBonuses,
-    knownForms,seenForms:knownForms,spells,spellSlots:parseSpellSlots(data,classes),feats,features:[],resources,equipment:defense.equipment,items,provenance:{provider:'dndbeyond',sourceId,ruleset:ruleset.ruleset,rulesetEvidence:[...ruleset.evidence,DDB_FEAT_SELECTION_EVIDENCE],reviewRequired:ruleset.reviewRequired},customForms:[],
+    knownForms,seenForms:knownForms,spells,spellSlots:parseSpellSlots(data,classes),feats,features:[],resources,equipment:defense.equipment,items,provenance:{provider:'dndbeyond',sourceId,ruleset:ruleset.ruleset,rulesetEvidence:[...ruleset.evidence,DDB_FEAT_SELECTION_EVIDENCE],reviewRequired:ruleset.reviewRequired},transformationGrants,customForms:[],
   };
   const character=parseCharacter(raw);
   const privateSetup=setupNeeds(data,classes,feats,items,spells,homebrew);

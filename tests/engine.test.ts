@@ -185,6 +185,11 @@ test('castSpell consumes action, slot, and starts Concentration',()=>{
   assert.equal(state.turn.actionsRemaining,0);assert.equal(state.turn.bonusRemaining,1);assert.equal(state.turn.slotSpellCast,true);assert.equal(must(state.spellSlots['2']).current,1);assert.equal(state.concentration?.name,'Moonbeam');
 });
 
+test('a feat-granted spell uses its own free cast without requiring a class spell slot',()=>{
+  const c=character({classes:[{name:'Monk',level:6,subclass:'Way of the Astral Self (TCoE)'}],totalLevel:6,spells:[{name:'Entangle',level:1,sourceClass:'Feat',ability:'wis',prepared:true,castingTime:'magic-action',concentration:true,freeCastResourceId:'ddb-spell-use-entangle',freeCastResourceCost:1}],spellSlots:{},resources:[{id:'ddb-spell-use-entangle',name:'Entangle free cast',current:1,max:1,recovery:'long-all'}]});const state=createInitialState(c);
+  assert.equal(resolveSheet(c,state).spells.find(spell=>spell.name==='Entangle')?.available,true);const result=castSpell(c,state,'Entangle');assert.match(result.message,/free cast/);assert.equal(state.resources['ddb-spell-use-entangle']?.current,0);assert.equal(state.turn.slotSpellCast,false);assert.equal(state.concentration?.name,'Entangle');assert.equal(resolveSheet(c,state).spells.find(spell=>spell.name==='Entangle')?.available,false);longRest(c,state);assert.equal(state.resources['ddb-spell-use-entangle']?.current,1);
+});
+
 test('Barkskin applies a persistent AC 17 minimum through Wild Shape and can be ended',()=>{
   const c=character({ac:14,abilities:{str:12,dex:14,con:16,int:10,wis:16,cha:8},spells:[
     {name:'Barkskin',level:2,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'bonus'},

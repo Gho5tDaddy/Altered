@@ -539,6 +539,15 @@ test('private transformation builder supports guided ability substitutions and a
   assert.match(source,/function syncBuilderGuidance/);assert.match(source,/function applyBuilderTemplate/);assert.match(source,/ability-substitution/);assert.match(html,/Enhancement — keep the current sheet/);
 });
 
+test('user-created transformations expose a guarded delete path without affecting built-in forms',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');
+  assert.match(html,/id="delete-custom-form"[^>]*hidden/);
+  assert.match(source,/installedPacks\.find\(pack=>pack\.content\.transformationGrants\.some/);
+  assert.match(source,/End Enhancement Before Deleting/);
+  assert.match(source,/removeExtensionPack\(packId\)/);
+  assert.match(source,/Delete \$\{label\} from Altered\?/);
+});
+
 test('additive forms always expose an end path while preserving workspace scrolling',()=>{
   const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
   assert.match(source,/overlayEnd=\[\.\.\.options\]\.reverse\(\)\.find/);assert.match(source,/if\(!state\.activeTransform&&state\.overlays\.length\)/);assert.match(source,/tap End to release the latest/);assert.match(styles,/form-active:not\(\.effects-disabled\) \.workspace-view\{overflow:auto\}/);

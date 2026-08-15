@@ -472,3 +472,10 @@ Assistant results must identify their 2024 verification source. Public verificat
 - Preserves leveled spells granted by feats, species, backgrounds, and items when D&D Beyond omits a `prepared` flag.
 - Keeps genuinely unprepared class-list spells excluded.
 - Advances the hosted app and service-worker cache version so installed copies visibly receive the importer correction.
+
+# 0.29.34
+
+- Makes D&D Beyond feat-granted leveled spells usable through their own limited-use resource without requiring class spell slots. Chris's Magic Initiate Entangle now appears with its once-per-Long-Rest cast.
+- Imports Astral Arms as an explicit additive enhancement. Altered never guesses D&D Beyond's transient active state; the player activates or ends it in Forms, after which Wisdom substitutions, Force damage, reach, and the summon save are applied.
+- Consolidates duplicate Focus resource labels from D&D Beyond.
+- Adds a guarded Delete control for user-created forms and enhancements while protecting built-in and source-imported content.

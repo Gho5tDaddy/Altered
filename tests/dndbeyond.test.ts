@@ -190,12 +190,18 @@ test('keeps leveled spells granted by feats even when D&D Beyond omits prepared 
   const payload=structuredClone(ferocitusPayload);
   (payload.data.spells.feat as unknown[]).push({
     definition:{id:901,name:'Magic Initiate Choice',level:1,concentration:false,components:[1,2],modifiers:[]},
-    activation:{activationType:1},spellCastingAbilityId:5,
+    activation:{activationType:1},spellCastingAbilityId:5,usesSpellSlot:false,limitedUse:{maxUses:1,numberUsed:0,resetType:2},
   });
   payload.data.classSpells[0]!.spells.push({...spell(902,'Ordinary Unprepared Spell',1),prepared:false,alwaysPrepared:false,countsAsKnownSpell:false});
   const character=importDdbCharacter(payload,'152187683').character;
   assert.ok(character.spells.some(entry=>entry.name==='Magic Initiate Choice'&&entry.level===1));
+  const granted=character.spells.find(entry=>entry.name==='Magic Initiate Choice');assert.ok(granted?.freeCastResourceId);assert.equal(character.resources.find(entry=>entry.id===granted.freeCastResourceId)?.current,1);assert.equal(character.resources.find(entry=>entry.id===granted.freeCastResourceId)?.recovery,'long-all');
   assert.equal(character.spells.some(entry=>entry.name==='Ordinary Unprepared Spell'),false);
+});
+
+test('imports Astral Arms as an activatable enhancement instead of guessing live state',()=>{
+  const payload=structuredClone(ferocitusPayload) as any;payload.data.classes=[{id:3300,level:6,isStartingClass:true,definition:{id:33,name:'Monk',isLegacy:false,spellCastingAbilityId:0,classFeatures:[]},subclassDefinition:{name:'Way of the Astral Self (TCoE)',classFeatures:[{name:'Arms of the Astral Self',requiredLevel:3},{name:'Visage of the Astral Self',requiredLevel:6}]}}];payload.data.actions.class=[{id:'focus',name:'Focus Points',limitedUse:{resetType:1,numberUsed:0,maxUses:6,useProficiencyBonus:false}},{id:'astral-summon',name:'Arms of the Astral Self: Summon',saveStatId:2,dice:{diceString:'2d6'}}];
+  const report=importDdbCharacter(payload,'152187683'),grant=report.character.transformationGrants?.find(entry=>entry.id==='ddb-astral-arms');assert.ok(grant);assert.equal(grant.profile,'overlay');assert.equal(grant.resourceId,'focus-points');assert.equal(grant.effects?.attackAbilityOverride?.ability,'wis');assert.equal(grant.effects?.attackDamageTypeOverride?.type,'Force');assert.equal(grant.effects?.attackReachMinimum?.feet,10);assert.equal(report.setupNeeds.some(entry=>/arms of the astral self/i.test(entry.label)),false);assert.equal(report.setupNeeds.some(entry=>/visage of the astral self/i.test(entry.label)),true);
 });
 
 test('ignores unfinished D&D Beyond feat choosers without dropping selected or granted feats',()=>{
