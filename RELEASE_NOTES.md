@@ -1,4 +1,10 @@
-# Altered v0.29.20 release notes
+# Altered v0.29.21 release notes
+
+- Moves Suggested Next and Show Me into the compact header beside the Altered icon, reclaiming dashboard height.
+- Keeps the mystical ALTERED title centered above the guidance strip.
+- Constrains active-form pulsing to the artwork border so the portrait remains unobstructed.
+- Stops Suggested Next from repeating Initiative immediately after it was rolled.
+- Stops guidance from recommending End Rage or other deactivation and destructive controls as beneficial next actions.
 
 - Corrects Galaxy Fold folded and unfolded cockpit sizing so persistent artwork and fast-play controls remain visible without overlapping focused tools.
 - “Show me” now reclaims the guidance row after revealing and highlighting its destination, leaving more usable dashboard space.

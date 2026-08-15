@@ -2273,3 +2273,46 @@ body::after{
   .persistent-form-copy.is-active.is-beast>strong::before,
   .persistent-form-copy.is-active.is-beast>strong::after{margin-inline:.22em}
 }
+
+/* v0.29.21 compact header guidance and portrait-edge aura.
+   The guide occupies the previously unused header width instead of a dashboard row. */
+.topbar{
+  display:grid;grid-template-columns:44px minmax(0,1fr);grid-template-rows:auto auto;
+  align-items:center;column-gap:8px;row-gap:2px
+}
+.topbar .brand-mark{grid-column:1;grid-row:1/3;align-self:start}
+.topbar .brand-copy{grid-column:2;grid-row:1;min-width:0;margin:0;text-align:center}
+.topbar .brand-copy h1{
+  font-family:"Copperplate Gothic Bold","Copperplate Gothic","Palatino Linotype",Georgia,serif;
+  font-size:.78rem;font-weight:950;letter-spacing:.3em;line-height:1.1;
+  color:#eaffff;text-shadow:0 0 5px rgba(255,255,255,.8),0 0 13px rgba(89,235,255,.74),0 0 25px rgba(167,101,255,.42)
+}
+.topbar .brand-copy p{display:none}
+.topbar .next-step-guide{
+  grid-column:2;grid-row:2;width:100%;min-width:0;min-height:38px;margin:0;padding:5px 7px;gap:7px;
+  grid-template-columns:auto minmax(0,1fr) auto
+}
+.topbar .next-step-guide>span{font-size:1rem}
+.topbar .next-step-guide small{font-size:.49rem}
+.topbar .next-step-guide strong{font-size:.7rem}
+.topbar .next-step-guide p{max-width:none;font-size:.56rem}
+.topbar .next-step-guide .button{min-height:36px;padding:5px 8px;font-size:.62rem}
+.topbar .top-actions{grid-column:1/3;grid-row:3}
+
+/* Keep the active pulse on the artwork's perimeter. It never scales or washes over the portrait. */
+.form-aura-pulse{
+  inset:0;border-width:3px;opacity:.92;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--aura-three) 52%,transparent),inset 0 0 7px color-mix(in srgb,var(--aura-one) 36%,transparent);
+  will-change:opacity,border-color,box-shadow;transform:none!important;filter:none!important
+}
+@keyframes alteredVisibleFormPulse{
+  0%,100%{opacity:.68;border-color:color-mix(in srgb,var(--aura-one) 72%,white);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--aura-three) 42%,transparent),inset 0 0 5px color-mix(in srgb,var(--aura-one) 25%,transparent)}
+  50%{opacity:1;border-color:color-mix(in srgb,var(--aura-three) 88%,white);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--aura-three) 78%,transparent),inset 0 0 8px color-mix(in srgb,var(--aura-one) 42%,transparent)}
+}
+@media(max-width:420px){
+  .topbar{grid-template-columns:44px minmax(0,1fr);column-gap:6px}
+  .topbar .next-step-guide{grid-template-columns:14px minmax(0,1fr) auto;gap:5px;padding-inline:5px}
+  .topbar .next-step-guide p{display:none}
+  .topbar .next-step-guide .button{min-width:58px;padding-inline:5px}
+}
+@media(forced-colors:active){.form-aura-pulse{animation:none!important;box-shadow:none!important;border:3px solid Highlight}}

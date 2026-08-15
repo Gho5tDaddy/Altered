@@ -302,8 +302,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.20\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.20\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.20\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.21\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.21\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.21\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
@@ -482,6 +482,9 @@ test('every primary workspace uses consistent names and phone-safe controls',()=
   assert.equal((html.match(/data-workspace-view="[^\"]+"[^>]*tabindex="0"/g)??[]).length,4);assert.match(styles,/@media\(pointer:coarse\)[\s\S]*min-block-size:44px/);
   assert.match(html,/class="brand-menu-cue"/);assert.match(styles,/\.file-button:focus-within/);assert.match(source,/document\.querySelector\('dialog\[open\]'\)/);
   assert.match(html,/id="nav-play-label">Play</);assert.match(source,/returning\?'Back to Play':'Play'/);assert.match(source,/\$\('#next-step-guide'\)\.hidden=true/);
+  assert.match(html,/class="topbar"[\s\S]*id="next-step-guide"[\s\S]*id="top-actions"/);
+  assert.match(styles,/compact header guidance and portrait-edge aura/);assert.match(styles,/\.form-aura-pulse\{[\s\S]*?inset:0/);
+  assert.match(source,/latestRollTitle==='Initiative'/);assert.match(source,/state\.rage\.active[\s\S]*Use Rage — choose an attack/);assert.match(source,/recommendationSafeControl/);
 });
 
 test('focused action pages prioritize executable controls without losing advanced choices',()=>{

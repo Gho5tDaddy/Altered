@@ -14,6 +14,11 @@
     <header class="topbar">
       <button id="toggle-app-menu" class="brand-mark" type="button" aria-label="Open Altered menu" aria-expanded="false" aria-controls="top-actions"><img src="icon-192.png" alt=""><span class="brand-menu-cue" aria-hidden="true">⌄</span></button>
       <div class="brand-copy"><h1>ALTERED</h1><p>Rules-aware transformation character sheet</p></div>
+      <aside id="next-step-guide" class="next-step-guide" aria-live="polite" hidden>
+        <span aria-hidden="true">✦</span>
+        <div><small>Suggested next</small><strong id="next-step-title">Choose what to do</strong><p id="next-step-copy"></p></div>
+        <button id="show-next-step" class="button secondary compact" type="button">Show me</button>
+      </aside>
       <div id="top-actions" class="top-actions" aria-label="Application controls">
         <div id="account-status" class="account-status" hidden>
           <span class="account-copy"><small>Signed in</small><strong id="account-name">Adventurer</strong></span>
@@ -272,12 +277,6 @@
       </section>
       </div>
     </main>
-
-    <aside id="next-step-guide" class="next-step-guide" aria-live="polite" hidden>
-      <span aria-hidden="true">&#10022;</span>
-      <div><small>Suggested next</small><strong id="next-step-title">Choose what to do</strong><p id="next-step-copy"></p></div>
-      <button id="show-next-step" class="button secondary compact" type="button">Show me</button>
-    </aside>
 
     <nav class="workspace-nav" aria-label="Primary navigation">
       <button id="nav-play" class="workspace-nav-button active" type="button" aria-current="page"><span aria-hidden="true">&#9670;</span><b id="nav-play-label">Play</b></button>

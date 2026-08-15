@@ -69,6 +69,7 @@ let state=createInitialState(character);
 let sheet=resolveSheet(character,state);
 let currentTab='actions';
 let latestRollTab='actions';
+let latestRollTitle='Ready';
 let selectedOptionId='base';
 const selectedOptionalBonuses=new Map<string,Set<string>>();
 const selectedRollModes=new Map<string,RollMode>();
@@ -129,7 +130,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.20';
+const APP_VERSION='0.29.21';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -332,7 +333,7 @@ function captureTurnUndo(){
 function undoTurnChange(){
   if(!turnUndoSnapshot)return;state=structuredClone(turnUndoSnapshot.state);pendingDamageRolls.clear();for(const entry of turnUndoSnapshot.pending)pendingDamageRolls.set(entry.id,structuredClone(entry));clearTurnUndo();notify(`Returned to Turn ${state.turn.number}.`);render();
 }
-function resetLatestResult(){latestRollTab='actions';const title='Ready',total='—',detail='Press an attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically.';$('#latest-roll').classList.remove('flash');$('#roll-title').textContent=title;$('#roll-total').textContent=total;$('#roll-detail').textContent=detail;$('#play-roll-title').textContent=title;$('#play-roll-total').textContent=total;$('#play-roll-detail').textContent=detail;const toast=$('#roll-toast');toast.hidden=true;toast.classList.remove('show');if(rollToastTimer!==undefined)window.clearTimeout(rollToastTimer);}
+function resetLatestResult(){latestRollTab='actions';latestRollTitle='Ready';const title='Ready',total='—',detail='Press an attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically.';$('#latest-roll').classList.remove('flash');$('#roll-title').textContent=title;$('#roll-total').textContent=total;$('#roll-detail').textContent=detail;$('#play-roll-title').textContent=title;$('#play-roll-total').textContent=total;$('#play-roll-detail').textContent=detail;const toast=$('#roll-toast');toast.hidden=true;toast.classList.remove('show');if(rollToastTimer!==undefined)window.clearTimeout(rollToastTimer);}
 function setCharacter(next:Character){character=next;baseCharacter=baseCharacters.find(entry=>entry.id===next.id)??next;state=createInitialState(character);sheet=resolveSheet(character,state);selectedOptionId='base';currentTab='actions';formSearch='';formFilter='all';$<HTMLInputElement>('#form-search').value='';$<HTMLSelectElement>('#form-filter').value='all';radiantActions.clear();selectedOptionalBonuses.clear();selectedRollModes.clear();selectedMultiattackVariants.clear();selectedSpellSlots.clear();pendingDamageRolls.clear();resetLatestResult();notify(`${character.name} loaded in Base Form.`);render();}
 function reconcileState(next:Character,previous:GameState){
   const clean=createInitialState(next);clean.hp=Math.min(previous.hp,next.hp.max);clean.tempHp=previous.tempHp;clean.life={...previous.life};clean.exhaustionLevel=previous.exhaustionLevel;clean.relentlessRageDc=previous.relentlessRageDc;if(previous.pendingRelentlessRage)clean.pendingRelentlessRage={...previous.pendingRelentlessRage};if(previous.tempHpSource)clean.tempHpSource=previous.tempHpSource;
@@ -1160,7 +1161,7 @@ function showFloatingRoll(totalText:string,detail:string,title:string,presentati
   toast.hidden=false;void toast.offsetWidth;toast.classList.add('show');
   rollToastTimer=window.setTimeout(()=>{toast.classList.remove('show');window.setTimeout(()=>{if(!toast.classList.contains('show'))toast.hidden=true;},220);},8000);
 }
-function showRoll(total:number|string,detail:string,title='Roll result',presentation:RollPresentation={}){latestRollTab=currentTab;const panel=$('#latest-roll');const totalText=String(total);$('#roll-title').textContent=title;$('#roll-total').textContent=totalText;$('#roll-detail').textContent=detail;$('#play-roll-title').textContent=title;$('#play-roll-total').textContent=totalText;$('#play-roll-detail').textContent=detail;panel.classList.remove('flash');void panel.offsetWidth;panel.classList.add('flash');showFloatingRoll(totalText,detail,title,presentation);addActivity(`${title}: ${detail}`);renderLog();}
+function showRoll(total:number|string,detail:string,title='Roll result',presentation:RollPresentation={}){latestRollTab=currentTab;latestRollTitle=title;const panel=$('#latest-roll');const totalText=String(total);$('#roll-title').textContent=title;$('#roll-total').textContent=totalText;$('#roll-detail').textContent=detail;$('#play-roll-title').textContent=title;$('#play-roll-total').textContent=totalText;$('#play-roll-detail').textContent=detail;panel.classList.remove('flash');void panel.offsetWidth;panel.classList.add('flash');showFloatingRoll(totalText,detail,title,presentation);addActivity(`${title}: ${detail}`);renderLog();}
 function d20(mod:number,mode:RollMode,label:string,minimumD20?:number,minimumTotal?:number,minimumSource?:string,modifierSource?:string,rollKind?:ReceivedRollKind,skillName?:string){const result=rollD20Result(mod,mode);const treated=minimumD20!==undefined?Math.max(minimumD20,result.kept):result.kept;const raw=treated+mod;const received=rollKind?receivedRollBonus(rollKind,skillName):{total:0,detail:''};const boosted=raw+received.total;const total=minimumTotal!==undefined?Math.max(minimumTotal,boosted):boosted;const adjustments=[treated!==result.kept?`${minimumSource??'Feature'} treated ${result.kept} as ${treated}`:'',received.detail,total!==boosted?`${minimumSource??'Feature'} raised total ${boosted} to ${total}`:''].filter(Boolean).join(' · ');const baseLabel=label.replace(/ \(Strength\)$/,'');const save=Object.values(sheet.saves).find(value=>value.name===baseLabel);const skill=Object.values(sheet.skills).find(value=>value.name===baseLabel);const resolvedSource=modifierSource??save?.source??(label.endsWith('(Strength)')?skill?.alternate?.source:skill?.source);const source=resolvedSource?` (${resolvedSource})`:'';showRoll(total,`${modeText(result)}${treated!==result.kept?` → ${treated}`:''} ${signed(mod)}${source}${received.total?` + ${received.total} received`:''} = ${boosted}${total!==boosted?` → ${total}`:''}${adjustments?` · ${adjustments}`:''}`,label,d20Presentation(result.kept,total));return total;}
 function combinedMode(rulesMode:RollMode){return rulesMode;}
 function rollContext(actionId:string,rules:ReturnType<typeof attackRollSources>){
@@ -1463,6 +1464,16 @@ function renderLog(){const root=$('#activity-log');clear(root);$<HTMLButtonEleme
 type NextStepSuggestion={title:string;copy:string;target:HTMLElement;reveal?:()=>HTMLElement};
 function taskControl(label:string){const control=Array.from(document.querySelectorAll<HTMLButtonElement>('#tab-content button')).find(candidate=>candidate.textContent?.toLowerCase().includes(label.toLowerCase()));if(control){control.closest('details')?.setAttribute('open','');return control;}return $<HTMLElement>('#task-view-title');}
 function revealTask(tab:string,label?:string){return ()=>{setWorkspace('task',tab,'play');return label?taskControl(label):$<HTMLElement>('#task-view-title');};}
+function recommendationSafeControl(control:HTMLButtonElement){
+  const label=control.textContent?.trim().replace(/\s+/g,' ')??'';
+  if(!label||/^(end|stop|remove|clear|delete|reset|undo|release|sign out)\b/i.test(label))return false;
+  if(latestRollTab===currentTab&&latestRollTitle!=='Ready'){
+    const recent=latestRollTitle.toLowerCase().replace(/^roll\s+/,'').replace(/\s+(attack|damage)$/,'').trim();
+    const candidate=label.toLowerCase().replace(/^roll\s+/,'').replace(/\s+(attack|damage)$/,'').trim();
+    if(recent&&candidate.includes(recent))return false;
+  }
+  return true;
+}
 function recommendNextStep():NextStepSuggestion|null{
   if(currentWorkspace==='forms'){
     const transform=$<HTMLButtonElement>('#transform-button');const selected=currentOption();const active=state.activeTransform?.option;
@@ -1477,9 +1488,11 @@ function recommendNextStep():NextStepSuggestion|null{
     return {title:'Choose a form',copy:'Select a form to see whether your character can use it now.',target:$<HTMLElement>('#form-select')};
   }
   if(currentWorkspace==='task'){
-    const available=Array.from(document.querySelectorAll<HTMLButtonElement>('#tab-content button:not(:disabled)')).find(control=>!control.hidden);
+    if(currentTab==='rolls'&&latestRollTab==='rolls'&&latestRollTitle==='Initiative')return {title:'Initiative is set',copy:'Return to Play and take your turn. Roll Initiative again only if your table asks for a reroll.',target:$<HTMLElement>('#nav-play')};
+    if(currentTab==='features'&&state.rage.active)return {title:'Use Rage — choose an attack',copy:'Rage is already active. Keep it running and return to Play to choose your next useful action.',target:$<HTMLElement>('#nav-play'),reveal:revealTask('actions')};
+    const available=Array.from(document.querySelectorAll<HTMLButtonElement>('#tab-content button:not(:disabled)')).find(control=>!control.hidden&&recommendationSafeControl(control));
     if(available)return {title:available.textContent?.trim().replace(/\s+/g,' ')||'Use this option',copy:`This is an available ${TASK_TITLES[currentTab]?.toLowerCase()??'character'} option. You can still choose any other legal action.`,target:available};
-    return {title:'Return to Play',copy:'No executable option is available in this section right now. Review another tool or start a new turn.',target:$<HTMLElement>('#nav-play')};
+    return {title:'Return to Play',copy:'No new beneficial option is recommended in this section. Keep active effects running and choose another useful action.',target:$<HTMLElement>('#nav-play')};
   }
   if(currentWorkspace==='play'){
     const abilities=$<HTMLElement>('#open-features-view');
