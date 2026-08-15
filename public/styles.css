@@ -2389,3 +2389,84 @@ body::after{
 .first-character-actions .text-button{grid-column:1/-1;justify-self:center;min-height:42px}
 @media(max-width:520px){.first-character-card{padding:14px}.first-character-heading h2{font-size:1.25rem}.first-character-steps li{padding:8px}.first-character-actions{grid-template-columns:1fr}.first-character-actions .text-button{grid-column:auto}.first-character-dialog{max-height:94dvh}}
 @media(forced-colors:active){.first-character-rune,.first-character-steps li,.first-character-steps li>span{box-shadow:none;border:1px solid CanvasText}}
+
+/* v0.29.29 artwork-first cockpit.
+   Identity, the complete portrait, and live defenses share one compact column;
+   the former stat area now gives active effects a persistent, readable home. */
+.persistent-form-primary{min-width:0;min-height:0;display:flex;flex-direction:column;background:rgba(7,10,13,.98)}
+.persistent-form-primary .persistent-form-copy{
+  min-height:66px;flex:0 0 auto;order:0;padding:7px 8px 6px;
+  border:0;border-bottom:1px solid color-mix(in srgb,var(--aura-one) 38%,var(--line));
+  align-content:center;text-align:center
+}
+.persistent-form-primary .persistent-form-kicker{justify-content:center}
+.persistent-form-primary .persistent-form-copy>strong{width:100%;text-align:center}
+.persistent-form-primary .form-art{
+  order:1;width:100%;height:auto!important;min-height:0!important;aspect-ratio:var(--portrait-ratio,3 / 4);
+  align-self:start;border:0;border-bottom:1px solid color-mix(in srgb,var(--aura-one) 42%,var(--line));background:#05080a
+}
+.persistent-form-primary .main-form-art,.persistent-form-primary .main-form-art img{width:100%;height:100%;min-height:0}
+.persistent-form-primary .main-form-art img{display:block;object-fit:contain;object-position:center}
+.persistent-form-primary .persistent-form-stats{
+  order:2;min-height:62px;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(42px,.65fr) minmax(52px,.8fr);
+  gap:5px;margin:0;padding:7px 8px 8px;border:0;background:linear-gradient(180deg,rgba(26,31,35,.98),rgba(13,17,21,.98))
+}
+.persistent-form-primary .persistent-form-stats>span{
+  min-width:0;display:grid;align-content:center;justify-items:center;gap:1px;padding:0;border:0;border-left:1px solid rgba(121,247,255,.2)
+}
+.persistent-form-primary .persistent-form-stats>span:first-child{border-left:0}
+.persistent-form-primary .persistent-form-stats small{font-size:.52rem;white-space:nowrap}
+.persistent-form-primary .persistent-form-stats b{font-size:.88rem;color:#f4ffff;text-shadow:0 0 7px rgba(121,247,255,.58)}
+.persistent-health-stat em{max-width:100%;overflow:hidden;color:var(--muted);font-size:.48rem;font-style:normal;text-overflow:ellipsis;white-space:nowrap}
+.persistent-effects-summary{
+  width:100%;min-height:76px;display:grid;align-content:center;gap:3px;padding:8px 10px;text-align:left;
+  color:var(--text);border:0;border-bottom:1px solid var(--line);background:linear-gradient(145deg,rgba(39,43,48,.98),rgba(27,31,36,.98))
+}
+.persistent-effects-summary>span{color:var(--muted);font-size:.57rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.persistent-effects-summary>strong{overflow:hidden;color:#f3f6f8;font-size:.72rem;line-height:1.25;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.persistent-effects-summary>small{color:var(--muted);font-size:.53rem}
+.persistent-effects-summary.tracked-active{
+  border-color:color-mix(in srgb,var(--aura-one) 82%,white);
+  box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--aura-one) 68%,transparent),inset 0 0 18px color-mix(in srgb,var(--aura-two) 18%,transparent),0 0 14px color-mix(in srgb,var(--aura-one) 38%,transparent)
+}
+.persistent-effects-summary.tracked-active>span{color:color-mix(in srgb,var(--aura-three) 78%,white);text-shadow:0 0 8px color-mix(in srgb,var(--aura-one) 78%,transparent)}
+.persistent-effects-summary.tracked-active>strong{color:#fff;text-shadow:0 0 7px color-mix(in srgb,var(--aura-one) 70%,transparent)}
+.app-shell:not(.reduce-motion) .persistent-effects-summary.tracked-active{animation:alteredCockpitEffectGlow 2.8s ease-in-out infinite}
+@keyframes alteredCockpitEffectGlow{
+  0%,100%{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--aura-one) 55%,transparent),inset 0 0 12px color-mix(in srgb,var(--aura-two) 12%,transparent),0 0 8px color-mix(in srgb,var(--aura-one) 25%,transparent)}
+  50%{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--aura-three) 82%,transparent),inset 0 0 22px color-mix(in srgb,var(--aura-two) 28%,transparent),0 0 18px color-mix(in srgb,var(--aura-one) 48%,transparent)}
+}
+
+@media(max-width:1180px){
+  .persistent-form-visual{
+    height:auto;align-self:start;grid-template-columns:minmax(0,44%) minmax(0,56%);grid-template-rows:auto;overflow:visible
+  }
+  .persistent-form-primary{grid-column:1;grid-row:1;align-self:start}
+  .persistent-form-side{grid-column:2;grid-row:1;min-height:100%}
+  .persistent-form-primary .form-art{height:auto!important;min-height:0!important}
+  .persistent-form-primary .main-form-art,.persistent-form-primary .main-form-art img{height:100%;object-fit:contain}
+}
+@media(min-width:701px) and (max-width:1180px) and (pointer:coarse){
+  .persistent-quick-effects{grid-template-columns:repeat(2,minmax(0,1fr));padding-inline:6px}
+  .quick-initiative{grid-column:1/-1}
+}
+@media(max-width:390px){
+  .persistent-form-visual{grid-template-columns:minmax(0,43%) minmax(0,57%)}
+  .persistent-form-primary .persistent-form-copy{min-height:62px;padding-inline:5px}
+  .persistent-form-primary .persistent-form-stats{grid-template-columns:minmax(0,1.25fr) minmax(36px,.65fr) minmax(46px,.8fr);padding-inline:5px}
+  .persistent-form-primary .persistent-form-stats b{font-size:.78rem}
+  .persistent-health-stat em{font-size:.44rem}
+  .persistent-effects-summary{min-height:70px;padding:7px 8px}
+}
+@media(min-width:1181px){
+  .workspace,html[data-altered-workspace="forms"] .workspace{grid-template-columns:430px minmax(0,1fr)}
+  .persistent-form-visual{height:auto;align-self:start;grid-template-columns:minmax(0,44%) minmax(0,56%);grid-template-rows:auto;overflow:visible}
+  .persistent-form-primary{grid-column:1;grid-row:1;align-self:start}
+  .persistent-form-side{grid-column:2;grid-row:1;min-height:100%}
+}
+@media(pointer:coarse){
+  .persistent-quick-effects .button,.persistent-end-form,.persistent-turn-controls .button{min-block-size:44px}
+}
+.app-shell.reduce-motion .persistent-effects-summary.tracked-active{animation:none!important}
+@media(prefers-reduced-motion:reduce){.app-shell:not(.motion-forced) .persistent-effects-summary.tracked-active{animation:none!important}}
+@media(forced-colors:active){.persistent-effects-summary.tracked-active{animation:none!important;box-shadow:none!important;border:2px solid Highlight}}

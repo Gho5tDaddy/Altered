@@ -43,19 +43,25 @@
 
     <main id="workspace" class="main-grid workspace" aria-label="Altered workspace">
       <aside class="persistent-form-visual" aria-label="Current form artwork">
-        <div id="form-art" class="form-art" aria-live="polite"></div>
-        <div class="persistent-form-side">
+        <div class="persistent-form-primary">
         <button id="open-persistent-form" class="persistent-form-copy" type="button">
           <span id="persistent-form-state" class="persistent-form-kicker">Base Form</span>
           <strong id="persistent-form-name">Base Form</strong>
           <small id="persistent-stat-context" class="persistent-stat-context" hidden>Current stats until transformed</small>
-          <span class="persistent-form-stats" aria-label="Live current form statistics">
-            <span><small>HP</small><b id="persistent-hp">0 / 0</b></span>
-            <span><small>Temp</small><b id="persistent-temp">0</b></span>
-            <span><small>AC</small><b id="persistent-ac">0</b></span>
-            <span><small>Speed</small><b id="persistent-speed">0 ft.</b></span>
-          </span>
           <small class="persistent-form-open">Open Forms &#8250;</small>
+        </button>
+        <div id="form-art" class="form-art" aria-live="polite"></div>
+        <div class="persistent-form-stats" aria-label="Live current form statistics">
+          <span class="persistent-health-stat"><small>Available HP</small><b id="persistent-total-hp">0</b><em><span id="persistent-hp">0 / 0</span> + <span id="persistent-temp">0</span> temp</em></span>
+          <span><small>AC</small><b id="persistent-ac">0</b></span>
+          <span><small>Speed</small><b id="persistent-speed">0 ft.</b></span>
+        </div>
+        </div>
+        <div class="persistent-form-side">
+        <button id="persistent-effects-summary" class="persistent-effects-summary" type="button">
+          <span>Active effects</span>
+          <strong id="persistent-effect-names">None active</strong>
+          <small>Tap to review or change effects</small>
         </button>
         <div id="action-economy" class="action-economy persistent-action-economy" aria-label="Action economy"></div>
         <div class="persistent-quick-effects" aria-label="Quick effects">

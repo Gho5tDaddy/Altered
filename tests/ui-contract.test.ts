@@ -99,7 +99,7 @@ test('phone gameplay uses focused views while keeping the form artwork persisten
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
   for(const view of ['play','forms','task','more'])assert.match(html,new RegExp(`data-workspace-view="${view}"`));
   for(const id of ['nav-play','nav-forms','nav-sheet','nav-more'])assert.match(html,new RegExp(`id="${id}"`));
-  assert.match(html,/class="persistent-form-visual"[\s\S]*id="form-art"[\s\S]*id="persistent-form-name"/);
+  assert.match(html,/class="persistent-form-visual"[\s\S]*id="persistent-form-name"[\s\S]*id="form-art"[\s\S]*id="persistent-total-hp"[\s\S]*id="persistent-effects-summary"/);
   assert.equal((html.match(/id="form-art"/g)??[]).length,1,'persistent artwork must render once and stay mounted');
   assert.match(source,/type WorkspaceView='play'\|'forms'\|'task'\|'more'/);assert.match(source,/function setWorkspace\(/);assert.match(source,/renderArt\(\)/);
   assert.match(styles,/one task, one scroll region, persistent form art/);assert.match(styles,/\.workspace-view\{[^}]*overflow:auto/);assert.match(styles,/\.persistent-form-visual \.form-art/);
@@ -109,6 +109,7 @@ test('phone gameplay uses focused views while keeping the form artwork persisten
   assert.match(styles,/@media\(max-width:1180px\)[\s\S]*?\.persistent-form-visual \.main-form-art img\{[\s\S]*?object-fit:contain/);
   assert.match(styles,/@media\(min-width:701px\) and \(max-width:1180px\)[\s\S]*?grid-template-columns:clamp\(360px,42vw,430px\)[\s\S]*?\.persistent-form-visual \.main-form-art img\{object-fit:contain/);
   assert.match(styles,/\.persistent-form-visual \.form-art\.is-active \.main-form-art\{transform:none\}/);
+  assert.match(source,/--portrait-ratio/);assert.match(styles,/aspect-ratio:var\(--portrait-ratio,3 \/ 4\)/);assert.match(styles,/\.persistent-effects-summary\.tracked-active/);
   assert.match(styles,/@media\(max-width:700px\)\{[\s\S]*grid-template-rows:160px minmax\(0,1fr\)/);
   assert.match(styles,/use the character header instead of truncating multiclass builds/);assert.match(styles,/-webkit-line-clamp:3/);assert.match(styles,/overflow-wrap:anywhere/);
   assert.match(styles,/\.task-launcher span\{[\s\S]*?-webkit-line-clamp:2/);assert.match(styles,/\.next-step-guide p\{[\s\S]*?-webkit-line-clamp:2/);
@@ -192,8 +193,8 @@ test('hosted release downloads use the platform static-asset binding',()=>{
   const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const build=readFileSync('scripts/build.mjs','utf8');
   assert.match(worker,/async fetch\(request,env\)/);
   assert.match(build,/__ALTERED_DOWNLOAD_ASSETS__/);assert.match(worker,/const DOWNLOAD_ASSETS=__ALTERED_DOWNLOAD_ASSETS__/);
-  assert.match(worker,/ANDROID_DOWNLOAD_PATH='\/downloads\/Altered-Android-v0\.29\.28\.apk'/);
-  assert.match(worker,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/Altered-Android-v0\.29\.28\.apk/);
+  assert.match(worker,/ANDROID_DOWNLOAD_PATH='\/downloads\/Altered-Android-v0\.29\.29\.apk'/);
+  assert.match(worker,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/Altered-Android-v0\.29\.29\.apk/);
   assert.match(worker,/Content-Disposition.*attachment/);
   assert.match(worker,/url\.pathname\.startsWith\('\/downloads\/'\)&&env\?\.ASSETS\?\.fetch/);
 });
@@ -318,8 +319,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.28\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.28\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.28\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.29\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.29\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.29\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{

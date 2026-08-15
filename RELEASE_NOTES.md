@@ -1,3 +1,13 @@
+# Altered v0.29.29 release notes
+
+## Artwork-first, space-efficient cockpit
+
+- The persistent form cockpit now places form state and name above the portrait, sizes the portrait to its real aspect ratio, and eliminates the empty letterbox bands around built-in and uploaded artwork.
+- Available HP now shows the combined current and Temporary HP total beneath the portrait, with the underlying HP and Temporary HP breakdown, AC, and Speed kept visible.
+- The former right-side stat area now summarizes active effects such as Rage, Wild Shape, Guidance, and Inspiration and opens their full controls with one tap.
+- Active-effect borders and glow are stronger while retaining visible text labels and reduced-motion and forced-color fallbacks.
+- Folded phone, unfolded Galaxy Fold/tablet, Windows, and macOS layouts share the same non-cropping cockpit geometry and preserve every existing combat control.
+
 # Altered v0.29.28 release notes
 
 ## Beast-body attacks and Rage completeness

@@ -134,7 +134,7 @@ const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
 const FIRST_CHARACTER_SETUP_KEY='altered-first-character-setup-v1';
-const APP_VERSION='0.29.28';
+const APP_VERSION='0.29.29';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -371,8 +371,9 @@ function queueArtLoad(targetId:string){
 }
 function appendPortrait(container:HTMLElement,targetId:string,fallbackKey:string,label:string,className='main-form-art'){
   const wrapper=document.createElement('div');wrapper.className=className;const key=artCacheKey(targetId);const override=artOverrideCache.get(key);
-  if(override){const image=document.createElement('img');image.src=override;image.alt=`Custom artwork for ${label}`;image.loading='lazy';image.decoding='async';wrapper.append(image);}
-  else{const builtIn=BUILT_IN_FORM_ART[targetId];if(builtIn){const image=document.createElement('img');image.src=builtIn;image.alt=`Built-in artwork for ${label}`;image.loading='lazy';image.decoding='async';wrapper.append(image);}else wrapper.innerHTML=art[fallbackKey]??art['base']??'';queueArtLoad(targetId);}
+  const sizeToArtwork=(image:HTMLImageElement)=>{const apply=()=>{if(image.naturalWidth&&image.naturalHeight)container.style.setProperty('--portrait-ratio',`${image.naturalWidth} / ${image.naturalHeight}`);};if(image.complete)apply();else image.addEventListener('load',apply,{once:true});};
+  if(override){const image=document.createElement('img');image.src=override;image.alt=`Custom artwork for ${label}`;image.loading='lazy';image.decoding='async';sizeToArtwork(image);wrapper.append(image);}
+  else{const builtIn=BUILT_IN_FORM_ART[targetId];if(builtIn){const image=document.createElement('img');image.src=builtIn;image.alt=`Built-in artwork for ${label}`;image.loading='lazy';image.decoding='async';sizeToArtwork(image);wrapper.append(image);}else{container.style.removeProperty('--portrait-ratio');wrapper.innerHTML=art[fallbackKey]??art['base']??'';queueArtLoad(targetId);}}
   container.append(wrapper);return Boolean(override);
 }
 function activeOverlayVisuals(){
@@ -995,7 +996,7 @@ function syncTurnCompletionCue(){
 }
 function renderMetrics(){
   const grid=$('#metric-grid');clear(grid);grid.append(healthMetric(),metric('Armor Class',String(sheet.ac),sheet.acSource),metric('Speed',String(sheet.speeds.walk??0)+' ft.',speedText()));
-  $('#persistent-hp').textContent=`${state.hp} / ${character.hp.max}`;$('#persistent-temp').textContent=String(state.tempHp);$('#persistent-ac').textContent=String(sheet.ac);$('#persistent-speed').textContent=`${sheet.speeds.walk??0} ft.`;
+  $('#persistent-total-hp').textContent=String(state.hp+state.tempHp);$('#persistent-hp').textContent=`${state.hp} / ${character.hp.max}`;$('#persistent-temp').textContent=String(state.tempHp);$('#persistent-ac').textContent=String(sheet.ac);$('#persistent-speed').textContent=`${sheet.speeds.walk??0} ft.`;
   const economy=$('#action-economy');clear(economy);const chips:[string,string,number][]=[['Action','Action',state.turn.actionsRemaining],['Surge','Surge Action',state.turn.surgeActionsRemaining],['Bonus','Bonus Action',state.turn.bonusRemaining],['Reaction','Reaction',state.turn.reactionRemaining]];const economySummary:string[]=[];for(const [label,name,count] of chips){const node=text('span',`${label}: ${count}`,'economy-chip '+(count>0?'available':'used'));node.title=`${name}: ${count>0?'available':'used'}`;economy.append(node);economySummary.push(`${name} ${count}`);}if(state.turn.attackAction){const remaining=text('span',`Extra: ${state.turn.attackAction.remaining}`,'economy-chip available');remaining.title=`Extra Attack: ${state.turn.attackAction.remaining} remaining`;economy.append(remaining);economySummary.push(`Extra Attack ${state.turn.attackAction.remaining}`);}const slotSpell=text('span',state.turn.slotSpellCast?'Slot: Used':'Slot: Ready','economy-chip '+(state.turn.slotSpellCast?'used':'available'));slotSpell.title='2024 rule: you can expend only one spell slot to cast a spell on a turn. Cantrips do not use this limit.';economy.append(slotSpell);economySummary.push(`slot spell ${state.turn.slotSpellCast?'used':'available'}`);economy.setAttribute('aria-label',economySummary.join(', '));economy.title=state.turn.actionsRemaining>0&&state.turn.bonusRemaining===0?`Action still available: use it for an attack, another non-spell action, or a cantrip. Rage and Wild Shape require the Bonus Action already used this turn.${state.turn.slotSpellCast?' Another leveled spell is blocked by the one-slot-spell-per-turn rule.':''}`:'Current turn availability.';
   $('#turn-number').textContent=`Turn ${state.turn.number}`;$('#persistent-turn-number').textContent=`Turn ${state.turn.number}`;syncTurnCompletionCue();
 }
@@ -1095,6 +1096,7 @@ function renderActiveEffects(){
   }
   for(const activeCard of cards)activeCard.classList.add('tracked-active');const names=cards.map(card=>card.querySelector('strong')?.textContent).filter((name):name is string=>Boolean(name));root.dataset.hasEffects=String(cards.length>0);root.hidden=cards.length===0||currentTab!=='features';if(cards.length){const summary=document.createElement('summary');const copy=document.createElement('span');copy.append(text('strong',`Active effects (${cards.length})`),text('small',names.join(' · ')));summary.append(copy);root.append(summary,...cards);root.open=wasOpen;}
   const summaryButton=$<HTMLButtonElement>('#open-active-effects');summaryButton.hidden=names.length===0;$('#play-active-summary').textContent=names.join(' · ')||'No active effects';
+  const cockpitSummary=$<HTMLButtonElement>('#persistent-effects-summary');const effectNames=names.join(' · ')||'None active';$('#persistent-effect-names').textContent=effectNames;cockpitSummary.classList.toggle('tracked-active',names.length>0);cockpitSummary.dataset.hasEffects=String(names.length>0);cockpitSummary.setAttribute('aria-label',names.length?`Review active effects: ${effectNames}`:'Open Effects and Conditions');
 }
 function renderQuickFeatures(){
   const box=$('#quick-features');clear(box);
@@ -1587,6 +1589,7 @@ function initializeControls(){
   $('#close-task-view').addEventListener('click',()=>setWorkspace('play',undefined,taskOrigin,$('#nav-play')));
   document.querySelectorAll<HTMLButtonElement>('[data-open-tab]').forEach(control=>control.addEventListener('click',()=>openTask(control.dataset.openTab??'actions','play')));
   $('#open-active-effects').addEventListener('click',()=>{openTask('features','play');$<HTMLDetailsElement>('#active-effects').open=true;});
+  $('#persistent-effects-summary').addEventListener('click',()=>{if($<HTMLElement>('#persistent-effects-summary').dataset.hasEffects==='true'){$<HTMLButtonElement>('#open-active-effects').click();return;}openMoreDrawer('Effects & Conditions');});
   $('#open-latest-result').addEventListener('click',()=>openTask(latestRollTab,'play'));
   $('#open-damage-view').addEventListener('click',()=>openMoreDrawer('Damage'));
   $('#open-conditions-view').addEventListener('click',()=>openMoreDrawer('Effects & Conditions'));
