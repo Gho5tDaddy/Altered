@@ -1,3 +1,11 @@
+# Altered v0.29.22 release notes
+
+- Makes Guidance a single quick control beside the character portrait; the longer Effects form no longer duplicates it.
+- Removes the unnecessary source, chosen-skill, and duration inputs from received buffs.
+- The next skill rolled becomes Guidance's chosen skill automatically, preserving the 2024 rule without interrupting play.
+- Guidance visibly counts down and expires after 10 turns, equal to its one-minute duration.
+- Keeps the remaining buff editor compact and preserves all existing saved effects.
+
 # Altered v0.29.21 release notes
 
 - Moves Suggested Next and Show Me into the compact header beside the Altered icon, reclaiming dashboard height.

@@ -8,7 +8,9 @@ test('static shell exposes accessible tabs, dialogs, and condition input',()=>{
   assert.equal((html.match(/role="tab"/g)??[]).length,6);
   assert.match(html,/id="tab-content"[^>]*role="tabpanel"[^>]*aria-labelledby="tab-actions"/);
   assert.match(html,/for="condition-select">Condition<\/label>/);
-  for(const id of ['received-effect-kind','received-effect-source','received-effect-skill','add-received-effect-button','received-effect-list'])assert.match(html,new RegExp(`id="${id}"`));
+  for(const id of ['received-effect-kind','add-received-effect-button','received-effect-list'])assert.match(html,new RegExp(`id="${id}"`));
+  for(const removed of ['received-effect-source','received-effect-skill','received-effect-duration'])assert.equal(new RegExp(`id="${removed}"`).test(html),false);
+  assert.equal(/<option value="guidance">/.test(html),false);assert.match(html,/id="quick-guidance"/);
   for(const id of ['help-dialog','import-dialog','private-mechanics-dialog','transform-builder-dialog','settings-dialog','temp-hp-dialog','delete-character-dialog']){
     assert.match(html,new RegExp(`<dialog id="${id}"[^>]*aria-labelledby="${id.replace(/-dialog$/,'')}(?:-dialog)?-title"`));
   }
@@ -20,7 +22,7 @@ test('received effects stay compact and attacks separate hit from damage',()=>{
   assert.match(source,/receivedRollBonus\('attack'\)/);assert.match(source,/receivedRollBonus\('skill',/);assert.match(source,/queueDamageRoll/);assert.match(source,/Roll Damage/);assert.match(source,/Miss · Clear/);
   assert.match(source,/quick-guidance/);assert.match(source,/quick-inspiration/);assert.match(source,/autoChooseSkill/);assert.match(source,/Guidance chose \$\{skill\}/);
   assert.match(html,/id="quick-initiative"/);assert.match(html,/id="persistent-undo-turn"/);assert.match(source,/autoUseNextRoll/);assert.match(source,/Heroic Inspiration rerolled/);assert.match(source,/startCombat\(state\)/);assert.match(source,/Choose Damage, Grapple, or Shove/);
-  for(const id of ['battlefield-facts','fact-ally-near-target','fact-attacker-unseen','fact-target-unseen','received-effect-duration'])assert.match(html,new RegExp(`id="${id}"`));
+  for(const id of ['battlefield-facts','fact-ally-near-target','fact-attacker-unseen','fact-target-unseen'])assert.match(html,new RegExp(`id="${id}"`));
   assert.match(source,/confirmed ally beside target/);assert.match(source,/nextAttackFacts\.clear\(\)/);assert.match(source,/Rules confidence/);
   assert.match(styles,/alteredTrackedEffect/);assert.match(styles,/\.app-shell\.reduce-motion \.tracked-active/);
 });
@@ -302,8 +304,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.21\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.21\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.21\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.22\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.22\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.22\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{

@@ -33,7 +33,7 @@ const signed=(value:number)=>value>=0?`+${value}`:`${value}`;
 const damageTypes:DamageType[]=['Acid','Bludgeoning','Cold','Fire','Force','Lightning','Necrotic','Piercing','Poison','Psychic','Radiant','Slashing','Thunder'];
 const commonConditions=Object.keys(CONDITIONS).sort((a,b)=>a.localeCompare(b));
 const RECEIVED_EFFECTS:Record<ReceivedEffectKind,{name:string;duration:string;summary:string}>={
-  guidance:{name:'Guidance',duration:'Up to 1 minute; end when its source ends it',summary:'Adds 1d4 to checks using the selected skill.'},
+  guidance:{name:'Guidance',duration:'Up to 1 minute',summary:'Adds 1d4 to checks using the skill chosen when the effect begins.'},
   bless:{name:'Bless',duration:'Up to 1 minute; end when its source ends it',summary:'Adds 1d4 to your attack rolls and saving throws.'},
   'bardic-inspiration':{name:'Bardic Inspiration',duration:'Up to 1 hour or until used',summary:'After a failed D20 Test, roll and add the inspiration die.'},
   'heroic-inspiration':{name:'Heroic Inspiration',duration:'Until used',summary:'Reroll one die immediately after rolling it; use the new roll.'}
@@ -130,7 +130,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.21';
+const APP_VERSION='0.29.22';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -1010,7 +1010,8 @@ function receivedRollBonus(kind:ReceivedRollKind,skill?:string){
   }
   return {total,detail:applied.join(' · ')};
 }
-function receivedEffectSummary(effect:ReceivedEffect){const info=RECEIVED_EFFECTS[effect.kind];return [info.summary,effect.autoChooseSkill?'Waiting for your next skill check; Altered will choose that skill automatically.':'',effect.autoUseNextRoll?'Ready for the next d20 roll; Altered will reroll one die and use the new result.':'',effect.skill?`Chosen skill: ${effect.skill}.`:'',effect.die?`Die: d${effect.die}.`:'',`Duration: ${effect.duration}.`,effect.source?`Source: ${effect.source}.`:'' ].filter(Boolean).join(' ');}
+function finiteEffectTurns(duration:string){const match=duration.toLowerCase().match(/(?:up to\s+)?(\d+)\s*(round|minute|hour)s?/);if(!match)return undefined;const amount=Math.max(1,Number(match[1]));return match[2]==='round'?amount:match[2]==='minute'?amount*10:amount*600;}
+function receivedEffectSummary(effect:ReceivedEffect){const info=RECEIVED_EFFECTS[effect.kind],turns=finiteEffectTurns(effect.duration),elapsed=Math.max(0,state.turn.number-effect.addedTurn),remaining=turns===undefined?undefined:Math.max(0,turns-elapsed);return [info.summary,effect.autoChooseSkill?'Waiting for your next skill check; that skill is chosen automatically.':'',effect.autoUseNextRoll?'Ready for the next d20 roll; Altered will reroll one die and use the new result.':'',effect.skill?`Chosen skill: ${effect.skill}.`:'',effect.die?`Die: d${effect.die}.`:'',remaining!==undefined?`${remaining} turn${remaining===1?'':'s'} remaining.`:`Duration: ${effect.duration}.`].filter(Boolean).join(' ');}
 function consumeReceivedEffect(effect:ReceivedEffect){
   if(effect.kind==='bardic-inspiration'){const die=effect.die??6,result=rollDice(`1d${die}`).total;applyResult(endReceivedEffect(state,effect.id));showRoll(`+${result}`,`Add ${result} [1d${die}] to the failed D20 Test. Bardic Inspiration is now used.`,`Use ${effect.name}`,{tone:result===die?'exceptional':'high',label:'Received effect used'});return;}
   if(effect.kind==='heroic-inspiration'){const result=rollDice('1d20').total;applyResult(endReceivedEffect(state,effect.id));showRoll(result,`Use this as the new d20 result. Heroic Inspiration is now used.`, `Use ${effect.name}`,d20Presentation(result,result));}
@@ -1458,8 +1459,8 @@ function renderConditions(){
   for(const effect of state.receivedEffects){const card=document.createElement('article');card.className='received-effect-entry tracked-active';const copy=document.createElement('div');copy.append(text('strong',effect.name),text('small',receivedEffectSummary(effect)));const actions=document.createElement('div');actions.className='received-effect-actions';if(effect.kind==='bardic-inspiration'||effect.kind==='heroic-inspiration')actions.append(button(effect.kind==='bardic-inspiration'?`Use d${effect.die??6}`:'Reroll d20',()=>consumeReceivedEffect(effect),'button compact primary'));actions.append(button('End',()=>applyResult(endReceivedEffect(state,effect.id)),'button compact secondary'));card.append(copy,actions);effects.append(card);}
   const hasAnything=state.receivedEffects.length>0||state.conditions.length>0||state.activeSpellEffects.length>0||Boolean(state.concentration)||state.rage.active||Boolean(state.activeTransform);$('#open-active-effects').classList.toggle('tracked-active',hasAnything);
 }
-function syncReceivedEffectFields(){const kind=$<HTMLSelectElement>('#received-effect-kind').value as ReceivedEffectKind;$('#received-effect-skill-field').hidden=kind!=='guidance';$('#received-effect-die-field').hidden=kind!=='bardic-inspiration';$('#add-received-effect-button').textContent=`Add ${RECEIVED_EFFECTS[kind].name}`;}
-function createReceivedEffect(){const kind=$<HTMLSelectElement>('#received-effect-kind').value as ReceivedEffectKind,info=RECEIVED_EFFECTS[kind],source=$<HTMLInputElement>('#received-effect-source').value.trim()||'Another creature',chosenDuration=$<HTMLSelectElement>('#received-effect-duration').value;const effect:ReceivedEffect={id:`received:${kind}:${Date.now()}`,kind,name:info.name,source,addedTurn:state.turn.number,duration:chosenDuration==='default'?info.duration:chosenDuration,...(kind==='guidance'?{skill:$<HTMLSelectElement>('#received-effect-skill').value}:{}),...(kind==='bardic-inspiration'?{die:Number($<HTMLSelectElement>('#received-effect-die').value) as 6|8|10|12}:{})};applyResult(addReceivedEffect(state,effect));$<HTMLDetailsElement>('#add-received-effect').open=false;}
+function syncReceivedEffectFields(){const kind=$<HTMLSelectElement>('#received-effect-kind').value as ReceivedEffectKind;$('#received-effect-die-field').hidden=kind!=='bardic-inspiration';$('#add-received-effect-button').textContent=`Add ${RECEIVED_EFFECTS[kind].name}`;}
+function createReceivedEffect(){const kind=$<HTMLSelectElement>('#received-effect-kind').value as ReceivedEffectKind,info=RECEIVED_EFFECTS[kind];const effect:ReceivedEffect={id:`received:${kind}:${Date.now()}`,kind,name:info.name,source:'Received buff',addedTurn:state.turn.number,duration:info.duration,...(kind==='guidance'?{autoChooseSkill:true}:{}),...(kind==='bardic-inspiration'?{die:Number($<HTMLSelectElement>('#received-effect-die').value) as 6|8|10|12}:{})};applyResult(addReceivedEffect(state,effect));$<HTMLDetailsElement>('#add-received-effect').open=false;}
 function renderLog(){const root=$('#activity-log');clear(root);$<HTMLButtonElement>('#clear-activity').disabled=state.log.length===0;if(state.log.length===0){root.append(text('div','No activity yet.','log-row'));return;}for(const item of state.log)root.append(text('div',item,'log-row'));}
 type NextStepSuggestion={title:string;copy:string;target:HTMLElement;reveal?:()=>HTMLElement};
 function taskControl(label:string){const control=Array.from(document.querySelectorAll<HTMLButtonElement>('#tab-content button')).find(candidate=>candidate.textContent?.toLowerCase().includes(label.toLowerCase()));if(control){control.closest('details')?.setAttribute('open','');return control;}return $<HTMLElement>('#task-view-title');}
@@ -1543,7 +1544,7 @@ function endCurrentForm(){
 function initializeControls(){
   const damage=$<HTMLSelectElement>('#damage-type');for(const type of damageTypes){const option=document.createElement('option');option.value=type;option.textContent=type;damage.append(option);}damage.value='Slashing';
   const conditions=$<HTMLSelectElement>('#condition-select');for(const condition of commonConditions){const option=document.createElement('option');option.value=condition;option.textContent=condition;conditions.append(option);}
-  const effectSkills=$<HTMLSelectElement>('#received-effect-skill');for(const skill of ['Acrobatics','Animal Handling','Arcana','Athletics','Deception','History','Insight','Intimidation','Investigation','Medicine','Nature','Perception','Performance','Persuasion','Religion','Sleight of Hand','Stealth','Survival']){const option=document.createElement('option');option.value=skill;option.textContent=skill;effectSkills.append(option);}effectSkills.value='Perception';syncReceivedEffectFields();
+  syncReceivedEffectFields();
   syncBattlefieldFacts();
   $('#toggle-app-menu').addEventListener('click',()=>setAppMenuOpen($<HTMLButtonElement>('#toggle-app-menu').getAttribute('aria-expanded')!=='true'));
   $('#top-actions').addEventListener('click',event=>{if((event.target as Element).closest('button,a'))setAppMenuOpen(false);});
