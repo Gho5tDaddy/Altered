@@ -1,3 +1,12 @@
+# Altered v0.29.28 release notes
+
+## Beast-body attacks and Rage completeness
+
+- Altered's explicit table rule now classifies physical Beast-form attacks such as Bite, Claw, Tentacles, Rend, and Slam as natural Unarmed Strikes for feature and effect eligibility.
+- Eligible Strength-based beast attacks receive the current Barbarian Rage Damage bonus as a separate damage packet while preserving the original attack bonus, reach, damage dice, damage type, riders, Multiattack sequence, and recharge rules.
+- Nonphysical actions, ranged emissions, spells, roars, and save-only effects do not receive Rage Damage.
+- Rage now records its starting turn and enforces the 2024 ten-minute maximum of 100 rounds, including Persistent Rage. Older saved active Rages migrate without losing combat state.
+
 # Altered v0.29.27 release notes
 
 ## Private owner character and first-time setup

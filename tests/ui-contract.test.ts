@@ -192,8 +192,8 @@ test('hosted release downloads use the platform static-asset binding',()=>{
   const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const build=readFileSync('scripts/build.mjs','utf8');
   assert.match(worker,/async fetch\(request,env\)/);
   assert.match(build,/__ALTERED_DOWNLOAD_ASSETS__/);assert.match(worker,/const DOWNLOAD_ASSETS=__ALTERED_DOWNLOAD_ASSETS__/);
-  assert.match(worker,/ANDROID_DOWNLOAD_PATH='\/downloads\/Altered-Android-v0\.29\.27\.apk'/);
-  assert.match(worker,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/Altered-Android-v0\.29\.27\.apk/);
+  assert.match(worker,/ANDROID_DOWNLOAD_PATH='\/downloads\/Altered-Android-v0\.29\.28\.apk'/);
+  assert.match(worker,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/Altered-Android-v0\.29\.28\.apk/);
   assert.match(worker,/Content-Disposition.*attachment/);
   assert.match(worker,/url\.pathname\.startsWith\('\/downloads\/'\)&&env\?\.ASSETS\?\.fetch/);
 });
@@ -318,8 +318,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.27\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.27\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.27\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.28\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.28\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.28\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
@@ -347,7 +347,7 @@ test('combat state and spell availability are explained before a click',()=>{
   assert.match(source,/Static aura is active because Reduce motion is on/);
   assert.match(source,/Initiative is a Dexterity check when combat starts/);
   assert.match(source,/Surprised \(Disadvantage\)/);
-  assert.match(source,/Rage Damage applies only to Strength attacks with a weapon or Unarmed Strike/);
+  assert.match(source,/table rule treats Beast-form physical attacks as Unarmed Strikes/);
   assert.match(source,/Available now \(\$\{ready\.length\}\)/);
   assert.match(source,/Unavailable right now \(\$\{blocked\.length\}\)/);
   assert.match(source,/availableSpellSlotLevels\(character,state,slotLevel\)/);

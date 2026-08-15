@@ -1,5 +1,5 @@
 import type {
-  Ability,AcCandidate,ActionCost,Character,CreatureAction,DamagePacket,DamageType,
+  Ability,AcCandidate,ActionCost,Character,Creature,CreatureAction,DamagePacket,DamageType,
   DerivedRoll,EvaluatedFeature,GameState,ImportedFeatureRule,ProficiencyRank,ReceivedEffect,ResolvedSheet,ResourcePool,RetentionPolicy,
   Spell,TransformProfile,TransformationEffects,TransformationOption,TransitionResult
 } from './types.js';
@@ -58,6 +58,9 @@ function creature(character:Character,id?:string){return id?(character.customFor
 function allForms(character:Character){return [...Object.values(CREATURES),...Object.values(character.customForms)]}
 function activeProfile(state?:GameState):TransformProfile{return state?.activeTransform?.option.profile??'base'}
 function activeOption(state?:GameState):TransformationOption{return state?.activeTransform?.option??{id:'base',label:'Base Form',profile:'base',source:'Character sheet',actionCost:'none',usable:true}}
+function beastPhysicalAttack(action:CreatureAction,form?:Creature){return action.type==='attack'&&action.kind==='beast'&&normalized(form?.type)==='beast'}
+export function attackCountsAsUnarmedStrike(character:Character,state:GameState,action:CreatureAction){return action.type==='attack'&&(action.kind==='unarmed'||beastPhysicalAttack(action,creature(character,activeOption(state).formId)))}
+function featureAttackKinds(action:CreatureAction,beastForm=false):('weapon'|'unarmed')[]{return action.type!=='attack'?[]:action.kind==='weapon'?['weapon']:action.kind==='unarmed'||beastForm&&action.kind==='beast'?['unarmed']:[]}
 function activeConditionImmunities(character:Character,state:GameState,option=activeOption(state)){
   const values=[...(creature(character,option.formId)?.conditionImmunities??[]),...(option.effects?.conditionImmunities??[])];
   for(const overlay of activeOverlayOptions(character,state))values.push(...(overlay.effects?.conditionImmunities??[]));
@@ -165,7 +168,7 @@ export function availableTransformations(character:Character,state?:GameState):T
 export function createInitialState(character:Character):GameState{
   return {
     stateVersion:5,hp:character.hp.current,tempHp:0,life:{dead:false,stable:false,deathSaveSuccesses:0,deathSaveFailures:0},exhaustionLevel:0,relentlessRageDc:10,
-    rage:{active:false,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false},
+    rage:{active:false,startedAtTurn:0,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false},
     turn:{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,slotSpellCast:false,attackRollsMade:0,oncePerTurn:{}},
     resources:Object.fromEntries(character.resources.map(r=>[r.id,cloneResource(r)])),
     spellSlots:Object.fromEntries(Object.entries(character.spellSlots).map(([k,v])=>[k,{...v}])),
@@ -311,14 +314,14 @@ function baseActions(character:Character,abilities:Character['abilities'],size:s
   ];
 }
 function adjustedDamageAbility(expression:string,delta:number,minimum=1){if(delta===0)return expression;if(/^\d+$/.test(expression))return String(Math.max(minimum,Number(expression)+delta));const match=expression.match(/^(\d*d\d+)([+-]\d+)?$/i);if(!match)return expression;const next=Number(match[2]??0)+delta;return `${match[1]}${next>0?`+${next}`:next<0?String(next):''}`;}
-function applyAttackAbilityOverride(action:CreatureAction,effects:TransformationEffects[],abilities:Character['abilities']):CreatureAction{
-  if(action.type!=='attack')return action;const override=effects.map(effect=>effect.attackAbilityOverride).filter((value):value is NonNullable<TransformationEffects['attackAbilityOverride']>=>Boolean(value)).at(-1);if(!override||!override.appliesTo.includes(action.kind as 'weapon'|'unarmed'))return action;const delta=abilityMod(abilities[override.ability])-abilityMod(abilities[action.ability]);if(delta===0&&action.ability===override.ability)return action;const damage=action.damage.map((packet,index)=>index===0?{...packet,expression:adjustedDamageAbility(packet.expression,delta)}:{...packet});return {...action,ability:override.ability,attackBonus:action.attackBonus+delta,damage,notes:[action.notes,`Active transformation uses ${override.ability.toUpperCase()} for this attack and its ability-based damage.`].filter(Boolean).join(' · ')};
+function applyAttackAbilityOverride(action:CreatureAction,effects:TransformationEffects[],abilities:Character['abilities'],beastForm=false):CreatureAction{
+  if(action.type!=='attack')return action;const override=effects.map(effect=>effect.attackAbilityOverride).filter((value):value is NonNullable<TransformationEffects['attackAbilityOverride']>=>Boolean(value)).at(-1);if(!override||!featureAttackKinds(action,beastForm).some(kind=>override.appliesTo.includes(kind)))return action;const delta=abilityMod(abilities[override.ability])-abilityMod(abilities[action.ability]);if(delta===0&&action.ability===override.ability)return action;const damage=action.damage.map((packet,index)=>index===0?{...packet,expression:adjustedDamageAbility(packet.expression,delta)}:{...packet});return {...action,ability:override.ability,attackBonus:action.attackBonus+delta,damage,notes:[action.notes,`Active transformation uses ${override.ability.toUpperCase()} for this attack and its ability-based damage.`].filter(Boolean).join(' · ')};
 }
 function resolvedActions(character:Character,state:GameState,option:TransformationOption,effects:TransformationEffects[],canAttack:boolean,abilities:Character['abilities']):CreatureAction[]{
-  const form=creature(character,option.formId);const size=effects.map(effect=>effect.size).filter((value):value is string=>Boolean(value)).at(-1)??form?.size??character.size;const naturalAttackRollBonus=itemEffectBonus(character,state,option,'natural-attack-rolls',true),naturalAttackDamageBonus=itemEffectBonus(character,state,option,'natural-attack-damage',true);const actions:CreatureAction[]=form&&option.profile!=='overlay'?[...form.actions]:baseActions(character,abilities,size);for(const effect of effects)actions.push(...(effect.actions??[]));
-  const monk=classLevel(character,'Monk');if(canAttack&&retainedClassFeatures(option)&&monk>=1){const stats=abilities;const strMod=abilityMod(stats.str),dexMod=abilityMod(stats.dex),mod=Math.max(strMod,dexMod),chosen:Ability=dexMod>=strMod?'dex':'str';actions.push({id:'monk-unarmed',name:'Monk Unarmed Strike',type:'attack',cost:'action',attackBonus:proficiencyBonus(character.totalLevel)+mod,ability:chosen,kind:'unarmed',reach:5,damage:[{expression:`${monkDie(monk)}${mod>=0?'+':''}${mod}`,type:'Bludgeoning'}],notes:'Separate Unarmed Strike; Beast attacks do not become Unarmed Strikes.'});}
+  const form=creature(character,option.formId);const isBeastForm=normalized(form?.type)==='beast'&&option.profile!=='overlay';const size=effects.map(effect=>effect.size).filter((value):value is string=>Boolean(value)).at(-1)??form?.size??character.size;const naturalAttackRollBonus=itemEffectBonus(character,state,option,'natural-attack-rolls',true),naturalAttackDamageBonus=itemEffectBonus(character,state,option,'natural-attack-damage',true);const actions:CreatureAction[]=form&&option.profile!=='overlay'?[...form.actions]:baseActions(character,abilities,size);for(const effect of effects)actions.push(...(effect.actions??[]));
+  const monk=classLevel(character,'Monk');if(canAttack&&retainedClassFeatures(option)&&monk>=1){const stats=abilities;const strMod=abilityMod(stats.str),dexMod=abilityMod(stats.dex),mod=Math.max(strMod,dexMod),chosen:Ability=dexMod>=strMod?'dex':'str';actions.push({id:'monk-unarmed',name:'Monk Unarmed Strike',type:'attack',cost:'action',attackBonus:proficiencyBonus(character.totalLevel)+mod,ability:chosen,kind:'unarmed',reach:5,damage:[{expression:`${monkDie(monk)}${mod>=0?'+':''}${mod}`,type:'Bludgeoning'}],notes:'Separate Unarmed Strike option; the beast stat-block attacks remain available with their original dice.'});}
   const rogue=classLevel(character,'Rogue');if(canAttack&&retainedClassFeatures(option)&&rogue>=2){const choices:NonNullable<Extract<CreatureAction,{type:'automatic'}>['choices']>=[{id:'dash',label:'Dash',resolution:'dash',notes:'Gain extra movement equal to Speed for the rest of this turn.'},{id:'disengage',label:'Disengage',resolution:'disengage',notes:'Movement does not provoke Opportunity Attacks for the rest of this turn.'},{id:'hide',label:'Hide',resolution:'hide',prerequisite:'Heavily Obscured or behind Three-Quarters or Total Cover, and outside every enemy’s line of sight.',skill:'Stealth',notes:'Make a DC 15 Dexterity (Stealth) check.'}];if(sameText(subclass(character,'Rogue'),'Thief')&&rogue>=3)choices.push({id:'sleight-of-hand',label:'Sleight of Hand',resolution:'skill-check',skill:'Sleight of Hand',prerequisite:'Pick a lock, disarm a trap with Thieves’ Tools, or pick a pocket.'},{id:'utilize',label:'Utilize',resolution:'utilize',prerequisite:'Choose an object whose rules use the Utilize action.'},{id:'magic-item',label:'Use Magic Item',resolution:'magic-item',prerequisite:'Choose a magic item that requires the Magic action.'});actions.push({id:'cunning-action',name:rogue>=3&&sameText(subclass(character,'Rogue'),'Thief')?'Cunning Action / Fast Hands':'Cunning Action',type:'automatic',cost:'bonus',choices,notes:'Choose one legal option before spending the Bonus Action.'});}
-  const adjusted=actions.map(action=>applyAttackAbilityOverride(action,effects,abilities)).map(action=>{if(action.type!=='attack')return action;const natural=action.kind==='unarmed'||Boolean(form&&option.profile!=='overlay'&&action.kind==='beast');const damage=natural&&naturalAttackDamageBonus?action.damage.map((packet,index)=>index===0?{...packet,expression:adjustedDamageAbility(packet.expression,naturalAttackDamageBonus)}:packet):action.damage;return {...action,attackBonus:action.attackBonus+(natural?naturalAttackRollBonus:0)-exhaustionPenalty(state),damage,notes:[action.notes,natural&&(naturalAttackRollBonus||naturalAttackDamageBonus)?'Retained equipment modifies this natural or unarmed attack.':''].filter(Boolean).join(' · ')};});
+  const adjusted=actions.map(action=>applyAttackAbilityOverride(action,effects,abilities,isBeastForm)).map(action=>{if(action.type!=='attack')return action;const natural=action.kind==='unarmed'||Boolean(form&&option.profile!=='overlay'&&action.kind==='beast');const tableRule=beastPhysicalAttack(action,isBeastForm?form:undefined);const damage=natural&&naturalAttackDamageBonus?action.damage.map((packet,index)=>index===0?{...packet,expression:adjustedDamageAbility(packet.expression,naturalAttackDamageBonus)}:packet):action.damage;return {...action,attackBonus:action.attackBonus+(natural?naturalAttackRollBonus:0)-exhaustionPenalty(state),damage,notes:[action.notes,tableRule?'Altered table rule: this Beast-form physical attack counts as an Unarmed Strike for feature and effect eligibility; its stat-block dice remain unchanged.':'',natural&&(naturalAttackRollBonus||naturalAttackDamageBonus)?'Retained equipment modifies this natural or unarmed attack.':''].filter(Boolean).join(' · ')};});
   if(canAttack)return adjusted;
   return adjusted.filter(action=>action.type==='automatic'&&!action.damage?.length&&!action.effects?.length);
 }
@@ -476,7 +479,7 @@ export function startRage(character:Character,state:GameState):TransitionResult{
   const immunities=activeConditionImmunities(character,state);
   spendActionCost(state,'bonus',immunities);spendResource(state,'rage');
   const persistent=classLevel(character,'Barbarian')>=15;
-  state.rage={active:true,endsAtTurn:persistent?Number.MAX_SAFE_INTEGER:state.turn.number+1,usedThisTurn:true,recklessDeclared:false,extendedThisTurn:persistent};
+  state.rage={active:true,startedAtTurn:state.turn.number,endsAtTurn:persistent?state.turn.number+100:state.turn.number+1,usedThisTurn:true,recklessDeclared:false,extendedThisTurn:persistent};
   const mindless=classLevel(character,'Barbarian')>=6&&sameText(subclass(character,'Barbarian'),'Path of the Berserker');if(mindless)state.conditions=state.conditions.filter(condition=>condition!=='Charmed'&&condition!=='Frightened');
   const endedConcentration=Boolean(state.concentration);
   if(endedConcentration)endConcentration(state,'Rage prevents maintaining Concentration.',character);
@@ -492,14 +495,14 @@ export function rageStartError(character:Character,state:GameState){
   if(!hasResource(state,'rage'))return 'No Rage uses remain.';
   return null;
 }
-export function endRage(state:GameState,reason='Rage ended.'):TransitionResult{state.rage={active:false,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false};return {state,message:reason}}
+export function endRage(state:GameState,reason='Rage ended.'):TransitionResult{state.rage={active:false,startedAtTurn:0,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false};return {state,message:reason}}
 export function declareRecklessAttack(character:Character,state:GameState):TransitionResult{
   if(classLevel(character,'Barbarian')<2)return {state,message:'This character has no Reckless Attack feature.'};
   if(state.turn.attackRollsMade>0)return {state,message:'Reckless Attack must be chosen before the first attack roll of the turn.'};
   state.rage.recklessDeclared=!state.rage.recklessDeclared;
   return {state,message:state.rage.recklessDeclared?'Reckless Attack declared for Strength attack rolls this turn.':'Reckless Attack canceled before the first attack roll.'};
 }
-export function markRageExtension(state:GameState){if(state.rage.active){state.rage.endsAtTurn=Math.max(state.rage.endsAtTurn,state.turn.number+1);state.rage.extendedThisTurn=true;}}
+export function markRageExtension(state:GameState){if(state.rage.active){const maximum=state.rage.startedAtTurn+100;state.rage.endsAtTurn=Math.min(maximum,Math.max(state.rage.endsAtTurn,state.turn.number+1));state.rage.extendedThisTurn=true;}}
 export function extendRage(character:Character,state:GameState):TransitionResult{
   if(!state.rage.active)return {state,message:'Rage is not active.'};
   if(classLevel(character,'Barbarian')>=15)return {state,message:'Persistent Rage does not require round-by-round extension.'};
@@ -564,6 +567,7 @@ export function startNewTurn(state:GameState,rechargeRoll=()=>rollDice('1d6').to
   return {state,message:`Turn ${state.turn.number} started.${expired.length?` ${expired.join(', ')} expired and were removed.`:''}${rechargeMessages.length?` ${rechargeMessages.join(' ')}`:''}`};
 }
 export function endTurn(character:Character,state:GameState):TransitionResult{
+  if(state.rage.active&&state.turn.number>=state.rage.startedAtTurn+100)return endRage(state,'Rage ended after its maximum duration of 10 minutes (100 rounds).');
   if(state.rage.active&&classLevel(character,'Barbarian')<15&&state.turn.number>=state.rage.endsAtTurn)return endRage(state,'Rage ended because it was not extended.');
   return {state,message:`Turn ${state.turn.number} ended.`};
 }
@@ -604,7 +608,7 @@ export function longRest(character:Character,state:GameState):TransitionResult{
   for(const slot of Object.values(state.spellSlots))slot.current=slot.max;
   state.hp=character.hp.max;state.tempHp=0;delete state.tempHpSource;
   if(state.exhaustionLevel>0){state.exhaustionLevel--;notes.push(`Exhaustion reduced to level ${state.exhaustionLevel}.`);if(state.exhaustionLevel===0)state.conditions=state.conditions.filter(condition=>condition!=='Exhaustion');}
-  state.rage={active:false,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false};state.concentrationChecks=[];clearActionRecharges(state);state.actionUses={};
+  state.rage={active:false,startedAtTurn:0,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false};state.concentrationChecks=[];clearActionRecharges(state);state.actionUses={};
   state.relentlessRageDc=10;delete state.pendingRelentlessRage;
   restoreTurnBudget(state);
   return {state,message:`Long Rest completed; HP, slots, and eligible resources restored. Temporary Hit Points ended. Existing conditions were preserved.${notes.length?` ${notes.join(' ')}`:''}`};
@@ -757,7 +761,7 @@ export function attackRollSources(character:Character,state:GameState,action:Cre
   return {...resolveAdvantage({advantage,disadvantage}),conditional};
 }
 export function criticalHitThreshold(character:Character,action:CreatureAction,state?:GameState){
-  if(action.type!=='attack'||(action.kind!=='weapon'&&action.kind!=='unarmed'))return 20;
+  if(action.type!=='attack'||(action.kind!=='weapon'&&action.kind!=='unarmed'&&!(state&&attackCountsAsUnarmedStrike(character,state,action))))return 20;
   if(state&&!retainedClassFeatures(activeOption(state)))return 20;
   const fighter=character.classes.find(entry=>sameText(entry.name,'Fighter'));const isChampion=normalized(fighter?.subclass).includes('champion');
   return isChampion&&fighter&&fighter.level>=15?18:isChampion&&fighter&&fighter.level>=3?19:20;
@@ -773,16 +777,17 @@ export function criticalDiceExpression(expression:string){return expression.repl
 export function attackBonuses(character:Character,state:GameState,sheet:ResolvedSheet,action:CreatureAction):DamagePacket[]{
   if(action.type!=='attack')return [];
   const packets:DamagePacket[]=[];
-  if(state.rage.active&&retainedClassFeatures(activeOption(state))&&classLevel(character,'Barbarian')>=1&&action.ability==='str'&&(action.kind==='weapon'||action.kind==='unarmed'))packets.push({expression:String(rageDamage(classLevel(character,'Barbarian'))),type:action.damage[0]?.type??'Bludgeoning',label:'Rage Damage'});
+  const unarmed=attackCountsAsUnarmedStrike(character,state,action);
+  if(state.rage.active&&retainedClassFeatures(activeOption(state))&&classLevel(character,'Barbarian')>=1&&action.ability==='str'&&(action.kind==='weapon'||unarmed))packets.push({expression:String(rageDamage(classLevel(character,'Barbarian'))),type:action.damage[0]?.type??'Bludgeoning',label:'Rage Damage'});
   const hasPrimalStrike=character.features.some(feature=>feature.id==='primal-strike');
   if(sheet.profile==='wildshape'&&hasPrimalStrike&&classLevel(character,'Druid')>=7&&!state.turn.oncePerTurn['primal-strike']&&(action.kind==='beast'||action.kind==='weapon')){
     for(const type of ['Cold','Fire','Lightning','Thunder'] as DamageType[])packets.push({expression:classLevel(character,'Druid')>=15?'2d8':'1d8',type,label:`Optional Primal Strike — ${type}`});
   }
   if(sheet.profile==='wildshape'&&sameText(subclass(character,'Druid'),'Circle of the Moon')&&classLevel(character,'Druid')>=14&&!state.turn.oncePerTurn['lunar-form']&&action.kind==='beast')packets.push({expression:'2d10',type:'Radiant',label:'Optional Lunar Form'});
   if(sameText(state.concentration?.name,'Fount of Moonlight')&&action.range===undefined&&['beast','weapon','unarmed'].includes(action.kind))packets.push({expression:'2d6',type:'Radiant',label:'Fount of Moonlight'});
-  if(retainedClassFeatures(activeOption(state))&&classLevel(character,'Paladin')>=11&&(action.kind==='unarmed'||(action.kind==='weapon'&&action.reach!==undefined)))packets.push({expression:'1d8',type:'Radiant',label:'Radiant Strikes'});
+  if(retainedClassFeatures(activeOption(state))&&classLevel(character,'Paladin')>=11&&(unarmed||(action.kind==='weapon'&&action.reach!==undefined)))packets.push({expression:'1d8',type:'Radiant',label:'Radiant Strikes'});
   for(const modifier of sheet.attackDamageModifiers){
-    if(!modifier.appliesTo.includes(action.kind as 'weapon'|'unarmed'))continue;
+    if(!featureAttackKinds(action,unarmed&&action.kind==='beast').some(kind=>modifier.appliesTo.includes(kind)))continue;
     packets.push({expression:modifier.mode==='subtract'?`-${modifier.expression}`:modifier.expression,type:action.damage[0]?.type??'Bludgeoning',label:modifier.mode==='subtract'?'Reduce damage (minimum 1)':'Enlarge damage',doubleOnCritical:modifier.mode!=='subtract'});
   }
   return packets;

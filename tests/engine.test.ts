@@ -232,9 +232,9 @@ test('spells clearly become unavailable after their Magic Action is spent',()=>{
   const spell=resolveSheet(c,state).spells.find(entry=>entry.name==='Moonbeam');assert.equal(spell?.available,false);assert.match(spell?.reason??'',/Action remains/);
 });
 
-test('Rage benefits a beast form but does not add Rage Damage to beast stat-block attacks',()=>{
+test('Altered table rule classifies beast-form physical attacks as Unarmed Strikes for Rage Damage',()=>{
   const c=character();const state=createInitialState(c);const bear=availableTransformations(c,state).find(option=>option.profile==='wildshape'&&option.formId==='brown-bear');assert.ok(bear);startTransformation(c,state,bear);state.turn.bonusRemaining=1;startRage(c,state);
-  const sheet=resolveSheet(c,state);const bite=sheet.actions.find(action=>action.type==='attack');assert.ok(bite);assert.ok(sheet.resistances.includes('Slashing'));assert.equal(bite?attackBonuses(c,state,sheet,bite).some(packet=>packet.label==='Rage Damage'):true,false);
+  const sheet=resolveSheet(c,state);const bite=sheet.actions.find(action=>action.type==='attack');assert.ok(bite);assert.ok(sheet.resistances.includes('Slashing'));assert.equal(bite?attackBonuses(c,state,sheet,bite).some(packet=>packet.label==='Rage Damage'&&packet.expression==='2'):false,true);assert.match(bite?.notes??'',/counts as an Unarmed Strike/);
 });
 
 
@@ -297,6 +297,11 @@ test('Persistent Rage does not require round-by-round extension and ends on Unco
   const c=character({classes:[{name:'Barbarian',level:15}],totalLevel:15});const state=createInitialState(c);startRage(c,state);startNewTurn(state);assert.equal(endTurn(c,state).message,'Turn 2 ended.');assert.equal(state.rage.active,true);
   applyCondition(c,state,'Incapacitated');assert.equal(state.rage.active,true);
   applyCondition(c,state,'Unconscious');assert.equal(state.rage.active,false);
+});
+
+test('Rage and Persistent Rage both stop at the 2024 ten-minute maximum',()=>{
+  const ordinary=character();const ordinaryState=createInitialState(ordinary);startRage(ordinary,ordinaryState);ordinaryState.rage.endsAtTurn=ordinaryState.rage.startedAtTurn+100;ordinaryState.turn.number=ordinaryState.rage.startedAtTurn+100;assert.match(endTurn(ordinary,ordinaryState).message,/maximum duration of 10 minutes/);assert.equal(ordinaryState.rage.active,false);
+  const persistent=character({classes:[{name:'Barbarian',level:15}],totalLevel:15});const persistentState=createInitialState(persistent);startRage(persistent,persistentState);assert.equal(persistentState.rage.endsAtTurn,persistentState.rage.startedAtTurn+100);persistentState.turn.number=persistentState.rage.startedAtTurn+99;assert.equal(endTurn(persistent,persistentState).message,`Turn ${persistentState.turn.number} ended.`);persistentState.turn.number++;assert.match(endTurn(persistent,persistentState).message,/100 rounds/);assert.equal(persistentState.rage.active,false);
 });
 
 test('Incapacitated ends Wild Shape and Concentration',()=>{
