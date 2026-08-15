@@ -195,8 +195,8 @@ test('hosted release downloads use the platform static-asset binding',()=>{
   const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const build=readFileSync('scripts/build.mjs','utf8');
   assert.match(worker,/async fetch\(request,env\)/);
   assert.match(build,/__ALTERED_DOWNLOAD_ASSETS__/);assert.match(worker,/const DOWNLOAD_ASSETS=__ALTERED_DOWNLOAD_ASSETS__/);
-  assert.match(worker,/ANDROID_DOWNLOAD_PATH='\/downloads\/Altered-Android-v0\.29\.31\.apk'/);
-  assert.match(worker,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/Altered-Android-v0\.29\.31\.apk/);
+  assert.match(worker,/ANDROID_DOWNLOAD_PATH='\/downloads\/Altered-Android-v0\.29\.32\.apk'/);
+  assert.match(worker,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/Altered-Android-v0\.29\.32\.apk/);
   assert.match(worker,/Content-Disposition.*attachment/);
   assert.match(worker,/url\.pathname\.startsWith\('\/downloads\/'\)&&env\?\.ASSETS\?\.fetch/);
 });
@@ -321,8 +321,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.31\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.31\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.31\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.32\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.32\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.32\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
@@ -371,9 +371,11 @@ test('the Transform button gives accessible ready and blocked next-step cues',()
 });
 
 test('cockpit effect names stay concise and the full HP breakdown can wrap',()=>{
-  const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
   assert.match(source,/replace\(\/\\s\+is active\$\/i,''\)/);
   assert.match(styles,/\.persistent-health-stat em\{[\s\S]*grid-column:1\/-1[\s\S]*overflow:visible[\s\S]*white-space:normal/);
+  assert.equal(/id="open-active-effects"/.test(html),false);assert.equal(/#open-active-effects/.test(source),false);
+  assert.match(source,/#persistent-effects-summary'[\s\S]*openTask\('features','play'\)[\s\S]*#active-effects/);
 });
 
 test('optional next-step guidance stays contextual, non-tactical, and persistent',()=>{

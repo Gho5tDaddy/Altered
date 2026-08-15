@@ -134,7 +134,7 @@ const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
 const FIRST_CHARACTER_SETUP_KEY='altered-first-character-setup-v1';
-const APP_VERSION='0.29.31';
+const APP_VERSION='0.29.32';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -1110,7 +1110,6 @@ function renderActiveEffects(){
   for(const activeCard of cards)activeCard.classList.add('tracked-active');
   const names=cards.map(card=>card.querySelector('strong')?.textContent?.replace(/\s+is active$/i,'').replace(/\s+active$/i,'').replace(/\s+used$/i,'')).filter((name):name is string=>Boolean(name));
   root.dataset.hasEffects=String(cards.length>0);root.hidden=cards.length===0||currentTab!=='features';if(cards.length){const summary=document.createElement('summary');const copy=document.createElement('span');copy.append(text('strong',`Active effects (${cards.length})`),text('small',names.join(' · ')));summary.append(copy);root.append(summary,...cards);root.open=wasOpen;}
-  const summaryButton=$<HTMLButtonElement>('#open-active-effects');summaryButton.hidden=names.length===0;$('#play-active-summary').textContent=names.join(' · ')||'No active effects';
   const cockpitSummary=$<HTMLButtonElement>('#persistent-effects-summary');const effectNames=names.join(' · ')||'None active';$('#persistent-effect-names').textContent=effectNames;cockpitSummary.classList.toggle('tracked-active',names.length>0);cockpitSummary.dataset.hasEffects=String(names.length>0);cockpitSummary.setAttribute('aria-label',names.length?`Review active effects: ${effectNames}`:'Open Effects and Conditions');
 }
 function renderQuickFeatures(){
@@ -1483,7 +1482,6 @@ function renderConditions(){
   const effects=$('#received-effect-list');clear(effects);$('#received-effect-count').textContent=state.receivedEffects.length?`${state.receivedEffects.length} active`:'None active';
   if(!state.receivedEffects.length)effects.append(text('p','No received buffs are active.','empty compact-empty'));
   for(const effect of state.receivedEffects){const card=document.createElement('article');card.className='received-effect-entry tracked-active';const copy=document.createElement('div');copy.append(text('strong',effect.name),text('small',receivedEffectSummary(effect)));const actions=document.createElement('div');actions.className='received-effect-actions';if(effect.kind==='bardic-inspiration'||effect.kind==='heroic-inspiration')actions.append(button(effect.kind==='bardic-inspiration'?`Use d${effect.die??6}`:'Reroll d20',()=>consumeReceivedEffect(effect),'button compact primary'));actions.append(button('End',()=>applyResult(endReceivedEffect(state,effect.id)),'button compact secondary'));card.append(copy,actions);effects.append(card);}
-  const hasAnything=state.receivedEffects.length>0||state.conditions.length>0||state.activeSpellEffects.length>0||Boolean(state.concentration)||state.rage.active||Boolean(state.activeTransform);$('#open-active-effects').classList.toggle('tracked-active',hasAnything);
 }
 function syncReceivedEffectFields(){const kind=$<HTMLSelectElement>('#received-effect-kind').value as ReceivedEffectKind;$('#received-effect-die-field').hidden=kind!=='bardic-inspiration';$('#add-received-effect-button').textContent=`Add ${RECEIVED_EFFECTS[kind].name}`;}
 function createReceivedEffect(){const kind=$<HTMLSelectElement>('#received-effect-kind').value as ReceivedEffectKind,info=RECEIVED_EFFECTS[kind];const effect:ReceivedEffect={id:`received:${kind}:${Date.now()}`,kind,name:info.name,source:'Received buff',addedTurn:state.turn.number,duration:info.duration,...(kind==='guidance'?{autoChooseSkill:true}:{}),...(kind==='bardic-inspiration'?{die:Number($<HTMLSelectElement>('#received-effect-die').value) as 6|8|10|12}:{})};applyResult(addReceivedEffect(state,effect));$<HTMLDetailsElement>('#add-received-effect').open=false;}
@@ -1603,8 +1601,7 @@ function initializeControls(){
   document.querySelectorAll<HTMLElement>('.workspace-home').forEach(control=>control.addEventListener('click',()=>setWorkspace('play',undefined,taskOrigin,$('#nav-play'))));
   $('#close-task-view').addEventListener('click',()=>setWorkspace('play',undefined,taskOrigin,$('#nav-play')));
   document.querySelectorAll<HTMLButtonElement>('[data-open-tab]').forEach(control=>control.addEventListener('click',()=>openTask(control.dataset.openTab??'actions','play')));
-  $('#open-active-effects').addEventListener('click',()=>{openTask('features','play');$<HTMLDetailsElement>('#active-effects').open=true;});
-  $('#persistent-effects-summary').addEventListener('click',()=>{if($<HTMLElement>('#persistent-effects-summary').dataset.hasEffects==='true'){$<HTMLButtonElement>('#open-active-effects').click();return;}openMoreDrawer('Effects & Conditions');});
+  $('#persistent-effects-summary').addEventListener('click',()=>{if($<HTMLElement>('#persistent-effects-summary').dataset.hasEffects==='true'){openTask('features','play');$<HTMLDetailsElement>('#active-effects').open=true;return;}openMoreDrawer('Effects & Conditions');});
   $('#open-latest-result').addEventListener('click',()=>openTask(latestRollTab,'play'));
   $('#open-damage-view').addEventListener('click',()=>openMoreDrawer('Damage'));
   $('#open-conditions-view').addEventListener('click',()=>openMoreDrawer('Effects & Conditions'));

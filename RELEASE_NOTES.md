@@ -1,3 +1,10 @@
+# Altered v0.29.32 release notes
+
+## One Active Effects summary
+
+- Removed the duplicate `Active Now` row from Play, reclaiming vertical space on phones and Fold displays.
+- The cockpit Active Effects panel remains the single summary and still opens the complete effects controls.
+
 # Altered v0.29.31 release notes
 
 ## Concise effects and complete HP details
