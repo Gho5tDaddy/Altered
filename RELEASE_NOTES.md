@@ -467,3 +467,8 @@ Altered is a cross-platform local alpha for Android, Windows, and macOS browsers
 ChatGPT can now assist only when Altered finds an unresolved character mechanic. The app prepares a narrow request for the selected character, and it accepts only a reviewed JSON proposal locked to that character. Proposals may cover features, spells, equipped items, transformations, enhancements, and form stat blocks.
 
 Assistant results must identify their 2024 verification source. Public verification is restricted to official D&D/Wizards pages or the SRD 5.2.1 catalog; private paid mechanics can be verified from a source the user owns. Legacy, mixed-edition, wiki, forum, and unsourced rules are explicitly rejected by the request contract.
+# 0.29.33
+
+- Preserves leveled spells granted by feats, species, backgrounds, and items when D&D Beyond omits a `prepared` flag.
+- Keeps genuinely unprepared class-list spells excluded.
+- Advances the hosted app and service-worker cache version so installed copies visibly receive the importer correction.
