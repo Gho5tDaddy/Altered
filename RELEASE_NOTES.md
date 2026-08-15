@@ -1,3 +1,10 @@
+# Altered v0.29.31 release notes
+
+## Concise effects and complete HP details
+
+- Active Effects summaries now show concise names such as `Barkskin · Guidance` without repeating “is active.”
+- Available HP keeps its complete base/temporary-HP breakdown visible and wraps safely on narrow Fold displays.
+
 # Altered v0.29.30 release notes
 
 ## Fold stat spacing and active form nameplate

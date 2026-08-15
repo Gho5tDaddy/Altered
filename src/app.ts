@@ -134,7 +134,7 @@ const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
 const FIRST_CHARACTER_SETUP_KEY='altered-first-character-setup-v1';
-const APP_VERSION='0.29.30';
+const APP_VERSION='0.29.31';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -1107,7 +1107,9 @@ function renderActiveEffects(){
     if(effect.kind==='bardic-inspiration'||effect.kind==='heroic-inspiration')panel.append(button(effect.kind==='bardic-inspiration'?`Failed a D20 Test? Roll d${effect.die??6} & use`:'Reroll d20 & use',()=>consumeReceivedEffect(effect),'button compact primary'));
     panel.append(button(`End ${effect.name}`,()=>applyResult(endReceivedEffect(state,effect.id)),'button compact secondary'));cards.push(panel);
   }
-  for(const activeCard of cards)activeCard.classList.add('tracked-active');const names=cards.map(card=>card.querySelector('strong')?.textContent).filter((name):name is string=>Boolean(name));root.dataset.hasEffects=String(cards.length>0);root.hidden=cards.length===0||currentTab!=='features';if(cards.length){const summary=document.createElement('summary');const copy=document.createElement('span');copy.append(text('strong',`Active effects (${cards.length})`),text('small',names.join(' · ')));summary.append(copy);root.append(summary,...cards);root.open=wasOpen;}
+  for(const activeCard of cards)activeCard.classList.add('tracked-active');
+  const names=cards.map(card=>card.querySelector('strong')?.textContent?.replace(/\s+is active$/i,'').replace(/\s+active$/i,'').replace(/\s+used$/i,'')).filter((name):name is string=>Boolean(name));
+  root.dataset.hasEffects=String(cards.length>0);root.hidden=cards.length===0||currentTab!=='features';if(cards.length){const summary=document.createElement('summary');const copy=document.createElement('span');copy.append(text('strong',`Active effects (${cards.length})`),text('small',names.join(' · ')));summary.append(copy);root.append(summary,...cards);root.open=wasOpen;}
   const summaryButton=$<HTMLButtonElement>('#open-active-effects');summaryButton.hidden=names.length===0;$('#play-active-summary').textContent=names.join(' · ')||'No active effects';
   const cockpitSummary=$<HTMLButtonElement>('#persistent-effects-summary');const effectNames=names.join(' · ')||'None active';$('#persistent-effect-names').textContent=effectNames;cockpitSummary.classList.toggle('tracked-active',names.length>0);cockpitSummary.dataset.hasEffects=String(names.length>0);cockpitSummary.setAttribute('aria-label',names.length?`Review active effects: ${effectNames}`:'Open Effects and Conditions');
 }

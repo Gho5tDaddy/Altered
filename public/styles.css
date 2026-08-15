@@ -2390,7 +2390,7 @@ body::after{
 @media(max-width:520px){.first-character-card{padding:14px}.first-character-heading h2{font-size:1.25rem}.first-character-steps li{padding:8px}.first-character-actions{grid-template-columns:1fr}.first-character-actions .text-button{grid-column:auto}.first-character-dialog{max-height:94dvh}}
 @media(forced-colors:active){.first-character-rune,.first-character-steps li,.first-character-steps li>span{box-shadow:none;border:1px solid CanvasText}}
 
-/* v0.29.30 artwork-first cockpit.
+/* v0.29.31 artwork-first cockpit.
    Identity, the complete portrait, and live defenses share one compact column;
    the former stat area now gives active effects a persistent, readable home. */
 .persistent-form-primary{min-width:0;min-height:0;display:flex;flex-direction:column;background:rgba(7,10,13,.98)}
@@ -2433,13 +2433,16 @@ body::after{
   min-width:0;display:grid;align-content:center;justify-items:center;gap:1px;padding:5px 8px 0;border:0;border-left:1px solid rgba(121,247,255,.32)
 }
 .persistent-form-primary .persistent-form-stats>span:first-child{
-  grid-column:1/-1;grid-template-columns:auto auto minmax(0,1fr);align-items:center;justify-items:start;gap:7px;
+  grid-column:1/-1;grid-template-columns:auto auto;align-items:center;justify-items:start;gap:7px;
   padding:0 1px 5px;border-left:0;border-bottom:1px solid rgba(121,247,255,.25)
 }
 .persistent-form-primary .persistent-form-stats>span:nth-child(2){border-left:0}
 .persistent-form-primary .persistent-form-stats small{font-size:.52rem;white-space:nowrap}
 .persistent-form-primary .persistent-form-stats b{font-size:.88rem;color:#f4ffff;text-shadow:0 0 7px rgba(121,247,255,.58)}
-.persistent-health-stat em{max-width:100%;overflow:hidden;justify-self:end;color:var(--muted);font-size:.48rem;font-style:normal;text-overflow:ellipsis;white-space:nowrap}
+.persistent-health-stat em{
+  grid-column:1/-1;width:100%;max-width:100%;overflow:visible;justify-self:start;
+  color:var(--muted);font-size:.5rem;font-style:normal;line-height:1.25;text-align:left;text-overflow:clip;white-space:normal
+}
 .persistent-effects-summary{
   width:100%;min-height:76px;display:grid;align-content:center;gap:3px;padding:8px 10px;text-align:left;
   color:var(--text);border:0;border-bottom:1px solid var(--line);background:linear-gradient(145deg,rgba(39,43,48,.98),rgba(27,31,36,.98))
