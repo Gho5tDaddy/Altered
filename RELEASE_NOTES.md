@@ -1,3 +1,8 @@
+# Altered v0.29.24 release notes
+
+- The signed-in identity now uses the full menu width, while Sign out occupies the previously unused lower-right action cell beside Settings.
+- Account-only controls remain hidden in standalone and signed-out sessions.
+
 # Altered v0.29.23 release notes
 
 - Folded and unfolded touch layouts now show the complete form artwork instead of cropping parts of the creature away.

@@ -215,12 +215,14 @@ test('account identity and focused workspace stay incremental and accessible',()
   assert.match(html,/id="toggle-app-menu"[^>]*aria-expanded="false"[^>]*aria-controls="top-actions"/);
   assert.match(html,/id="toggle-app-menu"[\s\S]*?<img src="icon-192\.png"/);
   assert.match(html,/id="account-name"/);
-  assert.match(html,/href="\/signout-with-chatgpt\?return_to=%2F"/);
+  assert.match(html,/id="account-signout"[^>]*href="\/signout-with-chatgpt\?return_to=%2F"[^>]*hidden/);
+  assert.match(html,/id="open-settings"[\s\S]*?id="account-signout"/);
   assert.equal((html.match(/<details class="panel dashboard-drawer" name="more-controls"/g)??[]).length,4);
   assert.equal((html.match(/<details class="panel dashboard-drawer" name="more-controls" open>/g)??[]).length,0);
   assert.match(html,/class="form-tools-drawer"/);
   assert.match(source,/async function loadHostedAccount\(\)/);
   assert.match(source,/#account-name/);
+  assert.match(source,/#account-signout/);
   assert.match(source,/function setAppMenuOpen\(open:boolean,restoreFocus=false\)/);
   assert.match(styles,/html,body\{width:100%;height:100%;overflow:hidden\}/);
   assert.match(styles,/\.workspace-stage\{[^}]*overflow:hidden/);
@@ -306,8 +308,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.23\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.23\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.23\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.24\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.24\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.24\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{

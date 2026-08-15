@@ -130,7 +130,7 @@ let compactFormLayout:boolean|undefined;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.23';
+const APP_VERSION='0.29.24';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -491,9 +491,11 @@ async function loadHostedAccount(){
     const email=typeof payload.email==='string'?payload.email.trim().slice(0,254):'';
     if(!displayName&&!email)return;
     const status=$('#account-status');
+    const signout=$<HTMLAnchorElement>('#account-signout');
     $('#account-name').textContent=displayName||email;
     status.title=email?`Signed in as ${email}`:'Signed in to Altered';
     status.hidden=false;
+    signout.hidden=false;
   }catch{
     // Standalone and local builds intentionally have no hosted account route.
   }

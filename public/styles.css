@@ -1665,6 +1665,20 @@ html[data-altered-workspace="forms"] .persistent-form-copy>strong{font-size:1rem
 .topbar.menu-open .top-actions{display:grid}
 .top-actions .button{min-height:44px;min-width:0;padding-inline:7px}
 .account-status{grid-column:1/-1}
+.top-actions .account-status{
+  justify-content:flex-start;min-width:0;min-height:44px;margin:0;padding:6px 8px;
+  border:0;border-bottom:1px solid var(--line)
+}
+.top-actions .account-copy{
+  display:grid;grid-template-columns:auto minmax(0,1fr);align-items:baseline;
+  width:100%;min-width:0;gap:9px;line-height:1.2
+}
+.top-actions .account-copy strong{
+  max-width:none;overflow:visible;text-overflow:clip;white-space:normal;
+  overflow-wrap:anywhere;font-size:.76rem
+}
+.top-actions .account-signout{grid-column:2;width:100%;min-height:44px!important}
+.top-actions .account-signout[hidden]{display:none}
 .character-refresh-setting{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;margin:8px 0 12px;padding:9px;border:1px solid var(--line);background:rgba(10,14,18,.72)}
 .character-refresh-setting p{margin:0;color:var(--muted);font-size:.76rem}
 @media(max-width:700px){
