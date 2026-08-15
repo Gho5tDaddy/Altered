@@ -389,7 +389,7 @@
         </details>
         <details class="help-topic" data-help-keywords="images artwork upload crop reset portrait lazy">
           <summary><span aria-hidden="true">▣</span> Images</summary>
-          <p>Open <strong>Manage → Customize</strong> to upload a character portrait or separate artwork for the selected or active form. Images are cropped without distortion, optimized locally, and stored only on this device. Reset Current Image restores the built-in portrait.</p>
+          <p>Open <strong>Manage → Customize</strong> to upload a character portrait or separate artwork for the selected or active form. Preview the exact portrait, choose Fit or Fill, move or zoom it, then press Use This Image. Altered saves the approved frame without distortion. Reset Current Image restores the built-in portrait.</p>
         </details>
         <details class="help-topic" data-help-keywords="homebrew custom private ability feature transformation create manual">
           <summary><span aria-hidden="true">+</span> Homebrew and custom abilities</summary>
@@ -672,6 +672,21 @@
       <div class="dialog-actions builder-actions"><button id="cancel-transform-builder" class="button secondary" type="button">Cancel</button><button class="button primary" type="submit">Create & Install Pack</button></div>
       <div id="builder-status" class="status" role="status" aria-live="polite"></div>
     </form>
+  </dialog>
+
+  <dialog id="art-framing-dialog" class="art-framing-dialog" aria-labelledby="art-framing-title">
+    <div class="dialog-card art-framing-card">
+      <div class="section-title"><div><small>Artwork preview</small><h2 id="art-framing-title">Position your image</h2></div><button id="cancel-art-framing-top" class="text-button" type="button">Cancel</button></div>
+      <p>Adjust the portrait exactly as it will appear in Altered, then approve it.</p>
+      <div class="art-framing-preview"><canvas id="art-framing-preview" width="360" height="480" aria-label="Final portrait preview"></canvas></div>
+      <div class="art-framing-controls">
+        <div><label for="art-framing-fit">Display</label><select id="art-framing-fit"><option value="fill">Fill frame — crop edges</option><option value="contain">Fit full image</option></select></div>
+        <div><label for="art-framing-zoom">Zoom</label><input id="art-framing-zoom" type="range" min="100" max="220" value="100" step="1"></div>
+        <div><label for="art-framing-x">Move left / right</label><input id="art-framing-x" type="range" min="-100" max="100" value="0" step="1"></div>
+        <div><label for="art-framing-y">Move up / down</label><input id="art-framing-y" type="range" min="-100" max="100" value="0" step="1"></div>
+      </div>
+      <div class="dialog-actions"><button id="cancel-art-framing" class="button secondary" type="button">Choose Another Image</button><button id="approve-art-framing" class="button primary" type="button">Use This Image</button></div>
+    </div>
   </dialog>
 
   <dialog id="settings-dialog" aria-labelledby="settings-dialog-title">

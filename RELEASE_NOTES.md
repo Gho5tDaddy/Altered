@@ -1,3 +1,11 @@
+# Altered v0.29.30 release notes
+
+## Fold stat spacing and active form nameplate
+
+- Available HP now owns a protected left-aligned column, while AC and Speed use clearer separators and padding on folded and unfolded Galaxy Fold layouts.
+- The form header is now an aura-tinted stone nameplate attached directly to the portrait with a restrained luminous divider.
+- Active form names pulse and glow using the current form-family palette; reduced-motion mode retains a bright static identity cue.
+
 # Altered v0.29.29 release notes
 
 ## Artwork-first, space-efficient cockpit

@@ -134,7 +134,7 @@ const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
 const FIRST_CHARACTER_SETUP_KEY='altered-first-character-setup-v1';
-const APP_VERSION='0.29.29';
+const APP_VERSION='0.29.30';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -361,8 +361,21 @@ function artTargetInfo(){
   return {targetId:'base',label:character.name,fallbackKey:'base',option};
 }
 function currentFormArtTarget(){const target=artTargetInfo();return target.targetId.startsWith('form:')?target:null;}
+function decodeArtwork(file:File):Promise<{image:HTMLImageElement;url:string}>{
+  const url=URL.createObjectURL(file);return new Promise((resolve,reject)=>{const image=new Image();image.decoding='async';image.addEventListener('load',()=>resolve({image,url}),{once:true});image.addEventListener('error',()=>{URL.revokeObjectURL(url);reject(new Error('The selected image could not be decoded.'));},{once:true});image.src=url;});
+}
+async function chooseArtworkFraming(file:File,label:string):Promise<{fit:'fill'|'contain';zoom:number;x:number;y:number}|null>{
+  if(!file.type.startsWith('image/'))throw new Error('Choose an image file.');if(file.size>12_000_000)throw new Error('Artwork must be smaller than 12 MB.');
+  const {image,url}=await decodeArtwork(file);const dialog=$<HTMLDialogElement>('#art-framing-dialog');const canvas=$<HTMLCanvasElement>('#art-framing-preview');const context=canvas.getContext('2d');if(!context){URL.revokeObjectURL(url);throw new Error('Image preview is unavailable.');}
+  const fit=$<HTMLSelectElement>('#art-framing-fit'),zoom=$<HTMLInputElement>('#art-framing-zoom'),x=$<HTMLInputElement>('#art-framing-x'),y=$<HTMLInputElement>('#art-framing-y');fit.value='fill';zoom.value='100';x.value='0';y.value='0';$('#art-framing-title').textContent=`Position ${label}`;
+  const framing=()=>({fit:(fit.value==='contain'?'contain':'fill') as 'fill'|'contain',zoom:Number(zoom.value),x:Number(x.value),y:Number(y.value)});
+  const draw=()=>{const current=framing();const width=canvas.width,height=canvas.height;const base=(current.fit==='contain'?Math.min:Math.max)(width/image.naturalWidth,height/image.naturalHeight);const scale=base*Math.max(1,current.zoom/100);const drawnWidth=image.naturalWidth*scale,drawnHeight=image.naturalHeight*scale;const drawX=(width-drawnWidth)/2+(current.x/100)*Math.abs(drawnWidth-width)/2,drawY=(height-drawnHeight)/2+(current.y/100)*Math.abs(drawnHeight-height)/2;context.fillStyle='#080c10';context.fillRect(0,0,width,height);context.drawImage(image,drawX,drawY,drawnWidth,drawnHeight);};
+  for(const control of [fit,zoom,x,y])control.oninput=draw;draw();dialog.showModal();
+  return new Promise(resolve=>{const finish=(value:ReturnType<typeof framing>|null)=>{dialog.removeEventListener('cancel',cancel);dialog.close();URL.revokeObjectURL(url);for(const control of [fit,zoom,x,y])control.oninput=null;resolve(value);};const cancel=(event:Event)=>{event.preventDefault();finish(null);};dialog.addEventListener('cancel',cancel,{once:true});$<HTMLButtonElement>('#approve-art-framing').onclick=()=>finish(framing());$<HTMLButtonElement>('#cancel-art-framing').onclick=()=>finish(null);$<HTMLButtonElement>('#cancel-art-framing-top').onclick=()=>finish(null);});
+}
 async function saveArtwork(file:File,target:{targetId:string;label:string}){
-  notify(`Optimizing artwork for ${target.label}…`);const optimized=await optimizePortrait(file);await saveArtOverride(character.id,target.targetId,optimized);artOverrideCache.set(artCacheKey(target.targetId),optimized);notify(`Custom artwork saved for ${target.label}.`);renderArt();
+  const framing=await chooseArtworkFraming(file,target.label);if(!framing){notify('Artwork change canceled.');return;}
+  notify(`Optimizing artwork for ${target.label}…`);const optimized=await optimizePortrait(file,framing);await saveArtOverride(character.id,target.targetId,optimized);artOverrideCache.set(artCacheKey(target.targetId),optimized);notify(`Custom artwork saved for ${target.label}.`);renderArt();
 }
 async function resetArtwork(target:{targetId:string;label:string}){await removeArtOverride(character.id,target.targetId);artOverrideCache.set(artCacheKey(target.targetId),undefined);notify(`Default artwork restored for ${target.label}.`);renderArt();}
 function queueArtLoad(targetId:string){

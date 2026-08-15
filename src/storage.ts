@@ -79,13 +79,15 @@ function readAsDataUrl(file:File):Promise<string>{return new Promise((resolve,re
 function canvasBlob(canvas:HTMLCanvasElement,type:string,quality:number):Promise<Blob>{return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('The image could not be optimized.')),type,quality))}
 function blobAsDataUrl(blob:Blob):Promise<string>{return readAsDataUrl(new File([blob],'portrait',{type:blob.type}))}
 
-export async function optimizePortrait(file:File):Promise<string>{
+export interface PortraitFraming{fit:'fill'|'contain';zoom:number;x:number;y:number}
+export async function optimizePortrait(file:File,framing:PortraitFraming={fit:'fill',zoom:100,x:0,y:0}):Promise<string>{
   if(!file.type.startsWith('image/'))throw new Error('Choose an image file.');
   if(file.size>12_000_000)throw new Error('Artwork must be smaller than 12 MB.');
   const raw=await readAsDataUrl(file);const image=await imageElement(raw);
-  const size=512;const canvas=document.createElement('canvas');canvas.width=size;canvas.height=size;const context=canvas.getContext('2d');if(!context)throw new Error('Image processing is unavailable.');
-  const scale=Math.max(size/image.naturalWidth,size/image.naturalHeight);const width=image.naturalWidth*scale;const height=image.naturalHeight*scale;
-  context.fillStyle='#151a1f';context.fillRect(0,0,size,size);context.drawImage(image,(size-width)/2,(size-height)/2,width,height);
+  const width=512,height=683;const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;const context=canvas.getContext('2d');if(!context)throw new Error('Image processing is unavailable.');
+  const base=(framing.fit==='contain'?Math.min:Math.max)(width/image.naturalWidth,height/image.naturalHeight);const scale=base*Math.max(1,Math.min(2.2,framing.zoom/100));const drawnWidth=image.naturalWidth*scale;const drawnHeight=image.naturalHeight*scale;
+  const travelX=Math.abs(drawnWidth-width)/2,travelY=Math.abs(drawnHeight-height)/2;const x=(width-drawnWidth)/2+Math.max(-1,Math.min(1,framing.x/100))*travelX;const y=(height-drawnHeight)/2+Math.max(-1,Math.min(1,framing.y/100))*travelY;
+  context.fillStyle='#080c10';context.fillRect(0,0,width,height);context.drawImage(image,x,y,drawnWidth,drawnHeight);
   let blob:Blob;try{blob=await canvasBlob(canvas,'image/webp',.86);}catch{blob=await canvasBlob(canvas,'image/jpeg',.88);}
   return blobAsDataUrl(blob);
 }
