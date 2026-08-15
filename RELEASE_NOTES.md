@@ -1,4 +1,9 @@
-# Altered v0.29.35 release notes
+# Altered v0.29.36 release notes
+
+- Collapses legacy `Focus`, `Ki`, and `Focus Points` imports into one authoritative Monk Focus pool while preserving the lowest spent value.
+- Adds functional 2024 Flurry of Blows, Patient Defense, and Step of the Wind actions, including Focus costs, Bonus Action use, and level-10 Heightened Focus improvements.
+- Keeps core Monk Focus actions available through forms that retain class features and clearly disables only the paid option when insufficient Focus remains.
+- Verifies Astral Arms and Astral Visage can each spend one Focus Point independently; the combined activation still requires two.
 
 ## Astral Self activation and Focus synchronization
 

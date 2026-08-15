@@ -695,6 +695,19 @@ test('private overlays substitute roll abilities, add activation saves, and can 
   const end=availableTransformations(c,state).find(entry=>entry.grantId==='astral-test'&&entry.deactivate);assert.ok(end);startTransformation(c,state,end);assert.equal(state.overlays.includes('astral-test'),false);
 });
 
+test('2024 Monk Focus actions share one pool and work with retained transformations',()=>{
+  const monk=character({classes:[{name:'Monk',level:6,subclass:'Way of the Astral Self (TCoE)'},{name:'Druid',level:2}],totalLevel:8,abilities:{str:10,dex:16,con:12,int:10,wis:16,cha:8},knownForms:['cat'],seenForms:['cat'],spells:[],spellSlots:{},resources:[{id:'focus',name:'Focus Points',current:4,max:6,recovery:'short-all'}]});
+  const state=createInitialState(monk);const base=resolveSheet(monk,state);const focus=monk.resources.filter(resource=>resource.id==='focus-points');
+  assert.equal(focus.length,1);assert.equal(focus[0]?.current,4);assert.equal(focus[0]?.max,6);
+  const flurry=base.actions.find(action=>action.id==='monk-flurry-of-blows');const patient=base.actions.find(action=>action.id==='monk-patient-defense');const step=base.actions.find(action=>action.id==='monk-step-of-the-wind');
+  assert.ok(flurry?.type==='multiattack');if(flurry.type==='multiattack'){assert.equal(flurry.cost,'bonus');assert.equal(flurry.resourceId,'focus-points');assert.equal(flurry.resourceCost,1);assert.deepEqual(flurry.sequence,['monk-unarmed','monk-unarmed']);}
+  assert.ok(patient?.type==='automatic');if(patient.type==='automatic'){assert.equal(patient.cost,'bonus');assert.equal(patient.choices?.find(choice=>choice.id==='focused-defense')?.resourceCost,1);assert.deepEqual(patient.choices?.find(choice=>choice.id==='focused-defense')?.grants,['disengage','dodge']);}
+  assert.ok(step?.type==='automatic');if(step.type==='automatic'){assert.equal(step.cost,'bonus');assert.equal(step.choices?.find(choice=>choice.id==='focused-step')?.resourceCost,1);assert.deepEqual(step.choices?.find(choice=>choice.id==='focused-step')?.grants,['dash','disengage','double-jump']);}
+  assert.equal(spendActionExecution(monk,state,flurry),null);assert.equal(state.resources['focus-points']?.current,3);assert.equal(state.turn.bonusRemaining,0);
+  startNewTurn(state);const cat=availableTransformations(monk,state).find(option=>option.formId==='cat');assert.ok(cat);startTransformation(monk,state,cat);const transformed=resolveSheet(monk,state);
+  assert.ok(transformed.actions.some(action=>action.id==='monk-flurry-of-blows'));assert.ok(transformed.actions.some(action=>action.id==='monk-patient-defense'));assert.ok(transformed.actions.some(action=>action.id==='monk-step-of-the-wind'));
+});
+
 test('received effects initialize safely, replace duplicates, and end explicitly',()=>{
   const state=createInitialState(character());assert.deepEqual(state.receivedEffects,[]);
   addReceivedEffect(state,{id:'guidance-1',kind:'guidance',name:'Guidance',source:'Cleric',addedTurn:1,duration:'Up to 1 minute',skill:'Perception'});

@@ -19,25 +19,26 @@ export interface ActionUseLimit {max:number;recovery:'long'}
 export type AutomaticActionChoiceResolution='dash'|'disengage'|'hide'|'skill-check'|'utilize'|'magic-item'|'activate';
 export interface AutomaticActionChoice {
   id:string;label:string;resolution:AutomaticActionChoiceResolution;prerequisite?:string;skill?:string;notes?:string;
+  resourceId?:string;resourceCost?:number;grants?:('dash'|'disengage'|'dodge'|'double-jump'|'carry-ally')[];
 }
 
 export interface AttackAction {
   id:string;name:string;type:'attack';cost:ActionCost;attackBonus:number;ability:Ability;
   kind:'beast'|'weapon'|'unarmed'|'spell';reach?:number;range?:string;
-  damage:DamagePacket[];effects?:ConditionEffect[];riders?:AttackRider[];recharge?:{min:number;max:number};uses?:ActionUseLimit;notes?:string;
+  damage:DamagePacket[];effects?:ConditionEffect[];riders?:AttackRider[];recharge?:{min:number;max:number};uses?:ActionUseLimit;resourceId?:string;resourceCost?:number;notes?:string;
 }
 export interface SaveAction {
   id:string;name:string;type:'save';cost:ActionCost;saveAbility:Ability;dc:number;
   saveAbilityOptions?:Ability[];
   range?:string;damageOnFail?:DamagePacket[];damageOnSuccess?:DamagePacket[];
-  halfOnSuccess?:boolean;effectsOnFail?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;notes?:string;
+  halfOnSuccess?:boolean;effectsOnFail?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;resourceId?:string;resourceCost?:number;notes?:string;
 }
 export interface AutomaticAction {
   id:string;name:string;type:'automatic';cost:ActionCost;damage?:DamagePacket[];
-  damageTiming?:string;effects?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;prerequisite?:string;choices?:AutomaticActionChoice[];notes?:string;
+  damageTiming?:string;effects?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;resourceId?:string;resourceCost?:number;prerequisite?:string;choices?:AutomaticActionChoice[];notes?:string;
 }
 export interface MultiattackVariant {id:string;label:string;sequence:string[]}
-export interface MultiattackAction {id:string;name:string;type:'multiattack';cost:'action';sequence:string[];variants?:MultiattackVariant[];notes?:string}
+export interface MultiattackAction {id:string;name:string;type:'multiattack';cost:ActionCost;sequence:string[];variants?:MultiattackVariant[];resourceId?:string;resourceCost?:number;notes?:string}
 export type CreatureAction = AttackAction|SaveAction|AutomaticAction|MultiattackAction;
 
 export interface Creature {

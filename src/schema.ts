@@ -209,7 +209,9 @@ function parseResource(v:unknown,i:number):ResourcePool{
   if(!isObject(v))throw new Error(`resources[${i}] must be an object.`);
   const max=num(v.max,`resources[${i}].max`,0,999);const current=num(v.current,`resources[${i}].current`,0,max);
   const recovery=['short-one','short-all','long-all','manual'].includes(String(v.recovery))?v.recovery as ResourcePool['recovery']:'manual';
-  return {id:str(v.id,`resources[${i}].id`),name:str(v.name,`resources[${i}].name`),current,max,recovery};
+  const rawId=str(v.id,`resources[${i}].id`);const normalized=rawId.trim().toLowerCase().replace(/[\s_]+/g,'-');
+  const id=['focus','focus-points','ki','ki-points'].includes(normalized)?'focus-points':rawId;
+  return {id,name:id==='focus-points'?'Focus Points':str(v.name,`resources[${i}].name`),current,max,recovery};
 }
 function parseItem(v:unknown,i:number):Character['items'][number]{
   if(!isObject(v))throw new Error(`items[${i}] must be an object.`);
@@ -242,7 +244,7 @@ function defaultResources(classes:CharacterClass[],abilities:Character['abilitie
   const d=level('Druid');if(d>=2){const max=d>=17?4:d>=6?3:2;pools.push({id:'wild-shape',name:'Wild Shape',current:max,max,recovery:'short-one'});}if(d>=5)pools.push({id:'wild-resurgence-slot',name:'Wild Resurgence Slot Exchange',current:1,max:1,recovery:'long-all'});
   const b=level('Barbarian');if(b){const max=b>=17?6:b>=12?5:b>=6?4:b>=3?3:2;pools.push({id:'rage',name:'Rage',current:max,max,recovery:'short-one'});}
   const f=level('Fighter');if(f>=1){const max=f>=10?4:f>=4?3:2;pools.push({id:'second-wind',name:'Second Wind',current:max,max,recovery:'short-one'});}if(f>=2){const max=f>=17?2:1;pools.push({id:'action-surge',name:'Action Surge',current:max,max,recovery:'short-all'});}
-  const m=level('Monk');if(m>=2)pools.push({id:'focus',name:'Focus Points',current:m,max:m,recovery:'short-all'});
+  const m=level('Monk');if(m>=2)pools.push({id:'focus-points',name:'Focus Points',current:m,max:m,recovery:'short-all'});
   const p=level('Paladin');if(p>=1)pools.push({id:'lay-on-hands',name:'Lay On Hands',current:p*5,max:p*5,recovery:'long-all'});
   const bard=level('Bard');if(bard){const max=Math.max(1,Math.floor((abilities.cha-10)/2));pools.push({id:'bardic-inspiration',name:'Bardic Inspiration',current:max,max,recovery:bard>=5?'short-all':'long-all'});}
   const sorcerer=level('Sorcerer');if(sorcerer>=2)pools.push({id:'sorcery-points',name:'Sorcery Points',current:sorcerer,max:sorcerer,recovery:'long-all'});
@@ -274,7 +276,7 @@ export function parseCharacter(input:unknown):Character{
     const fly=druid.level>=8;
     for(const id of knownForms){const form=formById(id);if(!form)continue;if(form.type.toLowerCase()!=='beast'||form.cr>maxCr||Boolean(form.speeds.fly)&&!fly)throw new Error(`${form.name} is not a legal known Wild Shape form for this Druid level and subclass.`);}
   }
-  const defaults=defaultResources(classes,abilities,species,total);const imported=Array.isArray(input.resources)?input.resources.map(parseResource):[];const resourceMap=new Map(defaults.map(r=>[r.id,r]));for(const r of imported)resourceMap.set(r.id,r);const resources=[...resourceMap.values()];
+  const defaults=defaultResources(classes,abilities,species,total);const imported=Array.isArray(input.resources)?input.resources.map(parseResource):[];const resourceMap=new Map(defaults.map(r=>[r.id,r]));for(const r of imported){const existing=resourceMap.get(r.id);resourceMap.set(r.id,r.id==='focus-points'&&existing?{...r,current:Math.min(existing.current,r.current),max:Math.max(existing.max,r.max)}:r);}const resources=[...resourceMap.values()];
   const spellSlots:Character['spellSlots']={};if(isObject(input.spellSlots)){for(const [k,v] of Object.entries(input.spellSlots)){if(!/^[1-9]$/.test(k)||!isObject(v))continue;const max=num(v.max,`spellSlots.${k}.max`,0,20);spellSlots[k]={max,current:num(v.current,`spellSlots.${k}.current`,0,max)};}}
   const equipmentRaw=isObject(input.equipment)?input.equipment:{};const armor=['none','light','medium','heavy'].includes(String(equipmentRaw.armorCategory))?equipmentRaw.armorCategory as Character['equipment']['armorCategory']:'none';const behavior=['merge','drop','wear'].includes(String(equipmentRaw.transformBehavior))?equipmentRaw.transformBehavior as Character['equipment']['transformBehavior']:'merge';
   const sizeRaw=typeof input.size==='string'?input.size:'Medium';if(!SIZES.has(sizeRaw))throw new Error('size must be a standard creature size.');
