@@ -107,6 +107,7 @@ test('phone gameplay uses focused views while keeping the form artwork persisten
   assert.equal(/container\.append\(text\('div',stateLabel,`form-state/.test(source),false);assert.equal(/container\.append\(text\('div',[\s\S]*'art-label'\)\)/.test(source),false);
   assert.match(styles,/\.persistent-form-visual \.form-state,\.persistent-form-visual \.art-label\{display:none!important\}/);
   assert.match(styles,/@media\(max-width:1180px\)[\s\S]*?\.persistent-form-visual \.main-form-art img\{[\s\S]*?object-fit:contain/);
+  assert.match(styles,/@media\(min-width:760px\) and \(max-height:820px\)[\s\S]*?grid-template-columns:clamp\(360px,42vw,430px\)[\s\S]*?\.persistent-form-visual \.main-form-art img\{object-fit:contain/);
   assert.match(styles,/\.persistent-form-visual \.form-art\.is-active \.main-form-art\{transform:none\}/);
   assert.match(styles,/@media\(max-width:700px\)\{[\s\S]*grid-template-rows:160px minmax\(0,1fr\)/);
   assert.match(styles,/use the character header instead of truncating multiclass builds/);assert.match(styles,/-webkit-line-clamp:3/);assert.match(styles,/overflow-wrap:anywhere/);
@@ -308,8 +309,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.24\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.24\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.24\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.25\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.25\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.25\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{

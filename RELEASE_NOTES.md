@@ -1,3 +1,8 @@
+# Altered v0.29.25 release notes
+
+- Short, wide Galaxy Fold and compact-tablet layouts now keep the complete form artwork visible at full cockpit height.
+- The artwork and live controls share the persistent rail side by side in that display state, preventing either one from being clipped.
+
 # Altered v0.29.24 release notes
 
 - The signed-in identity now uses the full menu width, while Sign out occupies the previously unused lower-right action cell beside Settings.

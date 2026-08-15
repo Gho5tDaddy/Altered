@@ -2304,6 +2304,29 @@ body::after{
   .persistent-form-copy.is-active.is-beast>strong::after{margin-inline:.22em}
 }
 
+/* Short, wide Fold/tablet viewports otherwise let the cockpit controls consume
+   nearly the entire portrait rail. Keep the full creature visible beside the
+   controls, while preserving the same persistent dashboard and every action. */
+@media(min-width:760px) and (max-height:820px){
+  .workspace,html[data-altered-workspace="forms"] .workspace{
+    grid-template-columns:clamp(360px,42vw,430px) minmax(0,1fr)
+  }
+  .persistent-form-visual{
+    grid-template-columns:minmax(170px,48%) minmax(0,52%);
+    grid-template-rows:minmax(0,1fr)
+  }
+  .persistent-form-visual .form-art{
+    grid-column:1;grid-row:1;height:100%;min-height:0!important;
+    border-right:1px solid var(--line)
+  }
+  .persistent-form-side{grid-column:2;grid-row:1;min-height:0}
+  .persistent-form-visual .main-form-art,
+  .persistent-form-visual .main-form-art img{width:100%;height:100%;min-height:0}
+  .persistent-form-visual .main-form-art img{object-fit:contain;object-position:center}
+  .persistent-action-economy{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .persistent-action-economy .economy-chip{white-space:normal;text-overflow:clip;line-height:1.1}
+}
+
 /* v0.29.21 compact header guidance and portrait-edge aura.
    The guide occupies the previously unused header width instead of a dashboard row. */
 .topbar{
