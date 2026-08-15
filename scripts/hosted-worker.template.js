@@ -6,8 +6,8 @@ const ICONS=__ALTERED_ICONS__;
 const FORM_IMAGES=__ALTERED_FORM_IMAGES__;
 const TOOL_ASSETS=__ALTERED_TOOL_ASSETS__;
 const DOWNLOAD_ASSETS=__ALTERED_DOWNLOAD_ASSETS__;
-const ANDROID_DOWNLOAD_PATH='/downloads/Altered-Android-v0.29.25.apk';
-const ANDROID_DOWNLOAD_URL='https://raw.githubusercontent.com/Gho5tDaddy/Altered/main/public/downloads/Altered-Android-v0.29.25.apk';
+const ANDROID_DOWNLOAD_PATH='/downloads/Altered-Android-v0.29.26.apk';
+const ANDROID_DOWNLOAD_URL='https://raw.githubusercontent.com/Gho5tDaddy/Altered/main/public/downloads/Altered-Android-v0.29.26.apk';
 const LOGIN_PAGE=`<!doctype html>
 <html lang="en">
 <head>

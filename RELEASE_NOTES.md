@@ -1,3 +1,8 @@
+# Altered v0.29.26 release notes
+
+- The unfolded Galaxy Fold cockpit now uses the full-art side-by-side layout at every medium-screen height, matching the device's real viewport instead of only short landscape dimensions.
+- The complete creature remains visible while all live form and turn controls stay in the same persistent dashboard.
+
 # Altered v0.29.25 release notes
 
 - Short, wide Galaxy Fold and compact-tablet layouts now keep the complete form artwork visible at full cockpit height.

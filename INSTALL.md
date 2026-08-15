@@ -12,9 +12,9 @@ Installed copies open like an app and update from the same secure hosted release
 
 ## Downloadable offline app
 
-For a normal Windows installation, download and run `Altered-Windows-Setup-v0.29.25.exe`. It installs for the current Windows user, adds an Altered shortcut to the Desktop and Start menu, uses the moon/runic A icon, and includes an uninstaller. The main shortcut opens the secure hosted app so linked-character Refresh and future updates work; the Start menu also contains an **Altered Offline** fallback. The installer is not code-signed, so Windows can show an Unknown publisher warning.
+For a normal Windows installation, download and run `Altered-Windows-Setup-v0.29.26.exe`. It installs for the current Windows user, adds an Altered shortcut to the Desktop and Start menu, uses the moon/runic A icon, and includes an uninstaller. The main shortcut opens the secure hosted app so linked-character Refresh and future updates work; the Start menu also contains an **Altered Offline** fallback. The installer is not code-signed, so Windows can show an Unknown publisher warning.
 
-For a portable Windows or macOS copy, extract `Altered-Desktop-Mac-v0.29.25.zip`, keep all included files together, then open `Altered-v0.29.25.html` in a current browser. The package includes Ferocitus, the rules engine, Help, all six built-in form images, the no-JSON customization tools, and the lazy-loaded PDF/OCR readers.
+For a portable Windows or macOS copy, extract `Altered-Desktop-Mac-v0.29.26.zip`, keep all included files together, then open `Altered-v0.29.26.html` in a current browser. The package includes Ferocitus, the rules engine, Help, all six built-in form images, the no-JSON customization tools, and the lazy-loaded PDF/OCR readers.
 
 The package works on Windows and macOS, but direct D&D Beyond fetches and the live SRD catalog require the hosted app. PDF text extraction works locally; first-time OCR needs internet access to cache its English recognition model. An Altered JSON backup can be imported offline.
 
