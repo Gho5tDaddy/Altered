@@ -193,6 +193,8 @@ test('hosted release downloads use the platform static-asset binding',()=>{
   const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const build=readFileSync('scripts/build.mjs','utf8');
   assert.match(worker,/async fetch\(request,env\)/);
   assert.match(build,/__ALTERED_DOWNLOAD_ASSETS__/);assert.match(worker,/const DOWNLOAD_ASSETS=__ALTERED_DOWNLOAD_ASSETS__/);
+  assert.match(worker,/ANDROID_DOWNLOAD_PATH='\/downloads\/Altered-Android-v0\.29\.25\.apk'/);
+  assert.match(worker,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/Altered-Android-v0\.29\.25\.apk/);
   assert.match(worker,/Content-Disposition.*attachment/);
   assert.match(worker,/url\.pathname\.startsWith\('\/downloads\/'\)&&env\?\.ASSETS\?\.fetch/);
 });

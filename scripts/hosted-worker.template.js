@@ -6,6 +6,8 @@ const ICONS=__ALTERED_ICONS__;
 const FORM_IMAGES=__ALTERED_FORM_IMAGES__;
 const TOOL_ASSETS=__ALTERED_TOOL_ASSETS__;
 const DOWNLOAD_ASSETS=__ALTERED_DOWNLOAD_ASSETS__;
+const ANDROID_DOWNLOAD_PATH='/downloads/Altered-Android-v0.29.25.apk';
+const ANDROID_DOWNLOAD_URL='https://raw.githubusercontent.com/Gho5tDaddy/Altered/main/public/downloads/Altered-Android-v0.29.25.apk';
 const LOGIN_PAGE=`<!doctype html>
 <html lang="en">
 <head>
@@ -333,6 +335,7 @@ export default {
       const bytes=decodeBase64(asset.data);
       return new Response(request.method==='HEAD'?null:bytes,{headers:{...headers(asset.type,'public, max-age=31536000, immutable'),'Content-Disposition':`attachment; filename="${asset.name}"`,'Content-Length':String(bytes.byteLength)}});
     }
+    if(url.pathname===ANDROID_DOWNLOAD_PATH)return Response.redirect(ANDROID_DOWNLOAD_URL,302);
     if(url.pathname.startsWith('/downloads/')&&env?.ASSETS?.fetch)return env.ASSETS.fetch(request);
     if(url.pathname!=='/'&&url.pathname!=='/index.html')return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
     if(!authenticatedUser(request))return new Response(request.method==='HEAD'?null:LOGIN_PAGE,{headers:headers('text/html; charset=utf-8','private, no-store')});
