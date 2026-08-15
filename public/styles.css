@@ -2268,6 +2268,21 @@ body::after{
   .next-step-target{scroll-margin-block:20px 28px}
 }
 
+/* Folded and unfolded touch screens can give artwork a narrow or shallow slot.
+   Show the whole creature there instead of cropping it down to scenery. */
+@media(max-width:1180px){
+  .persistent-form-visual .form-art{
+    background:
+      radial-gradient(circle at 50% 42%,color-mix(in srgb,var(--aura-one) 12%,transparent),transparent 62%),
+      linear-gradient(180deg,#0a0e12,#030507)
+  }
+  .persistent-form-visual .main-form-art img{
+    object-fit:contain;
+    object-position:center
+  }
+}
+.persistent-form-visual .form-art.is-active .main-form-art{transform:none}
+
 @media(max-width:390px){
   .persistent-form-visual{grid-template-columns:minmax(0,42%) minmax(0,58%)}
   .persistent-form-copy.is-active.is-beast>strong{font-size:1.08rem;letter-spacing:.07em}

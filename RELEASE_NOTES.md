@@ -1,3 +1,8 @@
+# Altered v0.29.23 release notes
+
+- Folded and unfolded touch layouts now show the complete form artwork instead of cropping parts of the creature away.
+- Full-art framing preserves the current mystical aura, form identity, controls, and dashboard proportions.
+
 # Altered v0.29.22 release notes
 
 - Makes Guidance a single quick control beside the character portrait; the longer Effects form no longer duplicates it.
