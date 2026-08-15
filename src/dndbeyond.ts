@@ -340,13 +340,19 @@ function hasConditionalDamage(definition:JsonObject):boolean{
 
 function parseSpells(data:JsonObject,abilities:Character['abilities'],level:number):Spell[]{
   const classesById=new Map<number,JsonObject>();for(const raw of array(data.classes)){const entry=object(raw);classesById.set(whole(entry.id),entry);const definitionId=whole(object(entry.definition).id);if(definitionId)classesById.set(definitionId,entry);}
-  const candidates:{spell:JsonObject;parent:JsonObject}[]=[];
-  for(const [group,rawGroup] of Object.entries(object(data.spells)))for(const raw of array(rawGroup))candidates.push({spell:object(raw),parent:{group}});
-  for(const rawParent of array(data.classSpells)){const parent=object(rawParent);for(const raw of array(parent.spells))candidates.push({spell:object(raw),parent});}
+  const candidates:{spell:JsonObject;parent:JsonObject;granted:boolean}[]=[];
+  // Entries in the top-level spell groups are already attached to the
+  // character by a feat, species, background, item, or similar grant. D&D
+  // Beyond does not consistently mark their leveled spells as `prepared`, so
+  // requiring that flag loses choices such as Magic Initiate's level-1 spell.
+  for(const [group,rawGroup] of Object.entries(object(data.spells)))for(const raw of array(rawGroup))candidates.push({spell:object(raw),parent:{group},granted:true});
+  // classSpells can also contain ordinary unprepared class-list entries. Keep
+  // the stricter prepared/known check for that collection.
+  for(const rawParent of array(data.classSpells)){const parent=object(rawParent);for(const raw of array(parent.spells))candidates.push({spell:object(raw),parent,granted:false});}
   const result:Spell[]=[];const seen=new Set<string>();const pb=proficiencyBonus(level);
-  for(const {spell:raw,parent} of candidates){
+  for(const {spell:raw,parent,granted} of candidates){
     const definition=object(raw.definition);const name=string(definition.name);const spellLevel=whole(definition.level);
-    const included=spellLevel===0||Boolean(raw.prepared)||Boolean(raw.alwaysPrepared)||Boolean(raw.countsAsKnownSpell);
+    const included=granted||spellLevel===0||Boolean(raw.prepared)||Boolean(raw.alwaysPrepared)||Boolean(raw.countsAsKnownSpell);
     if(!name||!included)continue;
     const {ability,sourceClass}=spellAbility(raw,parent,classesById);const key=`${name.toLowerCase()}|${sourceClass.toLowerCase()}`;
     if(seen.has(key))continue;seen.add(key);

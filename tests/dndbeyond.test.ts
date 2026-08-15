@@ -186,6 +186,18 @@ test('normalizes a Ferocitus-shaped multiclass character without guessing core v
   assert.equal(ddbSetupPackId(report.sourceId,report.setupNeeds[0]!.id),'ddb-152187683-feat-sentinel');
 });
 
+test('keeps leveled spells granted by feats even when D&D Beyond omits prepared flags',()=>{
+  const payload=structuredClone(ferocitusPayload);
+  (payload.data.spells.feat as unknown[]).push({
+    definition:{id:901,name:'Magic Initiate Choice',level:1,concentration:false,components:[1,2],modifiers:[]},
+    activation:{activationType:1},spellCastingAbilityId:5,
+  });
+  payload.data.classSpells[0]!.spells.push({...spell(902,'Ordinary Unprepared Spell',1),prepared:false,alwaysPrepared:false,countsAsKnownSpell:false});
+  const character=importDdbCharacter(payload,'152187683').character;
+  assert.ok(character.spells.some(entry=>entry.name==='Magic Initiate Choice'&&entry.level===1));
+  assert.equal(character.spells.some(entry=>entry.name==='Ordinary Unprepared Spell'),false);
+});
+
 test('ignores unfinished D&D Beyond feat choosers without dropping selected or granted feats',()=>{
   const payload=structuredClone(ferocitusPayload);
   payload.data.feats.push({definition:{id:2048517,name:'Dark Bargain',isHomebrew:false,isLegacy:false}} as any);
