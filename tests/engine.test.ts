@@ -397,6 +397,13 @@ test('Polymorph lists bundled legal Beasts without requiring seenForms',()=>{
   const c=character({classes:[{name:'Wizard',level:8}],totalLevel:8,seenForms:[]});const forms=availableTransformations(c,createInitialState(c)).filter(o=>o.profile==='polymorph');assert.ok(forms.some(o=>o.formId==='dire-wolf'));
 });
 
+test('Shapechange lists eligible known content without requiring seenForms',()=>{
+  const c=character({classes:[{name:'Wizard',level:17}],totalLevel:17,seenForms:[],spells:[{name:'Shapechange',level:9,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true}],spellSlots:{'9':{current:1,max:1}}});
+  const forms=availableTransformations(c,createInitialState(c)).filter(o=>o.profile==='shapechange');
+  assert.ok(forms.some(o=>o.formId==='dire-wolf'));
+  assert.ok(forms.every(o=>o.source.includes('choose only a creature your character has seen')));
+});
+
 test('Rests restore a usable turn budget while Long Rest preserves unresolved conditions',()=>{
   const c=character();const state=createInitialState(c);startRage(c,state);state.conditions.push('Poisoned');
   state.turn.actionsRemaining=0;state.turn.surgeActionsRemaining=1;state.turn.bonusRemaining=0;state.turn.reactionRemaining=0;state.turn.attackRollsMade=2;state.turn.oncePerTurn.test=true;

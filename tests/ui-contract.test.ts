@@ -95,6 +95,14 @@ test('form browsing and visual statuses explain availability without changing fo
   assert.match(styles,/\.help-topic summary:focus-visible/);
 });
 
+test('transformation spells require a form choice before spending their spell slot',()=>{
+  const source=readFileSync('src/app.ts','utf8');
+  assert.match(source,/TRANSFORMATION_SPELL_PROFILES/);
+  assert.match(source,/Choose \$\{spell\.name\} Form/);
+  assert.match(source,/transformationProfile\?chooseTransformationSpellForm\(spell\.name\):castAndResolveSpell\(spell\)/);
+  assert.match(source,/formFilter='spell';formSearch=spellName/);
+});
+
 test('phone gameplay uses focused views while keeping the form artwork persistent',()=>{
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
   for(const view of ['play','forms','task','more'])assert.match(html,new RegExp(`data-workspace-view="${view}"`));
