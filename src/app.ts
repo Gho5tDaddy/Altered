@@ -134,7 +134,7 @@ const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
 const FIRST_CHARACTER_SETUP_KEY='altered-first-character-setup-v1';
-const APP_VERSION='0.29.34';
+const APP_VERSION='0.29.35';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -325,7 +325,7 @@ function currentOption(){return availableTransformations(character,state).find(o
 function applyResult(result:TransitionResult){
   if(previousTransformId&&!state.activeTransform){selectedOptionId='base';radiantActions.clear();selectedOptionalBonuses.clear();selectedRollModes.clear();selectedMultiattackVariants.clear();}
   if(result.choice){pendingTempChoice={incoming:result.choice.incoming,source:result.choice.source};const dialog=$<HTMLDialogElement>('#temp-hp-dialog');$('#temp-hp-copy').textContent=`Keep the current ${result.choice.current} Temporary Hit Points or replace them with ${result.choice.incoming} from ${result.choice.source}?`;$('#keep-current-thp').textContent=`Keep ${result.choice.current}`;$('#keep-new-thp').textContent=`Use ${result.choice.incoming}`;dialog.showModal();}
-  notify(result.message);render();
+  notify(result.message);render();for(const action of result.activationActions??[])resolveActivationSaveAction(action);
 }
 function clearTurnUndo(){
   turnUndoSnapshot=undefined;if(turnUndoTimer!==undefined)window.clearTimeout(turnUndoTimer);turnUndoTimer=undefined;
@@ -340,10 +340,10 @@ function undoTurnChange(){
 }
 function resetLatestResult(){latestRollTab='actions';latestRollTitle='Ready';const title='Ready',total='—',detail='Press an attack, spell, save, or skill button. Altered rolls the correct dice and modifiers automatically.';$('#latest-roll').classList.remove('flash');$('#roll-title').textContent=title;$('#roll-total').textContent=total;$('#roll-detail').textContent=detail;$('#play-roll-title').textContent=title;$('#play-roll-total').textContent=total;$('#play-roll-detail').textContent=detail;const toast=$('#roll-toast');toast.hidden=true;toast.classList.remove('show');if(rollToastTimer!==undefined)window.clearTimeout(rollToastTimer);}
 function setCharacter(next:Character){character=next;baseCharacter=baseCharacters.find(entry=>entry.id===next.id)??next;state=createInitialState(character);sheet=resolveSheet(character,state);selectedOptionId='base';currentTab='actions';formSearch='';formFilter='all';$<HTMLInputElement>('#form-search').value='';$<HTMLSelectElement>('#form-filter').value='all';radiantActions.clear();selectedOptionalBonuses.clear();selectedRollModes.clear();selectedMultiattackVariants.clear();selectedSpellSlots.clear();pendingDamageRolls.clear();resetLatestResult();notify(`${character.name} loaded in Base Form.`);render();}
-function reconcileState(next:Character,previous:GameState){
+function reconcileState(next:Character,previous:GameState,syncSheetResources=false){
   const clean=createInitialState(next);clean.hp=Math.min(previous.hp,next.hp.max);clean.tempHp=previous.tempHp;clean.life={...previous.life};clean.exhaustionLevel=previous.exhaustionLevel;clean.relentlessRageDc=previous.relentlessRageDc;if(previous.pendingRelentlessRage)clean.pendingRelentlessRage={...previous.pendingRelentlessRage};if(previous.tempHpSource)clean.tempHpSource=previous.tempHpSource;
-  for(const [id,pool] of Object.entries(clean.resources)){const old=previous.resources[id];if(old)pool.current=Math.min(old.current,pool.max);}
-  for(const [level,slot] of Object.entries(clean.spellSlots)){const old=previous.spellSlots[level];if(old)slot.current=Math.min(old.current,slot.max);}
+  for(const [id,pool] of Object.entries(clean.resources)){const old=previous.resources[id];if(old&&!syncSheetResources)pool.current=Math.min(old.current,pool.max);}
+  for(const [level,slot] of Object.entries(clean.spellSlots)){const old=previous.spellSlots[level];if(old&&!syncSheetResources)slot.current=Math.min(old.current,slot.max);}
   clean.conditions=[...previous.conditions];clean.overlays=previous.overlays.filter(id=>id.startsWith('spell:')||(next.transformationGrants??[]).some(grant=>grant.id===id));clean.activeSpellEffects=previous.activeSpellEffects.map(effect=>({...effect}));clean.receivedEffects=previous.receivedEffects.map(effect=>({...effect}));clean.recharges=Object.fromEntries(Object.entries(previous.recharges).map(([key,value])=>[key,{...value}]));clean.actionUses={...previous.actionUses};clean.log=[...previous.log];clean.turn={...previous.turn,oncePerTurn:{...previous.turn.oncePerTurn}};clean.rage={...previous.rage};clean.concentrationChecks=previous.concentrationChecks.map(check=>({...check}));
   if(previous.concentration)clean.concentration={...previous.concentration};
   const previousId=previous.activeTransform?.option.id;if(previousId){const option=availableTransformations(next,clean).find(candidate=>candidate.id===previousId);if(option)clean.activeTransform={option,startedTurn:previous.activeTransform?.startedTurn??clean.turn.number,duration:previous.activeTransform?.duration??'',tempHpSource:Boolean(previous.activeTransform?.tempHpSource),...(previous.activeTransform?.spellConcentration?{spellConcentration:true}:{}),...(previous.activeTransform?.permanentUntilDispelled?{permanentUntilDispelled:true}:{})};else if(previous.activeTransform?.tempHpSource){clean.tempHp=0;delete clean.tempHpSource;if(clean.concentration?.name===(previous.activeTransform.option.spellName??previous.activeTransform.option.label))delete clean.concentration;}}
@@ -791,8 +791,8 @@ async function refreshLinkedCharacter(manual=false,force=false){
     if(report.blocked||report.character.provenance.ruleset!=='2024')throw new Error(report.blockReason??'The refreshed sheet did not pass Altered’s 2024 rules check.');
     const index=baseCharacters.findIndex(entry=>entry.id===targetCharacterId);if(index<0)throw new Error('The selected saved character is no longer available.');
     const changed=JSON.stringify(baseCharacters[index])!==JSON.stringify(report.character);baseCharacters[index]=report.character;
-    if(baseCharacter.id===targetCharacterId){rebuildEffectiveCharacterLibrary(true);render();}else persist();
-    const checked=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});const message=changed?`${report.character.name} updated from the latest public D&D Beyond sheet at ${checked}. Current combat state was preserved.`:`${report.character.name} is already current. Checked at ${checked}.`;
+    if(baseCharacter.id===targetCharacterId){rebuildEffectiveCharacterLibrary(true,manual);render();}else persist();
+    const checked=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});const syncNote=manual?' Sheet resources and spell slots were synchronized; other combat state was preserved.':' Current combat state was preserved.';const message=changed?`${report.character.name} updated from the latest public D&D Beyond sheet at ${checked}.${syncNote}`:`${report.character.name} is already current. Checked at ${checked}.${manual?syncNote:''}`;
     setCharacterRefreshStatus(message);if(manual)notify(message);return true;
   }catch(error){const message=`Using the saved version of ${baseCharacter.name}; refresh could not be completed: ${error instanceof Error?error.message:'Unknown error'}`;setCharacterRefreshStatus(message);if(manual)notify(message);return false;}
   finally{characterRefreshRunning=false;setCharacterRefreshStatus(characterRefreshMessage);}
@@ -865,9 +865,9 @@ async function loadValidatedInstalledPacks(){
   return valid;
 }
 function applyInstalledPacks(imported:Character){const result=applyOwnedContentPacks(imported,installedPacks);return result;}
-function rebuildEffectiveCharacterLibrary(preserveState=true){
+function rebuildEffectiveCharacterLibrary(preserveState=true,syncSheetResources=false){
   const previousId=character.id;const previousState=state;characters=baseCharacters.map(entry=>applyOwnedContentPacks(entry,installedPacks).character);
-  const next=characters.find(entry=>entry.id===previousId)??characters[0];if(!next)return;character=next;baseCharacter=baseCharacters.find(entry=>entry.id===next.id)??next;state=preserveState?reconcileState(next,previousState):createInitialState(next);sheet=resolveSheet(character,state);
+  const next=characters.find(entry=>entry.id===previousId)??characters[0];if(!next)return;character=next;baseCharacter=baseCharacters.find(entry=>entry.id===next.id)??next;state=preserveState?reconcileState(next,previousState,syncSheetResources):createInitialState(next);sheet=resolveSheet(character,state);
 }
 function populateBuilderClassOptions(){const select=$<HTMLSelectElement>('#builder-match-class');clear(select);for(const entry of character.classes){const option=document.createElement('option');option.value=entry.name;option.textContent=`${entry.subclass?`${entry.subclass} `:''}${entry.name} ${entry.level}`;select.append(option);}}
 function syncBuilderGuidance(){
@@ -1269,7 +1269,9 @@ function resolveAttackAction(action:AttackAction){
   const presentation:RollPresentation=attack.naturalOne?{natural:1,tone:'critical-failure',label:'Natural 1 · automatic miss'}:attack.critical?{natural:attack.kept,tone:'critical-success',label:'Critical hit · damage dice doubled'}:d20Presentation(attack.kept,attack.total);
   showRoll(attack.naturalOne?'Natural 1':`${attack.total} to hit`,[attackLine,attack.naturalOne?'No damage roll is available.':'If this attack hits, use Roll Damage next. If it misses, clear the pending damage.',hitEffects.length?`On a hit: ${effectsText(hitEffects)}.`:'',...riderLines,sources.length?sources.join(' · '):''].filter(Boolean).join('\n'),`${action.name} Attack`,presentation);render();
 }
-function resolveSaveAction(action:Extract<CreatureAction,{type:'save'}>){if(!prepareLimitedAction(action))return;const fail=packetTotal(action.damageOnFail??[]);const success=action.halfOnSuccess?{total:Math.floor(fail.total/2),detail:`${Math.floor(fail.total/2)} (half of the failed-save roll, rounded down)`}:packetTotal(action.damageOnSuccess??[]);declareAttack(state,action);const total=fail.total?`${fail.total} fail dmg`:'Effect';const detail=[`Target makes a DC ${action.dc} ${saveAbilities(action)} save.`,fail.detail?`Failed save: ${fail.detail}.`:'',action.effectsOnFail?.length?`Failed-save effects: ${effectsText(action.effectsOnFail)}.`:!fail.detail?'Apply the listed failed-save effect.':'',success.detail?`Successful save: ${success.detail}.`:'Successful save: no listed failed-save damage or effects.',action.notes??''].filter(Boolean).join('\n');showRoll(total,detail,action.name);render();}
+function presentSaveAction(action:Extract<CreatureAction,{type:'save'}>,activation=false){const fail=packetTotal(action.damageOnFail??[]);const success=action.halfOnSuccess?{total:Math.floor(fail.total/2),detail:`${Math.floor(fail.total/2)} (half of the failed-save roll, rounded down)`}:packetTotal(action.damageOnSuccess??[]);const total=fail.total?`${fail.total} fail dmg`:'Effect';const detail=[activation?'Triggered automatically by activating the enhancement.':'',`${action.range??'Target'} makes a DC ${action.dc} ${saveAbilities(action)} save.`,fail.detail?`Failed save: ${fail.detail}.`:'',action.effectsOnFail?.length?`Failed-save effects: ${effectsText(action.effectsOnFail)}.`:!fail.detail?'Apply the listed failed-save effect.':'',success.detail?`Successful save: ${success.detail}.`:'Successful save: no listed failed-save damage or effects.',action.notes??''].filter(Boolean).join('\n');showRoll(total,detail,action.name);render();}
+function resolveActivationSaveAction(action:Extract<CreatureAction,{type:'save'}>){presentSaveAction(action,true);}
+function resolveSaveAction(action:Extract<CreatureAction,{type:'save'}>){if(!prepareLimitedAction(action))return;declareAttack(state,action);presentSaveAction(action);}
 function actionPrerequisiteKey(action:Extract<CreatureAction,{type:'automatic'}>,choice?:AutomaticActionChoice){return `${action.id}:${choice?.id??'action'}:prerequisite`;}
 function resolveAutomaticAction(action:Extract<CreatureAction,{type:'automatic'}>,choice?:AutomaticActionChoice){
   const prerequisite=choice?.prerequisite??(!action.choices?.length?action.prerequisite:undefined);if(prerequisite&&!confirmedActionPrerequisites.has(actionPrerequisiteKey(action,choice))){notify('Confirm the visible prerequisite before using this option.');return;}

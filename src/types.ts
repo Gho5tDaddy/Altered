@@ -74,13 +74,14 @@ export interface TransformationEffects {
   acBonus?:number;
   acFormula?:{base:number;abilities:Ability[]};
   resistances?:DamageType[];immunities?:DamageType[];vulnerabilities?:DamageType[];
-  senses?:string[];actions?:CreatureAction[];
+  senses?:string[];actions?:CreatureAction[];activationActions?:SaveAction[];
   checkAbilitySubstitution?:Partial<Record<Ability,Ability>>;
   saveAbilitySubstitution?:Partial<Record<Ability,Ability>>;
   attackAbilityOverride?:{ability:Ability;appliesTo:('weapon'|'unarmed')[]};
   attackDamageTypeOverride?:{type:DamageType;appliesTo:('weapon'|'unarmed')[]};
   attackReachMinimum?:{feet:number;appliesTo:('weapon'|'unarmed')[]};
   checkAdvantage?:Ability[];checkDisadvantage?:Ability[];saveAdvantage?:Ability[];saveDisadvantage?:Ability[];
+  skillAdvantage?:string[];skillDisadvantage?:string[];
   conditionImmunities?:string[];canSpeak?:boolean;canCast?:boolean;canConcentrate?:boolean;canAttack?:boolean;canManipulateObjects?:boolean;endsAtZeroHp?:boolean;endsAtZeroTemporaryHp?:boolean;endsOnIncapacitated?:boolean;
   attackDamageModifier?:{expression:string;mode:'add'|'subtract';appliesTo:('weapon'|'unarmed')[];minimumDamage?:number};
   temporaryHp?:{mode:'fixed'|'form-hp'|'expression';value?:number;expression?:string};
@@ -154,7 +155,7 @@ export interface ResolvedSheet {
   canSpeak:boolean;canCast:boolean;canConcentrate:boolean;canAttack:boolean;canManipulateObjects:boolean;conditionImmunities:string[];attackDamageModifiers:NonNullable<TransformationEffects['attackDamageModifier']>[];features:EvaluatedFeature[];spells:(Spell&{available:boolean;reason:string})[];
 }
 
-export interface TransitionResult {state:GameState;message:string;choice?:{kind:'temporary-hit-points';current:number;incoming:number;source:string}}
+export interface TransitionResult {state:GameState;message:string;choice?:{kind:'temporary-hit-points';current:number;incoming:number;source:string};activationActions?:SaveAction[]}
 
 export type ContentDomain='creatures'|'class-features'|'species-features'|'feats'|'spells'|'items'|'conditions'|'transformation-profiles';
 export interface ContentPackMetadata {

@@ -1,3 +1,13 @@
+# Altered v0.29.35 release notes
+
+## Astral Self activation and Focus synchronization
+
+- Astral Arms now resolves its nearby Dexterity save and Force damage once, immediately when the enhancement is activated.
+- While Astral Arms is active, a separate 10-foot Wisdom-based Force Unarmed Strike appears; the ordinary Monk Unarmed Strike remains available and unchanged.
+- Level-6 Astral Visage is available as its own enhancement, with darkness sight, Insight and Intimidation Advantage, and both Word of the Spirit choices. A combined Arms + Visage activation spends two Focus Points with one Bonus Action.
+- The 2024 Monk Martial Arts die drives both Astral Arms rolls, so a level-6 Monk uses 2d8 for the summon and 1d8 plus Wisdom for the spectral-arm strike.
+- Manual D&D Beyond refresh now synchronizes current sheet resources and spell slots while preserving other combat state, correcting stale Focus Point locks. Background refresh continues to preserve the live session.
+
 # Altered v0.29.32 release notes
 
 ## One Active Effects summary
