@@ -1,6 +1,4 @@
 import type {Character} from './types.js';
-import {FEROCITUS_CHARACTER} from './ferocitus-data.js';
-import {parseCharacter} from './schema.js';
 
 export const DDB_FEAT_SELECTION_EVIDENCE='Altered verified D&D Beyond feat selections';
 
@@ -8,7 +6,6 @@ const FEROCITUS_WEAPONS:Record<string,NonNullable<Character['items'][number]['at
   handaxe:{ability:'str',damage:'1d6',damageType:'Slashing',proficient:true,range:20,longRange:60,properties:['Light','Thrown','Vex'],magicBonus:0},
   greataxe:{ability:'str',damage:'1d12',damageType:'Slashing',proficient:true,properties:['Heavy','Two-Handed','Cleave'],magicBonus:0},
 };
-const FEROCITUS_ITEMS=parseCharacter(FEROCITUS_CHARACTER).items;
 
 export function migratePersistedCharacter(character:Character):{character:Character;repairs:string[]} {
   // Early bundled copies used the same canonical character ID but carried local
@@ -25,7 +22,6 @@ export function migratePersistedCharacter(character:Character):{character:Charac
   // weapon attacks. Enrich only this known public character and only exact
   // weapon names, leaving user-edited and already-structured items untouched.
   if(character.id==='ddb-152187683'){
-    if(migrated.items.length===0){migrated={...migrated,items:structuredClone(FEROCITUS_ITEMS)};repairs.push('Restored equipment and supported item effects from the linked public Ferocitus sheet.');}
     let enriched=0;
     const items=migrated.items.map(item=>{
       const attack=FEROCITUS_WEAPONS[item.name.trim().toLowerCase()];

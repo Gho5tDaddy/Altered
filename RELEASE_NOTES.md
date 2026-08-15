@@ -1,4 +1,8 @@
-# Altered v0.29.26 release notes
+# Altered v0.29.27 release notes
+
+## Private owner character and first-time setup
+
+Ferocitus is no longer seeded into new installations or new browser profiles. Existing saved copies remain untouched. A genuinely new user now sees a one-time Add Character guide explaining how to make a D&D Beyond character public, copy its share link, and review it in Altered, with JSON/PDF and clearly labeled demo alternatives.
 
 - The unfolded Galaxy Fold cockpit now uses the full-art side-by-side layout at every medium-screen height, matching the device's real viewport instead of only short landscape dimensions.
 - The complete creature remains visible while all live form and turn controls stay in the same persistent dashboard.

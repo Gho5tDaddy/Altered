@@ -12,7 +12,6 @@ import type {PdfTextItem} from './pdf-match.js';
 import {assistantRequestText,parseAssistantProposal} from './assistant-proposal.js';
 import {installExtensionPack,listExtensionPackRecords,loadArtOverride,loadBooleanSetting,loadJsonSetting,optimizePortrait,removeArtOverride,removeExtensionPack,removeSetting,saveArtOverride,saveBooleanSetting,saveJsonSetting} from './storage.js';
 import {SAMPLE_CHARACTERS} from './sample-data.js';
-import {FEROCITUS_CHARACTER} from './ferocitus-data.js';
 import {applyOwnedContentPack,applyOwnedContentPacks,ownedContentTemplate,parseOwnedContentPack,privateMechanicPack,safeOwnedContentParse} from './owned-content.js';
 import {rulesAuditSnapshot} from './audit-ledger.js';
 import {migratePersistedCharacter} from './data-migrations.js';
@@ -60,7 +59,10 @@ const BUILT_IN_FORM_ART:Record<string,string>={
   'form:tiger':'form-tiger.jpg',
 };
 
-const BUNDLED_CHARACTERS=[FEROCITUS_CHARACTER,...SAMPLE_CHARACTERS];
+// Built-in characters are clearly labeled demonstrations only. Ferocitus is
+// restored from the owner's existing saved library, never seeded for a new user.
+const BUNDLED_CHARACTERS=[...SAMPLE_CHARACTERS];
+const DEMO_CHARACTER_IDS=new Set(BUNDLED_CHARACTERS.map(raw=>parseCharacter(raw).id));
 let baseCharacters:Character[]=BUNDLED_CHARACTERS.map(parseCharacter);
 let baseCharacter=baseCharacters[0] as Character;
 let characters:Character[]=[...baseCharacters];
@@ -127,10 +129,12 @@ let walkthroughStepIndex=0;
 let walkthroughTarget:HTMLElement|undefined;
 let walkthroughReturnFocus:HTMLElement|undefined;
 let compactFormLayout:boolean|undefined;
+let firstRunCharacterSetup=false;
 const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
-const APP_VERSION='0.29.26';
+const FIRST_CHARACTER_SETUP_KEY='altered-first-character-setup-v1';
+const APP_VERSION='0.29.27';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -247,6 +251,7 @@ function notify(message:string){$('#status-message').textContent=message;$('#pla
 function setStatus(message:string){$('#status-message').textContent=message;$('#play-status').textContent=message;}
 function isLegacyStartupActivity(message:string){return /^Altered loaded for .+\. (?:Built-in rules and forms are ready\.|\d+ private content packs? available\..*)$/.test(message);}
 function persist(){try{localStorage.setItem('altered-v0.18',JSON.stringify({baseCharacters,currentCharacterId:baseCharacter.id,state,deletedCharacterIds:[...deletedCharacterIds]}));}catch{/* storage is optional */}}
+function finishFirstCharacterSetup(){firstRunCharacterSetup=false;try{localStorage.setItem(FIRST_CHARACTER_SETUP_KEY,'complete');}catch{/* storage is optional */}}
 function safeSavedText(value:unknown,fallback:string,max=200){return typeof value==='string'?value.slice(0,max):fallback;}
 function savedOncePerTurn(value:unknown){
   if(typeof value!=='object'||value===null||Array.isArray(value))return {};
@@ -646,6 +651,8 @@ function applyImportedCharacter(parsed:Character){
   const baseIndex=baseCharacters.findIndex(entry=>entry.id===parsed.id);if(baseIndex>=0)baseCharacters[baseIndex]=parsed;else baseCharacters=[parsed,...baseCharacters];
   baseCharacter=parsed;const result=applyInstalledPacks(parsed);const imported=result.character;rebuildEffectiveCharacterLibrary(false);setCharacter(characters.find(entry=>entry.id===imported.id)??imported);
   const detail=result.applied?` Matching private packs added ${result.added.transformations} transformations, ${result.added.forms} forms, and ${result.added.features} features.`:'';
+  finishFirstCharacterSetup();
+  const firstRunDialog=$<HTMLDialogElement>('#new-user-character-dialog');if(firstRunDialog.open)firstRunDialog.close();
   setImportStatus(`${imported.name} imported successfully.${detail}`);return imported;
 }
 function remainingDdbSetup(report:DdbImportReport){return report.setupNeeds.filter(need=>!installedPacks.some(pack=>pack.metadata.id===ddbSetupPackId(report.sourceId,need.id)));}
@@ -920,9 +927,9 @@ async function installAndApplyPack(pack:OwnedContentPack){await installExtension
 
 function renderCharacterStrip(){
   const select=$<HTMLSelectElement>('#sample-character');clear(select);
-  for(const c of characters){const option=document.createElement('option');option.value=c.id;option.textContent=c.name;select.append(option);}select.value=character.id;
+  for(const c of characters){const option=document.createElement('option');option.value=c.id;option.textContent=DEMO_CHARACTER_IDS.has(c.id)?`${c.name} · Demo`:c.name;select.append(option);}select.value=character.id;
   $('#character-name').textContent=character.name;
-  $('#character-build').textContent=`${character.species} · ${character.classes.map(c=>`${c.subclass?`${c.subclass} `:''}${c.name} ${c.level}`).join(' / ')}`;
+  $('#character-build').textContent=`${character.species} · ${character.classes.map(c=>`${c.subclass?`${c.subclass} `:''}${c.name} ${c.level}`).join(' / ')}${DEMO_CHARACTER_IDS.has(character.id)?' · Demo character':''}`;
   const meta=rulesMetadata();$('#rules-badge').textContent=`App ${APP_VERSION} · Rules SRD ${meta.srd} · ${auditSnapshot.rules} audited · verified ${meta.reviewed}`;
   $<HTMLButtonElement>('#more-delete-character').disabled=baseCharacters.length<=1;
   renderImportedFeatManagement();
@@ -1539,6 +1546,14 @@ function revealNextStep(){
 }
 function render(){sheet=resolveSheet(character,state);document.documentElement.dataset.alteredCharacter=character.name;syncAuraState();renderCharacterStrip();renderTransformSelector();renderArt();renderMetrics();renderQuickReceivedEffects();renderResources();renderQuickFeatures();renderActiveEffects();renderTab();renderConditions();renderLog();renderNextStepGuide();persist();}
 
+function openImportCenter(message?:string){
+  renderInstalledPacks();void refreshPrivatePdfLibrary();
+  if(message)setImportStatus(message);
+  else if(pendingDdbImport){renderDdbReview(pendingDdbImport);setImportStatus(`Saved setup found for ${pendingDdbImport.character.name}. Resume it below or start a different import.`);}
+  else setImportStatus('Import from a public D&D Beyond character link, or use a validated Altered JSON backup.');
+  $<HTMLDialogElement>('#import-dialog').showModal();
+}
+
 function endCurrentForm(){
   if(!state.activeTransform&&state.overlays.length){const options=availableTransformations(character,state);const overlay=[...options].reverse().find(option=>option.profile==='overlay'&&option.deactivate);if(overlay){selectedOptionId=overlay.id;applyResult(startTransformation(character,state,overlay));return;}}
   const wasActive=Boolean(state.activeTransform);const recordsExternalEnd=state.activeTransform?.option.profile==='true-polymorph'&&state.activeTransform.permanentUntilDispelled;const result=endTransformation(state,!recordsExternalEnd,character);if(wasActive&&!state.activeTransform){selectedOptionId='base';radiantActions.clear();selectedOptionalBonuses.clear();selectedRollModes.clear();selectedMultiattackVariants.clear();}applyResult(result);
@@ -1548,6 +1563,18 @@ function initializeControls(){
   const conditions=$<HTMLSelectElement>('#condition-select');for(const condition of commonConditions){const option=document.createElement('option');option.value=condition;option.textContent=condition;conditions.append(option);}
   syncReceivedEffectFields();
   syncBattlefieldFacts();
+  $('#new-user-import-ddb').addEventListener('click',()=>{
+    const source=$<HTMLInputElement>('#new-user-ddb-source').value.trim();
+    if(!source){$('#new-user-character-status').textContent='Paste the public D&D Beyond character link or numeric ID first.';$<HTMLInputElement>('#new-user-ddb-source').focus();return;}
+    $<HTMLInputElement>('#dndbeyond-source').value=source;
+    $<HTMLDialogElement>('#new-user-character-dialog').close();
+    openImportCenter('Checking the public D&D Beyond character. Altered will show a review before adding it.');
+    void fetchDdbCharacter();
+  });
+  $('#new-user-ddb-source').addEventListener('keydown',event=>{if((event as KeyboardEvent).key==='Enter'){event.preventDefault();$<HTMLButtonElement>('#new-user-import-ddb').click();}});
+  $('#new-user-other-import').addEventListener('click',()=>{$<HTMLDialogElement>('#new-user-character-dialog').close();openImportCenter('Choose a reviewed Altered JSON backup or a character PDF below. Nothing replaces the current demo until you confirm it.');});
+  $('#new-user-use-demo').addEventListener('click',()=>{finishFirstCharacterSetup();$<HTMLDialogElement>('#new-user-character-dialog').close();setStatus(`${character.name} demo loaded. Add your own character anytime from the A menu → Import.`);persist();startWalkthrough();});
+  $('#new-user-character-dialog').addEventListener('cancel',()=>{finishFirstCharacterSetup();setStatus(`${character.name} demo loaded. Add your own character anytime from the A menu → Import.`);persist();});
   $('#toggle-app-menu').addEventListener('click',()=>setAppMenuOpen($<HTMLButtonElement>('#toggle-app-menu').getAttribute('aria-expanded')!=='true'));
   $('#top-actions').addEventListener('click',event=>{if((event.target as Element).closest('button,a'))setAppMenuOpen(false);});
   document.addEventListener('pointerdown',event=>{const topbar=document.querySelector<HTMLElement>('.topbar');if(topbar?.classList.contains('menu-open')&&!topbar.contains(event.target as Node))setAppMenuOpen(false);});
@@ -1625,7 +1652,7 @@ function initializeControls(){
   $('#confirm-dndbeyond-import').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}if(pendingDdbImport.blocked){setImportStatus(pendingDdbImport.blockReason??'This character is blocked by the 2024-only rules policy.');return;}const imported=applyImportedCharacter(pendingDdbImport.character);confirmedDdbSourceId=pendingDdbImport.sourceId;renderDdbReview(pendingDdbImport);setImportStatus(`${imported.name} imported after review. You can complete any remaining private mechanics here, then close this window.`);});
   $('#download-dndbeyond-json').addEventListener('click',()=>{if(!pendingDdbImport){setImportStatus('Fetch and review a D&D Beyond character first.');return;}downloadJson(pendingDdbImport.character,`${slug(pendingDdbImport.character.name)}-altered.json`);});
   $('#export-character').addEventListener('click',()=>downloadJson(character,`${character.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')||'altered-character'}.json`));
-  $('#open-import-center').addEventListener('click',()=>{renderInstalledPacks();void refreshPrivatePdfLibrary();if(pendingDdbImport){renderDdbReview(pendingDdbImport);setImportStatus(`Saved setup found for ${pendingDdbImport.character.name}. Resume it below or start a different import.`);}else setImportStatus('Import from a public D&D Beyond character link, or use a validated Altered JSON backup.');$<HTMLDialogElement>('#import-dialog').showModal();});
+  $('#open-import-center').addEventListener('click',()=>openImportCenter());
   $('#close-import-center').addEventListener('click',()=>$<HTMLDialogElement>('#import-dialog').close());
   $('#resume-private-setup').addEventListener('click',resumePrivateSetup);
   $('#start-new-import').addEventListener('click',()=>{void clearPendingDdbImport();$<HTMLInputElement>('#dndbeyond-source').value='';setImportStatus('Ready for a different public D&D Beyond character link or ID.');$<HTMLInputElement>('#dndbeyond-source').focus();});
@@ -1669,13 +1696,21 @@ function initializeControls(){
 }
 
 async function boot(){
-  restore();
+  let setupState:string|null=null;try{setupState=localStorage.getItem(FIRST_CHARACTER_SETUP_KEY);}catch{/* storage is optional */}
+  const restored=restore();
+  if(!restored){firstRunCharacterSetup=true;try{localStorage.setItem(FIRST_CHARACTER_SETUP_KEY,'pending');}catch{/* storage is optional */}}
+  else if(setupState==='pending')firstRunCharacterSetup=true;
+  else{firstRunCharacterSetup=false;if(!setupState)try{localStorage.setItem(FIRST_CHARACTER_SETUP_KEY,'complete');}catch{/* storage is optional */}}
   // Paint a complete built-in sheet before waiting on IndexedDB. Some mobile
   // browsers can delay storage initialization after an authenticated redirect;
   // the core app must remain usable while private packs and settings hydrate.
   initializeControls();filterHelpTopics();renderSettings();renderInstalledPacks();
   setStatus(`Altered loaded for ${character.name}. Built-in rules and forms are ready.`);render();
   document.documentElement.dataset.alteredReady='true';
+  if(firstRunCharacterSetup){
+    const dialog=$<HTMLDialogElement>('#new-user-character-dialog');dialog.showModal();
+    window.requestAnimationFrame(()=>$<HTMLInputElement>('#new-user-ddb-source').focus());
+  }
   void loadHostedAccount();
   installedPacks=await loadValidatedInstalledPacks();
   const savedPending=savedDdbReport(await loadJsonSetting<unknown>(PENDING_DDB_SETTING));if(savedPending){pendingDdbImport=savedPending;renderDdbReview(savedPending);}else renderPendingSetupAccess();
@@ -1689,7 +1724,7 @@ async function boot(){
   renderSettings();renderInstalledPacks();
   const repairNote=invalidPackCount?` ${invalidPackCount} damaged private pack${invalidPackCount===1?' was':'s were'} removed safely.`:'';const migrationNote=restoredDataRepairs.length?` ${restoredDataRepairs.join(' ')}`:'';
   setStatus(`Altered loaded for ${character.name}. ${installedPacks.length} private content pack${installedPacks.length===1?'':'s'} available.${repairNote}${migrationNote}`);render();
-  if(!walkthroughCompleted)startWalkthrough();
+  if(!firstRunCharacterSetup&&!walkthroughCompleted)startWalkthrough();
   void refreshSrdCatalogStatus();
   void refreshLinkedCharacter(false,true);
 }

@@ -20,7 +20,9 @@ for(const name of await readdir(path.join(build,'src')))if(name.endsWith('.js'))
 // Bundle every compiled source module so adding a new import cannot leave the
 // production app with a module-not-found failure. Sort for reproducible output.
 const moduleNames=(await readdir(path.join(build,'src')))
-  .filter(name=>name.endsWith('.js'))
+  // The owner's private regression fixture is test-only and must never ship in
+  // a new user's browser bundle.
+  .filter(name=>name.endsWith('.js')&&name!=='ferocitus-data.js')
   .sort();
 const entries=[];
 for(const name of moduleNames){
@@ -46,10 +48,7 @@ for(const name of publicNames.filter(name=>/^form-.*\.jpg$/i.test(name))){
   const image=await readFile(path.join(root,'public',name));
   standaloneHtml=standaloneHtml.replaceAll(name,`data:image/jpeg;base64,${image.toString('base64')}`);
 }
-await Promise.all([
-  writeFile(path.join(dist,'altered-standalone.html'),standaloneHtml),
-  writeFile(path.join(dist,'altered-ferocitus.html'),standaloneHtml),
-]);
+await writeFile(path.join(dist,'altered-standalone.html'),standaloneHtml);
 
 // Sites hosting serves the same embedded application plus the minimal PWA
 // surface and guarded data routes needed for feature parity away from the PC.
@@ -72,8 +71,8 @@ const toolAssets=Object.fromEntries(await Promise.all(['pdf.bundle.js','pdf.work
   {type:'text/javascript; charset=utf-8',data:(await readFile(path.join(dist,name))).toString('base64')},
 ])));
 const downloadAssets=Object.fromEntries(await Promise.all([
-  ['Altered-Desktop-Mac-v0.29.26.zip','application/zip'],
-  ['Altered-Windows-Setup-v0.29.26.exe','application/octet-stream'],
+  ['Altered-Desktop-Mac-v0.29.27.zip','application/zip'],
+  ['Altered-Windows-Setup-v0.29.27.exe','application/octet-stream'],
 ].map(async([name,type])=>[
   `/downloads/${name}`,
   {name,type,data:(await readFile(path.join(root,'public','downloads',name))).toString('base64')},
@@ -81,7 +80,7 @@ const downloadAssets=Object.fromEntries(await Promise.all([
 // Android is distributed through the public GitHub release. Reading it here
 // keeps the local release audit strict without embedding a 6.5 MB APK in the
 // Worker bundle, which would exceed the hosting platform's script-size limit.
-await readFile(path.join(root,'public','downloads','Altered-Android-v0.29.26.apk'));
+await readFile(path.join(root,'public','downloads','Altered-Android-v0.29.27.apk'));
 const workerTemplate=await readFile(path.join(root,'scripts','hosted-worker.template.js'),'utf8');
 const hostedWorker=workerTemplate
   .replace('__ALTERED_PAGE_BASE64__',()=>JSON.stringify(hostedPage))

@@ -22,7 +22,7 @@ Open `altered-standalone.html` in Safari, Chrome, or Firefox.
 
 The same standalone file is used on all three platforms. The `dist` directory contains the hostable Progressive Web App and its bounded server worker.
 
-Fresh downloads open with the validated Ferocitus character already loaded at full resources. The specially named `altered-ferocitus.html` package is identical to the main standalone build and is provided to make the phone-ready download unambiguous.
+Fresh downloads open with a one-time Add Character guide. It explains how to use a public D&D Beyond character link, offers JSON/PDF alternatives, and labels all optional sample sheets as demos. Existing saved characters are not replaced.
 
 ## Help and first launch
 

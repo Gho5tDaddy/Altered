@@ -23,7 +23,7 @@ test('does not remove feats from other characters or newly verified imports',()=
   assert.equal(verified.character.items[0]?.attack?.damage,'1d6');
 });
 
-test('restores only the known empty Ferocitus inventory without changing other characters',()=>{
-  const ferocitus=character();ferocitus.items=[];const repaired=migratePersistedCharacter(ferocitus);assert.equal(repaired.character.items.length,15);assert.ok(repaired.character.items.some(item=>item.name==='Greataxe'&&item.attack));
+test('does not seed owner inventory into empty or unrelated character saves',()=>{
+  const ferocitus=character();ferocitus.items=[];const repaired=migratePersistedCharacter(ferocitus);assert.equal(repaired.character.items.length,0);
   const other=character('999999999');other.items=[];assert.equal(migratePersistedCharacter(other).character.items.length,0);
 });

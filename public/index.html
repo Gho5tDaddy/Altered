@@ -302,6 +302,30 @@
     </div>
   </section>
 
+  <dialog id="new-user-character-dialog" class="wide-dialog first-character-dialog" aria-labelledby="new-user-character-title">
+    <div class="dialog-card first-character-card">
+      <header class="first-character-heading">
+        <span class="first-character-rune" aria-hidden="true">A</span>
+        <div><small>First-time setup</small><h2 id="new-user-character-title">Add your character</h2></div>
+      </header>
+      <p class="first-character-intro">Altered starts with your own sheet. The quickest and most complete method is a public D&amp;D Beyond character link.</p>
+      <ol class="first-character-steps">
+        <li><span>1</span><div><strong>Make the character temporarily public</strong><p>In D&amp;D Beyond, open <strong>My Characters</strong>, edit the character, open the <strong>Home</strong> tab, set <strong>Character Privacy</strong> to <strong>Public</strong>, and save.</p></div></li>
+        <li><span>2</span><div><strong>Copy the character link</strong><p>Open the character sheet. Use <strong>Share</strong> or <strong>Share Character</strong>, then copy the public URL.</p></div></li>
+        <li><span>3</span><div><strong>Paste it into Altered</strong><p>Altered will retrieve the sheet, verify its 2024 rules information, and show a review before adding anything.</p></div></li>
+      </ol>
+      <a class="button secondary first-character-ddb-link" href="https://www.dndbeyond.com/my-characters" target="_blank" rel="noopener noreferrer">Open My Characters on D&amp;D Beyond</a>
+      <label for="new-user-ddb-source">Public D&amp;D Beyond character link or ID</label>
+      <input id="new-user-ddb-source" autocomplete="off" inputmode="url" placeholder="https://www.dndbeyond.com/characters/123456789">
+      <div id="new-user-character-status" class="status" role="status" aria-live="polite">Nothing is imported until you review and confirm it.</div>
+      <div class="first-character-actions">
+        <button id="new-user-import-ddb" class="button primary" type="button">Review My Character</button>
+        <button id="new-user-other-import" class="button secondary" type="button">JSON or PDF Instead</button>
+        <button id="new-user-use-demo" class="text-button" type="button">Explore a clearly marked demo first</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="help-dialog" class="wide-dialog" aria-labelledby="help-dialog-title">
     <div class="dialog-card help-card">
       <div class="section-title"><h2 id="help-dialog-title">Help & Tutorial</h2><button id="close-help" class="text-button" type="button">Close</button></div>

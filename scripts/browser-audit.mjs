@@ -54,7 +54,7 @@ function dumpDom(width,height){
       '--no-default-browser-check',
       '--disable-extensions',
       '--enable-logging=stderr',
-      '--virtual-time-budget=5000',
+      '--virtual-time-budget=12000',
       `--window-size=${width},${height}`,
       `--user-data-dir=${profile}`,
       '--dump-dom',
@@ -83,7 +83,11 @@ try{
       const consoleErrors=errors.split(/\r?\n/).filter(line=>/CONSOLE|ERROR/i.test(line)).slice(-5).join(' | ');
       throw new Error(`${label} build did not finish startup (${status}; ${dom.length} DOM characters${consoleErrors?`; ${consoleErrors}`:''}).`);
     }
-    if(!dom.includes('data-altered-character="Ferocitus"'))throw new Error(`${label} build did not load Ferocitus.`);
+    if(!dom.includes('data-altered-character="Kaelen Thorn"'))throw new Error(`${label} build did not load the labeled demo character.`);
+    if(!/(?:\bopen\b[^>]*id="new-user-character-dialog"|id="new-user-character-dialog"[^>]*\bopen\b)/.test(dom)){
+      const index=dom.indexOf('new-user-character-dialog');
+      throw new Error(`${label} build did not present first-time character setup (${index<0?'dialog missing':dom.slice(Math.max(0,index-80),index+180)}).`);
+    }
     if(dom.includes('data-altered-ready="error"'))throw new Error(`${label} build reported a startup error.`);
     if(!dom.includes('data-altered-workspace="play"'))throw new Error(`${label} build did not initialize the Play workspace.`);
     if(!dom.includes('class="persistent-form-visual"'))throw new Error(`${label} build did not keep the form artwork mounted.`);

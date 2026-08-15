@@ -2370,3 +2370,22 @@ body::after{
   .topbar .next-step-guide .button{min-width:58px;padding-inline:5px}
 }
 @media(forced-colors:active){.form-aura-pulse{animation:none!important;box-shadow:none!important;border:3px solid Highlight}}
+
+/* First-time character setup keeps one decision in view and reuses the proven
+   import/review flow instead of exposing the complete dashboard immediately. */
+.first-character-dialog{width:min(680px,calc(100vw - 22px));max-height:min(92dvh,840px)}
+.first-character-card{display:grid;gap:13px;padding:18px}
+.first-character-heading{display:flex;align-items:center;gap:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.first-character-heading small{color:var(--accent-2);text-transform:uppercase;letter-spacing:.13em}
+.first-character-heading h2{margin:2px 0 0;font-size:1.5rem}
+.first-character-rune{display:grid;place-items:center;width:52px;height:52px;flex:0 0 52px;border:1px solid var(--accent-2);border-radius:14px;color:#eaffff;font-family:"Copperplate Gothic Bold",Georgia,serif;font-size:1.6rem;text-shadow:0 0 9px var(--accent-2);box-shadow:inset 0 0 0 2px rgba(121,247,255,.16),0 0 16px rgba(121,247,255,.18)}
+.first-character-intro{margin:0;color:var(--bright);font-size:1rem}
+.first-character-steps{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.first-character-steps li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;padding:10px;border:1px solid color-mix(in srgb,var(--accent-2) 28%,var(--line));background:rgba(18,25,31,.72)}
+.first-character-steps li>span{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;color:#efffff;border:1px solid var(--accent-2);background:rgba(21,91,104,.45);font-weight:900}
+.first-character-steps strong{color:#f4fbff}.first-character-steps p{margin:3px 0 0;color:var(--muted);line-height:1.42}
+.first-character-ddb-link{text-align:center;text-decoration:none}
+.first-character-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.first-character-actions .text-button{grid-column:1/-1;justify-self:center;min-height:42px}
+@media(max-width:520px){.first-character-card{padding:14px}.first-character-heading h2{font-size:1.25rem}.first-character-steps li{padding:8px}.first-character-actions{grid-template-columns:1fr}.first-character-actions .text-button{grid-column:auto}.first-character-dialog{max-height:94dvh}}
+@media(forced-colors:active){.first-character-rune,.first-character-steps li,.first-character-steps li>span{box-shadow:none;border:1px solid CanvasText}}

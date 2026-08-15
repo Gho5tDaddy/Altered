@@ -23,8 +23,8 @@ if(loginPageResponse.status!==200||!loginPage.includes('/signin-with-chatgpt?ret
 }
 const hostedPageResponse=await hostedWorker.fetch(new Request('https://altered.audit/',{headers:auditIdentityHeaders}));
 const hostedPage=await hostedPageResponse.text();
-if(hostedPageResponse.status!==200||!hostedPage.includes('Ferocitus')||!hostedPage.includes('form-brown-bear.jpg')||hostedPage.includes('data:image/jpeg;base64,')){
-  throw new Error('Hosted release did not contain Ferocitus with lazy-loaded form art.');
+if(hostedPageResponse.status!==200||hostedPage.includes("name:'Ferocitus'")||!hostedPage.includes('Add your character')||!hostedPage.includes('form-brown-bear.jpg')||hostedPage.includes('data:image/jpeg;base64,')){
+  throw new Error('Hosted release did not contain first-time setup and lazy-loaded form art without the owner character fixture.');
 }
 const hostedArtResponse=await hostedWorker.fetch(new Request('https://altered.audit/form-brown-bear.jpg',{headers:auditIdentityHeaders}));
 if(hostedArtResponse.status!==200||hostedArtResponse.headers.get('content-type')!=='image/jpeg'||(await hostedArtResponse.arrayBuffer()).byteLength<100_000){

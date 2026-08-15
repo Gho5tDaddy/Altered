@@ -4,7 +4,7 @@ import {FEROCITUS_CHARACTER} from '../src/ferocitus-data.js';
 import {parseCharacter} from '../src/schema.js';
 import {availableTransformations,createInitialState} from '../src/engine.js';
 
-test('fresh standalone data opens with a complete Ferocitus character',()=>{
+test('the owner backup fixture remains valid for migration regression coverage',()=>{
   const character=parseCharacter(FEROCITUS_CHARACTER);
   assert.equal(character.id,'ddb-152187683');
   assert.equal(character.name,'Ferocitus');

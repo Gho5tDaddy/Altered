@@ -63,7 +63,7 @@ test('help and first-launch walkthrough remain optional, searchable, and restart
   assert.match(html,/id="skip-walkthrough"/);
   assert.match(source,/WALKTHROUGH_SETTING='walkthrough-completed-v1'/);
   assert.match(source,/availableWalkthroughSteps\(\)/);
-  assert.match(source,/if\(!walkthroughCompleted\)startWalkthrough\(\)/);
+  assert.match(source,/if\(!firstRunCharacterSetup&&!walkthroughCompleted\)startWalkthrough\(\)/);
   assert.match(source,/saveBooleanSetting\(WALKTHROUGH_SETTING,true\)/);
   assert.match(source,/selector:'\.persistent-form-visual'/);assert.match(source,/Play, Forms, Character, and Manage/);assert.match(source,/selector:'#toggle-app-menu'/);
   assert.match(source,/setTimeout\(\(\)=>focusTarget\.focus\(\{preventScroll:true\}\),0\)/);
@@ -152,9 +152,8 @@ test('the six current forms ship with app-ready artwork in both builds',()=>{
   assert.match(standalone,/data:image\/jpeg;base64,/);
   assert.equal((standalone.match(/<\/script>/gi)??[]).length,1,'standalone must contain exactly one executable script block');
   assert.ok(!standalone.includes('<script src="app.bundle.js"></script>'),'standalone bundle must not be re-injected by replacement tokens');
-  const ferocitusStandalone=readFileSync('dist/altered-ferocitus.html','utf8');
-  assert.match(ferocitusStandalone,/name:\s*'Ferocitus'/);
-  assert.match(ferocitusStandalone,/data:image\/jpeg;base64,/);
+  assert.equal(/name:\s*'Ferocitus'/.test(standalone),false);
+  assert.match(standalone,/Add your character/);
 });
 
 test('the exact hosted build executes before optional mobile storage hydration',()=>{
@@ -162,7 +161,7 @@ test('the exact hosted build executes before optional mobile storage hydration',
   const build=readFileSync('scripts/build.mjs','utf8');
   const worker=readFileSync('scripts/hosted-worker.template.js','utf8');
   const pkg=JSON.parse(readFileSync('package.json','utf8')) as {scripts?:Record<string,string>};
-  assert.match(source,/setStatus\(`Altered loaded for \$\{character\.name\}\. Built-in rules and forms are ready\.`\);render\(\);\s*document\.documentElement\.dataset\.alteredReady='true';\s*void loadHostedAccount\(\);\s*installedPacks=await/);
+  assert.match(source,/setStatus\(`Altered loaded for \$\{character\.name\}\. Built-in rules and forms are ready\.`\);render\(\);\s*document\.documentElement\.dataset\.alteredReady='true';[\s\S]*void loadHostedAccount\(\);\s*installedPacks=await/);
   assert.match(source,/function isLegacyStartupActivity/);
   assert.match(source,/!isLegacyStartupActivity\(x\)/);
   assert.equal(/notify\(`Altered loaded for/.test(source),false);
@@ -193,8 +192,8 @@ test('hosted release downloads use the platform static-asset binding',()=>{
   const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const build=readFileSync('scripts/build.mjs','utf8');
   assert.match(worker,/async fetch\(request,env\)/);
   assert.match(build,/__ALTERED_DOWNLOAD_ASSETS__/);assert.match(worker,/const DOWNLOAD_ASSETS=__ALTERED_DOWNLOAD_ASSETS__/);
-  assert.match(worker,/ANDROID_DOWNLOAD_PATH='\/downloads\/Altered-Android-v0\.29\.26\.apk'/);
-  assert.match(worker,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/Altered-Android-v0\.29\.26\.apk/);
+  assert.match(worker,/ANDROID_DOWNLOAD_PATH='\/downloads\/Altered-Android-v0\.29\.27\.apk'/);
+  assert.match(worker,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/Altered-Android-v0\.29\.27\.apk/);
   assert.match(worker,/Content-Disposition.*attachment/);
   assert.match(worker,/url\.pathname\.startsWith\('\/downloads\/'\)&&env\?\.ASSETS\?\.fetch/);
 });
@@ -294,6 +293,14 @@ test('character management exposes safe add and delete paths',()=>{
   assert.match(html,/id="delete-character-dialog"/);assert.match(source,/function deleteCurrentCharacter\(\)/);assert.match(source,/deletedCharacterIds/);assert.match(source,/baseCharacters\.length<=1/);
 });
 
+test('only a fresh browser receives guided character setup and no owner character fixture',()=>{
+  const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const build=readFileSync('scripts/build.mjs','utf8');
+  assert.match(html,/id="new-user-character-dialog"/);assert.match(html,/Make the character temporarily public/);assert.match(html,/Copy the character link/);assert.match(html,/id="new-user-ddb-source"/);
+  assert.match(source,/FIRST_CHARACTER_SETUP_KEY='altered-first-character-setup-v1'/);assert.match(source,/if\(!restored\)\{firstRunCharacterSetup=true/);assert.match(source,/setupState==='pending'/);assert.match(source,/if\(firstRunCharacterSetup\)[\s\S]*new-user-character-dialog/);
+  assert.match(source,/new-user-import-ddb[\s\S]*dndbeyond-source[\s\S]*fetchDdbCharacter/);assert.match(source,/new-user-other-import[\s\S]*openImportCenter/);assert.match(source,/new-user-use-demo/);
+  assert.match(source,/DEMO_CHARACTER_IDS/);assert.equal(/FEROCITUS_CHARACTER/.test(source),false);assert.match(build,/name!==\'ferocitus-data\.js\'/);
+});
+
 test('linked D&D Beyond characters refresh safely and can keep a saved version',()=>{
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');
   assert.match(html,/id="refresh-character"[^>]*>Refresh Character<\/button>/);assert.match(html,/id="auto-refresh-character"[^>]*type="checkbox"/);
@@ -311,8 +318,8 @@ test('Windows installer packages the app icon and creates user shortcuts',()=>{
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.26\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.26\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.26\.apk/);
+  assert.match(build,/Altered-Windows-Setup-v0\.29\.27\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.27\.zip/);
+  assert.match(build,/Altered-Android-v0\.29\.27\.apk/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
