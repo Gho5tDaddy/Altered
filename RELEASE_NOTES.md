@@ -1,3 +1,11 @@
+# Altered v0.29.37 release notes
+
+## Folded-phone cockpit correction
+
+- The Play workspace now starts below the complete character cockpit on narrow phones instead of overlapping it.
+- Available HP, its breakdown, AC, Speed, quick effects, and turn controls remain visible and unsquashed.
+- The correction is a localized responsive-layout change; character data, rules, imports, saved state, and combat behavior are unchanged.
+
 # Altered v0.29.36 release notes
 
 - Collapses legacy `Focus`, `Ki`, and `Focus Points` imports into one authoritative Monk Focus pool while preserving the lowest spent value.

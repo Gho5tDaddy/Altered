@@ -2520,3 +2520,18 @@ body::after{
 }
 @media(pointer:coarse){.art-framing-card .button,.art-framing-controls select,.art-framing-controls input{min-block-size:44px}}
 @media(forced-colors:active){.art-framing-preview{box-shadow:none;border:2px solid Highlight}}
+
+/* v0.29.37 folded-phone cockpit boundary.
+   The artwork-first cockpit is content-sized; legacy fixed phone rows allowed it
+   to paint underneath the focused workspace. Let the first row own its complete
+   height so HP, defenses, quick effects, and turn controls are never obscured. */
+@media(max-width:700px){
+  .workspace,
+  html[data-altered-workspace="forms"] .workspace,
+  .app-shell.form-active .workspace,
+  html[data-altered-workspace="forms"] .app-shell.form-active .workspace,
+  html[data-altered-workspace="play"] .workspace{
+    grid-template-rows:auto minmax(0,1fr)
+  }
+  .persistent-form-visual{overflow:hidden}
+}

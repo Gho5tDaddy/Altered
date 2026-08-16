@@ -120,7 +120,7 @@ test('phone gameplay uses focused views while keeping the form artwork persisten
   assert.match(source,/--portrait-ratio/);assert.match(styles,/aspect-ratio:var\(--portrait-ratio,3 \/ 4\)/);assert.match(styles,/\.persistent-effects-summary\.tracked-active/);
   assert.match(styles,/\.persistent-form-stats>span:first-child\{[\s\S]*?grid-column:1\/-1/);assert.match(styles,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(styles,/\.persistent-form-copy\.is-active>strong\{[\s\S]*?alteredActiveFormNameGlow/);assert.match(styles,/\.persistent-form-copy::after\{/);
-  assert.match(styles,/@media\(max-width:700px\)\{[\s\S]*grid-template-rows:160px minmax\(0,1fr\)/);
+  assert.match(styles,/folded-phone cockpit boundary[\s\S]*@media\(max-width:700px\)\{[\s\S]*grid-template-rows:auto minmax\(0,1fr\)/);
   assert.match(styles,/use the character header instead of truncating multiclass builds/);assert.match(styles,/-webkit-line-clamp:3/);assert.match(styles,/overflow-wrap:anywhere/);
   assert.match(styles,/\.task-launcher span\{[\s\S]*?-webkit-line-clamp:2/);assert.match(styles,/\.next-step-guide p\{[\s\S]*?-webkit-line-clamp:2/);
   assert.match(styles,/\.task-view \.tab-help\{overflow:visible;text-overflow:clip;white-space:normal\}/);assert.match(styles,/grid-template-rows:176px minmax\(0,1fr\)/);
