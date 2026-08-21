@@ -521,6 +521,8 @@ test('imported feats use accurate ownership language and can be corrected withou
 test('feature view explains effects and places activation controls with the feature',()=>{
   const source=readFileSync('src/app.ts','utf8');
   assert.match(source,/Abilities, explained/);assert.match(source,/What it does/);assert.match(source,/How to use it/);
+  assert.match(source,/function featureWhatItDoes/);assert.match(source,/Open Actions, then open Reactions/);assert.match(source,/Do nothing\. Altered is applying this benefit automatically/);
+  assert.match(source,/You cannot use it right now/);assert.match(source,/If the button is disabled, the message beside it explains what is missing/);
   assert.match(source,/function appendFeatureControls/);assert.match(source,/Use or confirm/);assert.match(source,/Applied automatically/);assert.match(source,/Owned references/);assert.match(source,/Unavailable now/);
 });
 

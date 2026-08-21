@@ -138,7 +138,7 @@ const WALKTHROUGH_SETTING='walkthrough-completed-v1';
 const PENDING_DDB_SETTING='pending-ddb-import-v1';
 const AUTO_REFRESH_CHARACTER_SETTING='auto-refresh-ddb-character-v1';
 const FIRST_CHARACTER_SETUP_KEY='altered-first-character-setup-v1';
-const APP_VERSION='0.29.40';
+const APP_VERSION='0.29.41';
 const CHARACTER_REFRESH_INTERVAL=5*60*1000;
 const PRIVATE_PDF_LIMIT=500*1024*1024;
 const PRIVATE_PDF_PART_SIZE=5*1024*1024;
@@ -1556,10 +1556,11 @@ function equipmentSection(){
   if(stored){const note=document.createElement('p');note.className='equipment-stored-note';note.textContent=`${stored} stored item${stored===1?' is':'s are'} preserved in the character record and hidden here to keep this page compact.`;group.content.append(note);}return group.section;
 }
 function featureHowToUse(feature:EvaluatedFeature,ownedFeat:boolean){
-  if(feature.status==='inactive')return feature.reason;
+  if(feature.status==='inactive')return `You cannot use it right now. ${feature.reason}`;
+  if(feature.name.trim().toLowerCase()==='sentinel')return 'Open Actions, then open Reactions. Choose the Sentinel attack that matches the weapon or form attack you want to use. Confirm that the displayed trigger happened before rolling; Altered spends your Reaction only after that confirmation.';
   if(feature.status==='ruling'&&feature.name.trim().toLowerCase()==='weapon mastery')return 'Reference only—not an error. Altered found Weapon Mastery, but the imported source did not identify this character’s chosen mastery weapons. Weapon attack and damage totals remain correct; confirm the chosen mastery effect from your character source when it triggers.';
-  if(ownedFeat)return 'Reference entry only. Altered preserves the name and imported totals; configure private mechanics or consult your authorized character source for its choices and triggers.';
-  if(feature.status==='ruling')return 'Reference only—not an error. Altered found this character option but does not have enough structured information to execute its choices or triggers automatically. Its imported totals remain unchanged.';
+  if(ownedFeat)return 'No button is available yet because only the feat name was imported. Altered keeps the character’s imported totals unchanged. Use your authorized character source, or add a reviewed private mechanic, for any choice or trigger the app cannot see.';
+  if(feature.status==='ruling')return 'No button is available because the import did not include enough structured rules to execute this ability safely. Use the authorized source for its choices or triggers; Altered leaves imported totals unchanged.';
   if(feature.id==='rage')return state.rage.active?'Rage is active. Use End Rage when you want to stop it.':'Tap Start Rage below. It spends one Rage use and your Bonus Action.';
   if(feature.id==='wild-shape')return state.activeTransform?.option.profile==='wildshape'?'Your selected form is active. Use Forms to change or end it.':'Tap Choose Form below, select a legal form, then Transform.';
   if(feature.id==='wild-resurgence')return 'Choose one exchange below. Each disabled button explains which resource or limit prevents it.';
@@ -1568,9 +1569,18 @@ function featureHowToUse(feature:EvaluatedFeature,ownedFeat:boolean){
   if(feature.id==='second-wind')return feature.reason;
   if(feature.id==='action-surge')return state.turn.surgeActionsRemaining>0?'The extra non-Magic action is available in the action economy now.':feature.reason;
   if(feature.id==='lay-on-hands')return `${feature.reason} The amount uses the Damage / Heal amount field.`;
-  if(feature.status==='active')return 'Automatic. Altered is applying this benefit now; no activation button is required.';
-  if(feature.activation&&feature.activation!=='none')return `Use the button below. It spends ${feature.activation==='bonus'?'your Bonus Action':feature.activation==='action'?'your Action':feature.activation==='reaction'?'your Reaction':'no action'}.`;
-  return 'Conditional. Altered applies it when the app can detect the trigger; battlefield or target conditions must be confirmed on the relevant roll or action.';
+  if(feature.status==='active')return 'Do nothing. Altered is applying this benefit automatically. The active badge confirms that it is included now.';
+  if(feature.activation&&feature.activation!=='none')return `Press the button directly below this explanation. It spends ${feature.activation==='bonus'?'your Bonus Action':feature.activation==='action'?'your Action':feature.activation==='reaction'?'your Reaction':'no action'}. If the button is disabled, the message beside it explains what is missing.`;
+  return 'Use the related roll or action. Altered applies conditions it can detect automatically and asks you to confirm any battlefield or target condition it cannot know.';
+}
+function featureWhatItDoes(feature:EvaluatedFeature,ownedFeat:boolean){
+  const name=feature.name.trim().toLowerCase();
+  if(name==='sentinel')return 'Lets you make a triggered Opportunity Attack with a currently legal melee weapon, Unarmed Strike, or Beast attack. On a hit, the target’s Speed becomes 0 for the rest of the current turn.';
+  if(name==='weapon mastery'&&feature.status==='ruling')return 'Lets the character use the mastery property of chosen weapons. The imported sheet confirms ownership but does not identify the chosen weapons, so Altered cannot safely automate the mastery effect yet.';
+  const summary=feature.summary.trim();
+  if(ownedFeat&&/^imported character feat\.?$/i.test(summary))return 'This feat belongs to the character. Its name is confirmed, but its detailed choices and triggered effects were not included in the structured import.';
+  if(!summary)return 'This ability belongs to the character, but its mechanical effect was not included in the structured import.';
+  return summary;
 }
 type PriorityAbilityState={state:'ready'|'blocked'|'active';reason:string};
 function priorityAbilityState(feature:EvaluatedFeature):PriorityAbilityState|undefined{
@@ -1609,7 +1619,7 @@ function appendFeatureControls(feature:EvaluatedFeature,actions:HTMLElement,prio
   }
 }
 function featureCard(feature:EvaluatedFeature){
-  const ownedFeat=feature.source==='Feat'&&feature.status==='ruling';const priority=priorityAbilityState(feature);const featureStatus:UiStatus=priority?.state==='ready'?'available':priority?.state==='blocked'?'unavailable':priority?.state==='active'?'active':feature.status==='active'?'active':feature.status==='conditional'?'warning':feature.status==='inactive'?'inactive':'reference';const badge=priority?.state==='ready'?'Available now':priority?.state==='blocked'?'Unavailable now':priority?.state==='active'?'Active now':feature.status==='active'?'Applied now':feature.status==='conditional'?'Ready / conditional':feature.status==='inactive'?'Unavailable now':ownedFeat?'Owned · reference':'Reference only';const c=card(feature.name,badge,'',featureStatus);c.badge.className=`badge ${priority?`priority-${priority.state}`:ownedFeat?'owned':feature.status}`;if(priority){c.node.classList.add('priority-ability',`priority-${priority.state}`);c.node.dataset.priorityState=priority.state;c.node.setAttribute('aria-label',`${feature.name}: ${badge}. ${priority.reason}`);}const paragraph=c.node.querySelector(':scope > p');if(paragraph){paragraph.className='feature-explanation';const instructions=priority?.state==='blocked'?`Blocked: ${priority.reason}`:featureHowToUse(feature,ownedFeat);paragraph.append(text('span','What it does','feature-explanation-label'),text('span',feature.summary),text('span','How to use it','feature-explanation-label'),text('span',instructions));}appendFeatureControls(feature,c.actions,priority);return c.node;
+  const ownedFeat=feature.source==='Feat'&&feature.status==='ruling';const priority=priorityAbilityState(feature);const featureStatus:UiStatus=priority?.state==='ready'?'available':priority?.state==='blocked'?'unavailable':priority?.state==='active'?'active':feature.status==='active'?'active':feature.status==='conditional'?'warning':feature.status==='inactive'?'inactive':'reference';const badge=priority?.state==='ready'?'Available now':priority?.state==='blocked'?'Unavailable now':priority?.state==='active'?'Active now':feature.status==='active'?'Applied now':feature.status==='conditional'?'Ready / conditional':feature.status==='inactive'?'Unavailable now':ownedFeat?'Owned · reference':'Reference only';const c=card(feature.name,badge,'',featureStatus);c.badge.className=`badge ${priority?`priority-${priority.state}`:ownedFeat?'owned':feature.status}`;if(priority){c.node.classList.add('priority-ability',`priority-${priority.state}`);c.node.dataset.priorityState=priority.state;c.node.setAttribute('aria-label',`${feature.name}: ${badge}. ${priority.reason}`);}const paragraph=c.node.querySelector(':scope > p');if(paragraph){paragraph.className='feature-explanation';const instructions=priority?.state==='blocked'?`You cannot use it right now. ${priority.reason}`:featureHowToUse(feature,ownedFeat);paragraph.append(text('span','What it does','feature-explanation-label'),text('span',featureWhatItDoes(feature,ownedFeat)),text('span','How to use it','feature-explanation-label'),text('span',instructions));}appendFeatureControls(feature,c.actions,priority);return c.node;
 }
 function renderFeatures(){
   const root=$('#tab-content');clear(root);let count=0;
