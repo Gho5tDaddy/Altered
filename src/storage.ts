@@ -8,6 +8,10 @@ const PACK_STORE='content-packs';
 const PACK_INDEX_KEY='__installed-pack-index__';
 const MEMORY=new Map<string,unknown>();
 const fallbackKey=(storeName:string,key:string)=>`altered:${storeName}:${key}`;
+let storageFailureHandler:((message:string)=>void)|undefined;
+
+export function setStorageFailureHandler(handler:((message:string)=>void)|undefined){storageFailureHandler=handler;}
+function reportStorageFailure(operation:string){storageFailureHandler?.(`Altered could not ${operation} in durable browser storage. This session still works, but the change may disappear after reload.`);}
 
 function requestValue<T>(request:IDBRequest<T>):Promise<T>{return new Promise((resolve,reject)=>{request.addEventListener('success',()=>resolve(request.result),{once:true});request.addEventListener('error',()=>reject(request.error??new Error('IndexedDB request failed.')),{once:true});});}
 function transactionDone(transaction:IDBTransaction):Promise<void>{return new Promise((resolve,reject)=>{transaction.addEventListener('complete',()=>resolve(),{once:true});transaction.addEventListener('abort',()=>reject(transaction.error??new Error('IndexedDB transaction aborted.')),{once:true});transaction.addEventListener('error',()=>reject(transaction.error??new Error('IndexedDB transaction failed.')),{once:true});});}
@@ -28,12 +32,15 @@ async function getValue<T>(storeName:string,key:string):Promise<T|undefined>{
 async function setValue(storeName:string,key:string,value:unknown):Promise<void>{
   MEMORY.set(`${storeName}:${key}`,value);
   try{const db=await openDb();const transaction=db.transaction(storeName,'readwrite');transaction.objectStore(storeName).put(value,key);await transactionDone(transaction);db.close();return;}catch{/* Use the smaller localStorage fallback when IndexedDB is unavailable. */}
-  try{localStorage.setItem(fallbackKey(storeName,key),JSON.stringify(value));}catch{/* In-memory fallback keeps the current session usable. */}
+  try{localStorage.setItem(fallbackKey(storeName,key),JSON.stringify(value));return;}catch{/* In-memory fallback keeps the current session usable. */}
+  reportStorageFailure('save this change');
 }
 async function deleteValue(storeName:string,key:string):Promise<void>{
   MEMORY.delete(`${storeName}:${key}`);
-  try{const db=await openDb();const transaction=db.transaction(storeName,'readwrite');transaction.objectStore(storeName).delete(key);await transactionDone(transaction);db.close();}catch{/* Continue to fallback cleanup. */}
-  try{localStorage.removeItem(fallbackKey(storeName,key));}catch{/* Nothing else to do. */}
+  let durable=false;
+  try{const db=await openDb();const transaction=db.transaction(storeName,'readwrite');transaction.objectStore(storeName).delete(key);await transactionDone(transaction);db.close();durable=true;}catch{/* Continue to fallback cleanup. */}
+  try{localStorage.removeItem(fallbackKey(storeName,key));durable=true;}catch{/* Nothing else to do. */}
+  if(!durable)reportStorageFailure('remove this saved item');
 }
 
 const artKey=(characterId:string,targetId:string)=>`${characterId}:${targetId}`;

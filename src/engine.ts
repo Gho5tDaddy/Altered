@@ -38,6 +38,7 @@ export function wildShapeLimits(character:Character){
 export function wildShapeUses(level:number){return level>=17?4:level>=6?3:level>=2?2:0}
 export function rageDamage(level:number){return level>=16?4:level>=9?3:2}
 export function monkDie(level:number){return level>=17?'1d12':level>=11?'1d10':level>=5?'1d8':'1d6'}
+function shillelaghDie(level:number){return level>=17?'2d6':level>=11?'1d12':level>=5?'1d10':'1d8'}
 export function monkMovement(level:number){return level>=18?30:level>=14?25:level>=10?20:level>=6?15:level>=2?10:0}
 
 function preparedSpell(character:Character,name:string){const key=name.toLowerCase();return character.spells.some(s=>s.name.toLowerCase()===key&&s.prepared!==false)}
@@ -49,10 +50,29 @@ export function availableSpellSlotLevels(character:Character,state:GameState|und
     .map(([level])=>Number(level))
     .sort((a,b)=>a-b);
 }
-function slotAvailable(state:GameState|undefined,character:Character,level:number){return level===0||availableSpellSlotLevels(character,state,level).length>0}
+export interface SpellCastingOption {
+  id:string;kind:'ordinary'|'pact-magic';level:number;label:string;resourceId?:string;
+}
+function pactMagicResources(character:Character,state:GameState|undefined){
+  const pools=state?Object.values(state.resources):character.resources;
+  return pools.filter((pool):pool is ResourcePool&{kind:'pact-magic-slots';slotLevel:number}=>pool.id==='pact-magic-slots'&&pool.kind==='pact-magic-slots'&&pool.current>0&&pool.slotLevel!==undefined);
+}
+export function availableSpellCastingOptions(character:Character,state:GameState|undefined,minimumLevel:number):SpellCastingOption[]{
+  if(minimumLevel<=0)return [];
+  const ordinary=availableSpellSlotLevels(character,state,minimumLevel).map(level=>({id:`spell-slot:${level}`,kind:'ordinary' as const,level,label:`Level ${level} spell slot`}));
+  const pact=pactMagicResources(character,state).filter(pool=>pool.slotLevel>=minimumLevel).map(pool=>({id:pool.id,kind:'pact-magic' as const,level:pool.slotLevel,label:`Pact Magic · Level ${pool.slotLevel}`,resourceId:pool.id}));
+  return [...ordinary,...pact];
+}
+function slotAvailable(state:GameState|undefined,character:Character,level:number){return level===0||availableSpellCastingOptions(character,state,level).length>0}
 function nextSpellSlot(character:Character,state:GameState,minimumLevel:number,requestedLevel?:number){
   const levels=availableSpellSlotLevels(character,state,minimumLevel);
   return requestedLevel===undefined?levels[0]:levels.includes(requestedLevel)?requestedLevel:undefined;
+}
+function castingOption(character:Character,state:GameState,minimumLevel:number,requestedLevel?:number,resourceId?:string){
+  const choices=availableSpellCastingOptions(character,state,minimumLevel);
+  if(resourceId)return choices.find(choice=>choice.kind==='pact-magic'&&choice.resourceId===resourceId&&(requestedLevel===undefined||choice.level===requestedLevel));
+  if(requestedLevel!==undefined)return choices.find(choice=>choice.kind==='ordinary'&&choice.level===requestedLevel);
+  return choices.find(choice=>choice.kind==='ordinary')??choices[0];
 }
 function creature(character:Character,id?:string){return id?(character.customForms[id]??CREATURES[id]):undefined}
 function allForms(character:Character){return [...Object.values(CREATURES),...Object.values(character.customForms)]}
@@ -166,13 +186,15 @@ export function availableTransformations(character:Character,state?:GameState):T
 }
 
 export function createInitialState(character:Character):GameState{
+  const resources=Object.fromEntries(character.resources.map(r=>[r.id,cloneResource(r)]));
+  if(classLevel(character,'Monk')>=2&&!resources['uncanny-metabolism'])resources['uncanny-metabolism']={id:'uncanny-metabolism',name:'Uncanny Metabolism',current:1,max:1,recovery:'long-all'};
   return {
     stateVersion:5,hp:character.hp.current,tempHp:0,life:{dead:false,stable:false,deathSaveSuccesses:0,deathSaveFailures:0},exhaustionLevel:0,relentlessRageDc:10,
     rage:{active:false,startedAtTurn:0,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false},
     turn:{number:1,actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,slotSpellCast:false,attackRollsMade:0,oncePerTurn:{}},
-    resources:Object.fromEntries(character.resources.map(r=>[r.id,cloneResource(r)])),
+    resources,
     spellSlots:Object.fromEntries(Object.entries(character.spellSlots).map(([k,v])=>[k,{...v}])),
-    concentrationChecks:[],activeSpellEffects:[],receivedEffects:[],conditions:[],equipment:{...character.equipment},overlays:[],recharges:{},actionUses:{},log:[]
+    concentrationChecks:[],activeSpellEffects:[],receivedEffects:[],conditions:[],equipment:{...character.equipment},overlays:[],overlayTimings:{},recharges:{},actionUses:{},log:[]
   };
 }
 
@@ -191,6 +213,7 @@ function itemEffectBonus(character:Character,state:GameState,option:Transformati
 }
 function getClassFeatureRules(character:Character):ImportedFeatureRule[]{return [...character.classes.flatMap(c=>[...(recordValue(CLASS_FEATURES,c.name)??[]),...(c.subclass?recordValue(SUBCLASS_FEATURES,c.subclass)??[]:[])].filter(f=>(f.level??1)<=c.level)),...character.features]}
 function getSpeciesRules(character:Character):ImportedFeatureRule[]{return (recordValue(SPECIES_FEATURES,character.species)??[]).filter(f=>(f.level??1)<=character.totalLevel)}
+function selectedInvocation(character:Character,name:string){return character.features.some(feature=>sameText(feature.name,name)&&(feature.id==='eldritch-mind'||feature.origin?.kind==='eldritch-invocation'))}
 function retentionAllows(feature:ImportedFeatureRule,option:TransformationOption){
   if(option.profile==='base'||option.profile==='overlay')return true;if(!policyFor(option).classFeatures)return false;
   if(option.profile==='wildshape')return feature.retention?.wildshape!==false;
@@ -198,9 +221,9 @@ function retentionAllows(feature:ImportedFeatureRule,option:TransformationOption
 }
 function evaluateFeatures(character:Character,state:GameState,option:TransformationOption,canCast:boolean):EvaluatedFeature[]{
   const result:EvaluatedFeature[]=[];const profile=option.profile;
-  const fullyCalculated=new Set(['rage','barbarian-unarmored-defense','danger-sense','reckless-attack','fast-movement','relentless-rage','wild-shape','wild-resurgence','beast-spells','second-wind','action-surge','monk-unarmored-defense','unarmored-movement','lay-on-hands','aura-of-protection','radiant-strikes','roving','feral-senses','reliable-talent','eldritch-mind']);
+  const fullyCalculated=new Set(['rage','barbarian-unarmored-defense','danger-sense','fast-movement','relentless-rage','wild-shape','wild-resurgence','beast-spells','monk-unarmored-defense','unarmored-movement','aura-of-protection','radiant-strikes','roving','feral-senses','reliable-talent','eldritch-mind']);
   for(const feature of getClassFeatureRules(character)){
-    const automation=feature.automation??(fullyCalculated.has(feature.id)?'calculated':'conditional');let status:EvaluatedFeature['status']=automation==='calculated'?'active':automation==='conditional'?'conditional':'ruling';let reason=automation==='calculated'?'Calculated from the current sheet and state.':automation==='conditional'?'Available when its target, equipment, or battlefield prerequisites are met.':automation==='reference'?'Reference only; Altered does not execute this feature.':'Unsupported automation; resolve this feature from its source.';
+    const selectedEldritchMind=feature.origin?.kind==='eldritch-invocation'&&sameText(feature.name,'Eldritch Mind');const automation=selectedEldritchMind?'calculated':feature.automation??(fullyCalculated.has(feature.id)?'calculated':'conditional');let status:EvaluatedFeature['status']=automation==='calculated'?'active':automation==='conditional'?'conditional':'ruling';let reason=selectedEldritchMind?'Selected invocation confirmed by the imported sheet; Altered applies Advantage to Concentration saves.':automation==='calculated'?'Calculated from the current sheet and state.':automation==='conditional'?'Available when its target, equipment, or battlefield prerequisites are met.':automation==='reference'?'Reference only; Altered does not execute this feature.':'Unsupported automation; resolve this feature from its source.';
     if(!retentionAllows(feature,option)){status='inactive';reason=`Not retained by the ${profile} transformation policy.`;}
     if(status!=='inactive'&&status!=='ruling'&&feature.requires?.spellcasting&&!canCast){status='inactive';reason='Unavailable now because the current state blocks spellcasting.';}
     if(status!=='inactive'&&status!=='ruling'&&feature.requires?.concentration&&!state.concentration){status='inactive';reason='Unavailable now because no Concentration effect is active.';}
@@ -213,7 +236,21 @@ function evaluateFeatures(character:Character,state:GameState,option:Transformat
     if(feature.id==='rage'){status=state.rage.active?'active':'conditional';reason=state.rage.active?'Active now. Concentration and spellcasting are blocked.':'Activate with the Start Rage button when a Rage use and Bonus Action remain.';}
     if(feature.id==='wild-shape'){const active=state.activeTransform?.option.profile==='wildshape';status=active?'active':'conditional';reason=active?'The selected Wild Shape is active now.':'Choose a legal form, then activate it with a Bonus Action and one Wild Shape use.';}
     if(feature.id==='wild-resurgence'){status='conditional';reason='Use one of the exchange buttons when its listed resource is available.';}
-    if(feature.id==='reckless-attack')reason=state.turn.attackRollsMade===0?'May be declared before the first attack roll of this turn.':'The first attack-roll decision has passed this turn.';
+    if(feature.id==='reckless-attack'){
+      const error=recklessAttackError(character,state);status=state.rage.recklessDeclared?'active':error?'inactive':'conditional';reason=state.rage.recklessDeclared?'Declared for eligible Strength attack rolls this turn. Attacks against this character have Advantage until the next turn.':error??'Ready to declare before the first attack roll of this turn.';
+    }
+    if(feature.id==='second-wind'){
+      const error=secondWindError(character,state);status=error?'inactive':'conditional';reason=error??'Ready to use with a Bonus Action; Altered rolls the healing and spends one use.';
+    }
+    if(feature.id==='action-surge'){
+      const error=actionSurgeError(character,state);status=state.turn.surgeActionsRemaining>0?'active':error?'inactive':'conditional';reason=state.turn.surgeActionsRemaining>0?'An additional non-Magic action is available now.':error??'Ready to use; Altered spends one use and adds a non-Magic action.';
+    }
+    if(feature.id==='lay-on-hands'){
+      const error=layOnHandsError(character,state,1);status=error?'inactive':'conditional';reason=error??'Ready to use with a Bonus Action; choose how many points to spend from the healing pool.';
+    }
+    if(feature.id==='dragon-wings'&&status!=='inactive'){
+      const active=state.overlays.includes('sorcerer-dragon-wings'),error=actionError(state,'bonus',activeConditionImmunities(character,state));status=active?'active':!hasResource(state,'sorcerer-dragon-wings')||error?'inactive':'conditional';reason=active?'Dragon Wings is active and supplying its Fly Speed.':!hasResource(state,'sorcerer-dragon-wings')?'No Dragon Wings use remains; restore it with 3 Sorcery Points or finish a Long Rest.':error??'Ready to activate from Forms with a Bonus Action.';
+    }
     result.push({id:feature.id,name:feature.name,source:feature.source,status,reason,summary:feature.summary,...(feature.activation?{activation:feature.activation}:{})});
   }
   for(const feature of getSpeciesRules(character)){const overlayId=feature.id==='large-form'?'goliath-large-form':feature.id;const ongoing=state.overlays.includes(overlayId);const retained=profile==='base'||profile==='overlay'||ongoing;const status=ongoing?'active':retained&&feature.activation&&feature.activation!=='none'?'conditional':retained?'active':'inactive';const reason=ongoing?'Active now and continuing through shape-shifting.':status==='conditional'?`Activate with ${feature.activation==='bonus'?'a Bonus Action':feature.activation==='action'?'an Action':feature.activation==='reaction'?'a Reaction':'its listed control'}.`:retained?'Applied automatically in the current form.':'Species traits are not generally retained by replacement transformations.';result.push({id:feature.id,name:feature.name,source:feature.source,status,reason,summary:feature.summary,...(feature.activation?{activation:feature.activation}:{})});}
@@ -222,7 +259,7 @@ function evaluateFeatures(character:Character,state:GameState,option:Transformat
 }
 function moonSpellAllowed(character:Character,spell:Spell){const level=recordValue(MOON_FORM_SPELL_LEVELS,spell.name);return sameText(subclass(character,'Druid'),'Circle of the Moon')&&level!==undefined&&classLevel(character,'Druid')>=level&&sameText(spell.sourceClass,'Druid')}
 function freeSpellCastReady(state:GameState,spell:Spell){return Boolean(spell.freeCastResourceId&&hasResource(state,spell.freeCastResourceId,spell.freeCastResourceCost??1))}
-export function spellActiveEffect(spell:Spell){if(spell.activeEffect)return spell.activeEffect;if(sameText(spell.name,'Barkskin'))return {id:'barkskin',duration:'1 hour',acMinimum:17,summary:'The target has Armor Class 17 if its AC would otherwise be lower.'};return undefined}
+export function spellActiveEffect(spell:Spell){if(spell.activeEffect)return spell.activeEffect;if(sameText(spell.name,'Barkskin'))return {id:'barkskin',duration:'1 hour',acMinimum:17,summary:'The target has Armor Class 17 if its AC would otherwise be lower.'};if(sameText(spell.name,'Shillelagh'))return {id:'shillelagh',duration:'1 minute',summary:'One held Club or Quarterstaff uses the spellcasting ability, a level-scaled weapon die, and a per-hit choice of its normal damage type or Force.'};return undefined}
 function evaluateSpells(character:Character,state:GameState,option:TransformationOption,baseCanCast:boolean){return character.spells.map(spell=>{const prepared=spell.prepared!==false;const circleAccess=moonSpellAllowed(character,spell);const freeCast=freeSpellCastReady(state,spell);let available=baseCanCast&&prepared;let reason=available?(freeCast?'Free cast available; no spell slot required.':'Spellcasting is allowed.'):'Spellcasting is blocked in the current form.';if(option.profile==='wildshape'&&circleAccess&&prepared&&!state.rage.active){available=true;reason='Available through Circle of the Moon while in Wild Shape.';}if(option.profile==='wildshape'&&classLevel(character,'Druid')>=18&&!state.rage.active){available=prepared&&!(spell.materialCost||spell.materialConsumed);reason=!prepared?'The spell is not prepared or otherwise available.':available?'Available through Beast Spells.':'Beast Spells excludes costly or consumed Material components.';}if(state.rage.active){available=false;reason='Rage blocks all spellcasting, including Circle spells.';}const level=spell.slotLevel??spell.level;if(available&&level>0&&!freeCast&&state.turn.slotSpellCast){available=false;reason='2024 rule: a spell slot has already been expended to cast a spell on this turn. Cantrips and non-spell actions remain available.';}if(available&&level>0&&!freeCast&&!slotAvailable(state,character,level)){available=false;reason=spell.freeCastResourceId?'The free cast has been used and no eligible spell slot remains.':`No level ${level} or higher spell slot remains.`;}if(available){const error=actionError(state,spell.castingTime,activeConditionImmunities(character,state,option));if(error){available=false;reason=error;}}return {...spell,...(spell.attackBonus!==undefined?{attackBonus:spell.attackBonus-exhaustionPenalty(state)}:{}),...(circleAccess?{specialAccess:'circle-of-the-moon' as const}:{}),available,reason};});}
 function resolveSpeeds(character:Character,state:GameState,option:TransformationOption,effects:TransformationEffects[]){
   const form=creature(character,option.formId);const speeds=form&&option.profile!=='overlay'?{...form.speeds}:{walk:character.speed};
@@ -303,11 +340,21 @@ function resolveInitiative(character:Character,state:GameState,option:Transforma
 const SIMPLE_MONK_WEAPONS=new Set(['club','dagger','greatclub','handaxe','javelin','light hammer','mace','quarterstaff','sickle','spear']);
 const MARTIAL_LIGHT_MONK_WEAPONS=new Set(['scimitar','shortsword']);
 function baseWeaponName(name:string){return normalized(name).replace(/[,\s]*[+-]\d+\s*$/,'').trim();}
-function monkWeaponEligible(name:string,properties:string[],range:number|undefined){const base=baseWeaponName(name);return range===undefined&&(SIMPLE_MONK_WEAPONS.has(base)||MARTIAL_LIGHT_MONK_WEAPONS.has(base)&&properties.some(property=>sameText(property,'Light')));}
+function monkWeaponEligible(name:string,properties:string[],_range:number|undefined){const base=baseWeaponName(name);return SIMPLE_MONK_WEAPONS.has(base)||MARTIAL_LIGHT_MONK_WEAPONS.has(base)&&properties.some(property=>sameText(property,'Light'));}
+function martialArtsWeaponReady(character:Character,state:GameState,option:TransformationOption){if(!equipmentRetained(state,option))return true;return character.items.filter(item=>item.equipped&&item.attack).every(item=>monkWeaponEligible(item.name,item.attack!.properties,item.attack!.range));}
 function largerWeaponDie(weapon:string,martial:string){const weaponMatch=weapon.match(/^1d(\d+)$/i),martialMatch=martial.match(/^1d(\d+)$/i);if(!weaponMatch||!martialMatch)return weapon;return Number(martialMatch[1])>Number(weaponMatch[1])?martial:weapon;}
-function baseActions(character:Character,abilities:Character['abilities'],size:string):CreatureAction[]{
+function activeShillelaghSpell(character:Character,state:GameState){
+  const active=state.activeSpellEffects.find(effect=>sameText(effect.id,'shillelagh')||sameText(effect.name,'Shillelagh'));if(!active)return undefined;
+  const spells=character.spells.filter(spell=>sameText(spell.name,'Shillelagh')&&spell.prepared!==false);return spells.find(spell=>sameText(spell.sourceClass,active.source))??spells[0];
+}
+function baseActions(character:Character,state:GameState,abilities:Character['abilities'],size:string):CreatureAction[]{
   const mod=abilityMod(abilities.str),pb=proficiencyBonus(character.totalLevel),dc=8+pb+mod,targetSizeMax=shiftedSize(size,1);
-  const monk=classLevel(character,'Monk');const weapons:CreatureAction[]=character.items.filter(item=>item.equipped&&(!item.requiresAttunement||item.attuned)&&item.attack).map(item=>{const attack=item.attack!,monkWeapon=monk>=1&&monkWeaponEligible(item.name,attack.properties,attack.range),ability:Ability=monkWeapon&&abilities.dex>abilities[attack.ability]?'dex':attack.ability,abilityModifier=abilityMod(abilities[ability]),bonus=abilityModifier+(attack.proficient?pb:0)+attack.magicBonus,damageModifier=abilityModifier+attack.magicBonus,damageDie=monkWeapon?largerWeaponDie(attack.damage,monkDie(monk)):attack.damage;const range=attack.range!==undefined?attack.longRange&&attack.longRange!==attack.range?`${attack.range}/${attack.longRange} ft.`:`${attack.range} ft.`:undefined;return {id:`item-attack-${item.id}`,name:item.name,type:'attack',cost:'action',attackBonus:bonus,ability,kind:'weapon',damage:[{expression:`${damageDie}${damageModifier>0?`+${damageModifier}`:damageModifier<0?String(damageModifier):''}`,type:attack.damageType}],...(range?{range}:{}),notes:[attack.proficient?'Proficient':'Not proficient',attack.magicBonus?`${attack.magicBonus>0?'+':''}${attack.magicBonus} magic weapon bonus to attack and damage`:'',monkWeapon?`Monk weapon · Martial Arts ${monkDie(monk)} die and Dexterity available`:'',attack.properties.join(', '),item.mechanics==='included-in-imported-totals'?'Equipped item; imported character totals are not applied twice.':''].filter(Boolean).join(' · ')};});
+  const monk=classLevel(character,'Monk'),shillelagh=activeShillelaghSpell(character,state);const weapons:CreatureAction[]=character.items.filter(item=>item.equipped&&(!item.requiresAttunement||item.attuned)&&item.attack).flatMap(item=>{
+    const attack=item.attack!,monkWeapon=monk>=1&&monkWeaponEligible(item.name,attack.properties,attack.range),shillelaghWeapon=Boolean(shillelagh&&['club','quarterstaff'].includes(baseWeaponName(item.name))),pactAbility=item.pactWeapon?.attackAbility,ability:Ability=shillelaghWeapon?shillelagh!.ability:pactAbility??(monkWeapon&&abilities.dex>abilities[attack.ability]?'dex':attack.ability),abilityModifier=abilityMod(abilities[ability]),bonus=abilityModifier+(attack.proficient?pb:0)+attack.magicBonus,damageModifier=abilityModifier+attack.magicBonus,damageDie=shillelaghWeapon?shillelaghDie(character.totalLevel):monkWeapon?largerWeaponDie(attack.damage,monkDie(monk)):attack.damage;const range=attack.range!==undefined?attack.longRange&&attack.longRange!==attack.range?`${attack.range}/${attack.longRange} ft.`:`${attack.range} ft.`:undefined;
+    const notes=[attack.proficient?'Proficient':'Not proficient',attack.magicBonus?`${attack.magicBonus>0?'+':''}${attack.magicBonus} magic weapon bonus to attack and damage`:'',shillelaghWeapon?`Active Shillelagh · ${ability.toUpperCase()} from the imported ${shillelagh!.sourceClass} spell · ${damageDie} at character level ${character.totalLevel} · choose this normal-damage action or the Force action for each hit, never both`:pactAbility?`Proven Pact Weapon · ${pactAbility.toUpperCase()} is used for attack and damage from structured D&D Beyond evidence`:monkWeapon?`Monk weapon · Martial Arts ${monkDie(monk)} die and Dexterity available`:'',monkWeapon&&pactAbility?`Monk weapon · Martial Arts ${monkDie(monk)} damage die retained`:'',attack.properties.join(', '),item.mechanics==='included-in-imported-totals'?'Equipped item; imported character totals are not applied twice.':''].filter(Boolean).join(' · ');
+    const normal:Extract<CreatureAction,{type:'attack'}>={id:`item-attack-${item.id}`,name:shillelaghWeapon?`${item.name} — Shillelagh (${attack.damageType})`:item.name,type:'attack',cost:'action',attackBonus:bonus,ability,kind:'weapon',damage:[{expression:`${damageDie}${damageModifier>0?`+${damageModifier}`:damageModifier<0?String(damageModifier):''}`,type:attack.damageType}],...(range?{range}:{}),notes};
+    if(!shillelaghWeapon)return [normal];return [normal,{...normal,id:`item-attack-${item.id}-shillelagh-force`,name:`${item.name} — Shillelagh (Force)`,damage:normal.damage.map(packet=>({...packet,type:'Force'}))}];
+  });
   return [...weapons,
     {id:'unarmed',name:'Unarmed Strike — Damage',type:'attack',cost:'action',attackBonus:pb+mod,ability:'str',kind:'unarmed',reach:5,damage:[{expression:String(Math.max(1,1+mod)),type:'Bludgeoning'}]},
     {id:'unarmed-grapple',name:'Unarmed Strike — Grapple',type:'save',cost:'action',saveAbility:'str',saveAbilityOptions:['str','dex'],dc,range:'5 ft.',effectsOnFail:[{condition:'Grappled',escapeDc:dc,targetSizeMax,note:'Requires a free hand.'}],notes:'The target chooses a Strength or Dexterity save. It must be no more than one size larger than you.'},
@@ -324,11 +371,33 @@ function applyAttackAbilityOverride(action:CreatureAction,effects:Transformation
   const reach=effects.map(effect=>effect.attackReachMinimum).filter((value):value is NonNullable<TransformationEffects['attackReachMinimum']>=>value!==undefined&&kinds.some(kind=>value.appliesTo.includes(kind))).at(-1);
   if(!damageType&&!reach)return abilityAdjusted;return {...abilityAdjusted,...(reach?{reach:Math.max(abilityAdjusted.reach??5,reach.feet)}:{}),damage:damageType?abilityAdjusted.damage.map(packet=>({...packet,type:damageType.type})):abilityAdjusted.damage,notes:[abilityAdjusted.notes,damageType?`Active enhancement changes this attack's damage to ${damageType.type}.`:'',reach?`Active enhancement extends this attack's reach to ${Math.max(abilityAdjusted.reach??5,reach.feet)} feet.`:''].filter(Boolean).join(' · ')};
 }
+function astralArmsOverlayActive(character:Character,state:GameState){return activeOverlayOptions(character,state).some(option=>/(?:astral.*arms|arms.*astral)/i.test(option.label)||option.effects?.actions?.some(action=>action.id==='astral-arms-unarmed-strike'||/astral arms? unarmed strike/i.test(action.name)));}
+function astralArmsActions(character:Character,abilities:Character['abilities'],size:string):CreatureAction[]{
+  const monk=classLevel(character,'Monk'),modifier=abilityMod(abilities.wis),dc=8+proficiencyBonus(character.totalLevel)+modifier,targetSizeMax=shiftedSize(size,1),expression=`${monkDie(monk)}${modifier>0?`+${modifier}`:modifier<0?String(modifier):''}`,tableNote='Legacy Astral Self compatibility: Wisdom and Force follow the imported Arms strike; Wisdom-based 10-foot Grapple/Shove are an explicit Altered table rule, not a claim that this legacy subclass was rewritten in the 2024 rules.';
+  return [
+    {id:'astral-arms-unarmed-strike',name:'Unarmed Strike — Astral Arms Damage',type:'attack',cost:'action',attackBonus:proficiencyBonus(character.totalLevel)+modifier,ability:'wis',kind:'unarmed',reach:10,damage:[{expression,type:'Force'}],notes:`Uses Wisdom for attack and damage and deals Force damage. ${tableNote}`},
+    {id:'astral-arms-unarmed-grapple',name:'Unarmed Strike — Astral Arms Grapple',type:'save',cost:'action',saveAbility:'str',saveAbilityOptions:['str','dex'],dc,range:'10 ft.',effectsOnFail:[{condition:'Grappled',escapeDc:dc,targetSizeMax,note:'Requires a free hand under the table’s 2024 Unarmed Strike handling.'}],notes:`The target chooses a Strength or Dexterity save; the DC uses Wisdom. ${tableNote}`},
+    {id:'astral-arms-unarmed-shove',name:'Unarmed Strike — Astral Arms Shove',type:'save',cost:'action',saveAbility:'str',saveAbilityOptions:['str','dex'],dc,range:'10 ft.',effectsOnFail:[{condition:'Prone',targetSizeMax,note:'Instead of Prone, you can push the target 5 feet away.'}],notes:`The target chooses a Strength or Dexterity save; the DC uses Wisdom. ${tableNote}`},
+  ];
+}
+function eldritchSmiteActions(character:Character,state:GameState,option:TransformationOption):CreatureAction[]{
+  if(!retainedClassFeatures(option)||!equipmentRetained(state,option)||!selectedInvocation(character,'Eldritch Smite'))return [];
+  const pact=resource(state,'pact-magic-slots');if(pact?.kind!=='pact-magic-slots'||pact.slotLevel===undefined||pact.max<1)return [];const slotLevel=pact.slotLevel;
+  return character.items.filter(item=>item.equipped&&(!item.requiresAttunement||item.attuned)&&item.attack&&item.pactWeapon?.evidence.length).map(item=>({
+    id:`eldritch-smite-${item.id}`,name:`Eldritch Smite — ${item.name}`,type:'automatic' as const,cost:'none' as const,
+    damage:[{expression:`${slotLevel+1}d8`,type:'Force' as const}],damageTiming:'Extra damage after the confirmed hit',resourceId:pact.id,resourceCost:1,oncePerTurnId:'eldritch-smite',
+    prerequisite:`Immediately after ${item.name}, the proven Pact Weapon, hits a creature.`,
+    notes:`2024 Eldritch Smite adapter: expend one level ${slotLevel} Pact Magic slot for ${slotLevel+1}d8 extra Force damage. If the target is Huge or smaller, you may also knock it Prone. The selected invocation, Pact slot level, and linked weapon all come from structured D&D Beyond evidence; Altered does not infer an unproven Pact Weapon.`,
+  }));
+}
 function resolvedActions(character:Character,state:GameState,option:TransformationOption,effects:TransformationEffects[],canAttack:boolean,abilities:Character['abilities']):CreatureAction[]{
-  const form=creature(character,option.formId);const isBeastForm=normalized(form?.type)==='beast'&&option.profile!=='overlay';const size=effects.map(effect=>effect.size).filter((value):value is string=>Boolean(value)).at(-1)??form?.size??character.size;const naturalAttackRollBonus=itemEffectBonus(character,state,option,'natural-attack-rolls',true),naturalAttackDamageBonus=itemEffectBonus(character,state,option,'natural-attack-damage',true);const actions:CreatureAction[]=form&&option.profile!=='overlay'?[...form.actions]:baseActions(character,abilities,size);for(const effect of effects)actions.push(...(effect.actions??[]));
-  const monk=classLevel(character,'Monk');if(canAttack&&retainedClassFeatures(option)&&monk>=1){const stats=abilities;const strMod=abilityMod(stats.str),dexMod=abilityMod(stats.dex),mod=Math.max(strMod,dexMod),chosen:Ability=dexMod>=strMod?'dex':'str';actions.push({id:'monk-unarmed',name:'Monk Unarmed Strike',type:'attack',cost:'action',attackBonus:proficiencyBonus(character.totalLevel)+mod,ability:chosen,kind:'unarmed',reach:5,damage:[{expression:`${monkDie(monk)}${mod>=0?'+':''}${mod}`,type:'Bludgeoning'}],notes:'Separate Unarmed Strike option; the beast stat-block attacks remain available with their original dice.'});}
+  const form=creature(character,option.formId);const isBeastForm=normalized(form?.type)==='beast'&&option.profile!=='overlay';const size=effects.map(effect=>effect.size).filter((value):value is string=>Boolean(value)).at(-1)??form?.size??character.size;const naturalAttackRollBonus=itemEffectBonus(character,state,option,'natural-attack-rolls',true),naturalAttackDamageBonus=itemEffectBonus(character,state,option,'natural-attack-damage',true);const actions:CreatureAction[]=form&&option.profile!=='overlay'?[...form.actions]:baseActions(character,state,abilities,size);for(const effect of effects)actions.push(...(effect.actions??[]));
+  actions.push(...eldritchSmiteActions(character,state,option));
+  const astral=astralArmsOverlayActive(character,state);if(astral){for(let index=actions.length-1;index>=0;index--){const action=actions[index]!;if(['astral-arms-unarmed-strike','astral-arms-unarmed-grapple','astral-arms-unarmed-shove'].includes(action.id)||/astral arms? unarmed strike/i.test(action.name))actions.splice(index,1);}actions.push(...astralArmsActions(character,abilities,size));}
+  const monk=classLevel(character,'Monk');if(canAttack&&retainedClassFeatures(option)&&monk>=1){const stats=abilities;const strMod=abilityMod(stats.str),dexMod=abilityMod(stats.dex),mod=Math.max(strMod,dexMod),chosen:Ability=dexMod>=strMod?'dex':'str';const monkUnarmed:Extract<CreatureAction,{type:'attack'}>={id:'monk-unarmed',name:'Monk Unarmed Strike',type:'attack',cost:'action',attackBonus:proficiencyBonus(character.totalLevel)+mod,ability:chosen,kind:'unarmed',reach:5,damage:[{expression:`${monkDie(monk)}${mod>=0?'+':''}${mod}`,type:'Bludgeoning'}],notes:'Separate Unarmed Strike option; the beast stat-block attacks remain available with their original dice.'};actions.push(monkUnarmed);const martialArtsReady=!armorActive(state,option)&&!shieldActive(state,option)&&martialArtsWeaponReady(character,state,option);if(martialArtsReady){actions.push({...monkUnarmed,id:'monk-bonus-unarmed',name:'Martial Arts — Bonus Unarmed Strike',cost:'bonus',notes:'2024 Martial Arts Bonus Action Unarmed Strike. Requires no active armor or Shield and no equipped non-Monk weapon.'});const enhancementStrikes=[...effects.flatMap(effect=>effect.actions??[]).filter((action):action is Extract<CreatureAction,{type:'attack'}>=>action.type==='attack'&&action.kind==='unarmed'&&!/astral arms? unarmed strike/i.test(action.name)&&action.id!=='astral-arms-unarmed-strike'),...(astral?actions.filter((action):action is Extract<CreatureAction,{type:'attack'}>=>action.type==='attack'&&action.id==='astral-arms-unarmed-strike'):[])],bonusStrikeIds=new Set<string>();for(const strike of enhancementStrikes){const id=`monk-bonus-${strike.id}`;if(bonusStrikeIds.has(id)||actions.some(action=>action.id===id))continue;bonusStrikeIds.add(id);actions.push({...strike,id,name:`${strike.name} — Bonus Action`,cost:'bonus',notes:[strike.notes,'Available as the 2024 Martial Arts Bonus Action Unarmed Strike.'].filter(Boolean).join(' · ')});}}}
   if(retainedClassFeatures(option)&&monk>=2){
-    if(canAttack){const count=monk>=10?3:2,ordinary=Array<string>(count).fill('monk-unarmed'),astral=actions.some(action=>action.id==='astral-arms-unarmed-strike');const variants=astral?[{id:'astral',label:`${count} Astral Arm Unarmed Strikes`,sequence:Array<string>(count).fill('astral-arms-unarmed-strike')},{id:'mixed',label:'Mix ordinary and Astral Arm strikes',sequence:Array.from({length:count},(_,index)=>index%2===0?'monk-unarmed':'astral-arms-unarmed-strike')}]:undefined;actions.push({id:'monk-flurry-of-blows',name:'Flurry of Blows',type:'multiattack',cost:'bonus',sequence:ordinary,...(variants?{variants}:{}),resourceId:'focus-points',resourceCost:1,notes:`Spend 1 Focus Point to make ${count} Unarmed Strikes as a Bonus Action.${astral?' Choose ordinary or Astral Arm strikes.':''}`});}
+    if(canAttack){const count=monk>=10?3:2,ordinary=Array<string>(count).fill('monk-unarmed'),astralDamage=actions.some(action=>action.id==='astral-arms-unarmed-strike'),variants=astralDamage?[{id:'astral',label:`${count} Astral Arms Damage Strikes`,sequence:Array<string>(count).fill('astral-arms-unarmed-strike')},{id:'astral-grapple',label:`${count} Astral Arms Grapple attempts`,sequence:Array<string>(count).fill('astral-arms-unarmed-grapple')},{id:'astral-shove',label:`${count} Astral Arms Shove attempts`,sequence:Array<string>(count).fill('astral-arms-unarmed-shove')},{id:'mixed',label:'Mix ordinary and Astral Arms damage strikes',sequence:Array.from({length:count},(_,index)=>index%2===0?'monk-unarmed':'astral-arms-unarmed-strike')}]:undefined;actions.push({id:'monk-flurry-of-blows',name:'Flurry of Blows',type:'multiattack',cost:'bonus',sequence:ordinary,...(variants?{variants}:{}),resourceId:'focus-points',resourceCost:1,notes:`Spend 1 Focus Point to make ${count} Unarmed Strikes as a Bonus Action.${astralDamage?' Stable Astral Arms Damage, Grapple, and Shove sequences use the same component actions without per-strike use limits.':''}`});if(monk>=5)actions.push({id:'monk-stunning-strike',name:'Stunning Strike',type:'save',cost:'none',saveAbility:'con',dc:8+proficiencyBonus(character.totalLevel)+abilityMod(abilities.wis),range:'Creature just hit with a Monk weapon or Unarmed Strike',resourceId:'focus-points',resourceCost:1,oncePerTurnId:'stunning-strike',prerequisite:'Once per turn, immediately after you hit a creature with a Monk weapon or Unarmed Strike.',effectsOnFail:[{condition:'Stunned',duration:'Until the start of your next turn'}],notes:'On a successful save, the target’s Speed is halved until the start of your next turn, and the next attack roll made against it before then has Advantage.'});}
+    if(!uncannyMetabolismError(character,state))actions.push({id:'monk-uncanny-metabolism',name:'Uncanny Metabolism',type:'automatic',cost:'none',resourceId:'uncanny-metabolism',resourceCost:1,prerequisite:'Immediately after rolling Initiative, with at least one expended Focus Point.',notes:`Optional: regain all expended Focus Points and recover ${monkDie(monk)} + ${monk} Hit Points. Once used, unavailable until a Long Rest.`});
     actions.push({id:'monk-patient-defense',name:'Patient Defense',type:'automatic',cost:'bonus',choices:[{id:'free-disengage',label:'Disengage',resolution:'disengage',grants:['disengage'],notes:'Take the Disengage action as a Bonus Action without spending Focus.'},{id:'focused-defense',label:'Spend 1 Focus: Disengage + Dodge',resolution:'activate',resourceId:'focus-points',resourceCost:1,grants:['disengage','dodge'],notes:`Take both Disengage and Dodge as one Bonus Action.${monk>=10?' Heightened Focus also grants Temporary Hit Points equal to two Martial Arts dice.':''}`}],notes:'Choose the free Disengage option or spend 1 Focus Point for Disengage and Dodge.'});
     actions.push({id:'monk-step-of-the-wind',name:'Step of the Wind',type:'automatic',cost:'bonus',choices:[{id:'free-dash',label:'Dash',resolution:'dash',grants:['dash'],notes:'Take the Dash action as a Bonus Action without spending Focus.'},{id:'focused-step',label:'Spend 1 Focus: Dash + Disengage',resolution:'activate',resourceId:'focus-points',resourceCost:1,grants:['dash','disengage','double-jump',...(monk>=10?['carry-ally' as const]:[])],notes:`Take Dash and Disengage as one Bonus Action; double jump distance for this turn.${monk>=10?' You may move one willing Large-or-smaller creature within 5 feet with you; its movement does not provoke Opportunity Attacks.':''}`}],notes:'Choose the free Dash option or spend 1 Focus Point for the enhanced movement.'});
   }
@@ -385,17 +454,21 @@ export function extraAttackCount(character:Character){
   const ordinary=Math.max(classLevel(character,'Barbarian'),classLevel(character,'Monk'),classLevel(character,'Paladin'),classLevel(character,'Ranger'))>=5?2:1;
   return Math.max(ordinary,fighter>=20?4:fighter>=11?3:fighter>=5?2:1);
 }
-function belongsToAttackAction(action:CreatureAction){return action.cost==='action'&&((action.type==='attack'&&action.kind!=='spell')||(action.type==='save'&&(action.id==='unarmed-grapple'||action.id==='unarmed-shove')))}
+function belongsToAttackAction(action:CreatureAction){return action.cost==='action'&&((action.type==='attack'&&action.kind!=='spell')||(action.type==='save'&&['unarmed-grapple','unarmed-shove','astral-arms-unarmed-grapple','astral-arms-unarmed-shove'].includes(action.id)))}
 export function actionExecutionError(character:Character,state:GameState,action:CreatureAction,conditionImmunities:Iterable<string>=[]){
+  if(action.id==='monk-uncanny-metabolism'){const error=uncannyMetabolismError(character,state);if(error)return error;}
+  if(action.oncePerTurnId&&state.turn.oncePerTurn[action.oncePerTurnId])return `${action.name} can be used only once on a turn.`;
   if(action.resourceId&&!hasResource(state,action.resourceId,action.resourceCost??1))return `Needs ${action.resourceCost??1} ${resource(state,action.resourceId)?.name??action.resourceId}; ${resource(state,action.resourceId)?.current??0} remain.`;
   if(belongsToAttackAction(action)&&(state.turn.attackAction?.remaining??0)>0){const error=actionError(state,'action',conditionImmunities);return error==='Action already used this turn.'?null:error;}
   return actionError(state,action.cost,conditionImmunities);
 }
 export function spendActionExecution(character:Character,state:GameState,action:CreatureAction,conditionImmunities:Iterable<string>=[]):string|null{
   const error=actionExecutionError(character,state,action,conditionImmunities);if(error)return error;
-  if(belongsToAttackAction(action)&&state.turn.attackAction&&state.turn.attackAction.remaining>0){state.turn.attackAction.remaining--;if(action.resourceId)spendResource(state,action.resourceId,action.resourceCost??1);if(state.turn.attackAction.remaining===0)delete state.turn.attackAction;return null;}
+  if(action.id==='monk-uncanny-metabolism'){useUncannyMetabolism(character,state);return null;}
+  if(belongsToAttackAction(action)&&state.turn.attackAction&&state.turn.attackAction.remaining>0){state.turn.attackAction.remaining--;if(action.resourceId)spendResource(state,action.resourceId,action.resourceCost??1);if(action.oncePerTurnId)state.turn.oncePerTurn[action.oncePerTurnId]=true;if(state.turn.attackAction.remaining===0)delete state.turn.attackAction;return null;}
   const spendError=spendActionCost(state,action.cost,conditionImmunities);if(spendError)return spendError;
   if(action.resourceId)spendResource(state,action.resourceId,action.resourceCost??1);
+  if(action.oncePerTurnId)state.turn.oncePerTurn[action.oncePerTurnId]=true;
   if(belongsToAttackAction(action)){const total=extraAttackCount(character);if(total>1)state.turn.attackAction={remaining:total-1,total,source:total>2?'Fighter Extra Attack':'Extra Attack'};}
   return null;
 }
@@ -414,7 +487,14 @@ function duration(character:Character,option:TransformationOption){
 }
 function consumeSpellSlot(state:GameState,level:number){const slot=state.spellSlots[String(level)];if(!slot||slot.current<1)return false;slot.current--;return true}
 function consumeAvailableSpellSlot(character:Character,state:GameState,minimumLevel:number,requestedLevel?:number){const level=nextSpellSlot(character,state,minimumLevel,requestedLevel);return level===undefined?undefined:(consumeSpellSlot(state,level),level)}
-function removeOverlay(state:GameState,id:string){state.overlays=state.overlays.filter(value=>value!==id)}
+function consumeCastingOption(state:GameState,choice:SpellCastingOption){
+  if(choice.kind==='ordinary')return consumeSpellSlot(state,choice.level);
+  return Boolean(choice.resourceId&&spendResource(state,choice.resourceId));
+}
+function consumeAvailableCastingOption(character:Character,state:GameState,minimumLevel:number,requestedLevel?:number,resourceId?:string){
+  const choice=castingOption(character,state,minimumLevel,requestedLevel,resourceId);if(!choice||!consumeCastingOption(state,choice))return undefined;return choice;
+}
+function removeOverlay(state:GameState,id:string){state.overlays=state.overlays.filter(value=>value!==id);if(state.overlayTimings)delete state.overlayTimings[id]}
 function overlayId(option:TransformationOption){return option.grantId??option.id}
 function tempHpSourceName(option:TransformationOption){if(option.spellName)return option.spellName;if(option.profile==='animal-shapes')return 'Animal Shapes';return option.label}
 function clearActionRecharges(state:GameState){state.recharges={}}
@@ -425,7 +505,7 @@ function applyIncomingTempHp(state:GameState,option:TransformationOption,incomin
 }
 function overlayInSwitchGroup(character:Character,state:GameState,group:string){return state.overlays.find(id=>overlayOption(character,state,id)?.switchGroup===group)}
 
-export function startTransformation(character:Character,state:GameState,option:TransformationOption):TransitionResult{
+export function startTransformation(character:Character,state:GameState,option:TransformationOption,castingChoice?:Pick<SpellCastingOption,'level'|'resourceId'>):TransitionResult{
   if(!option.usable)return {state,message:option.reason??'That transformation is not currently usable.'};if(option.profile==='base')return endTransformation(state,true,character);
   if(option.profile==='overlay'){
     const id=overlayId(option);
@@ -436,13 +516,16 @@ export function startTransformation(character:Character,state:GameState,option:T
       return {state,message:`${option.label.replace(/^End /,'')} ended.`};
     }
     const error=actionError(state,option.actionCost,activeConditionImmunities(character,state));if(error)return {state,message:error};if(option.resourceId&&!hasResource(state,option.resourceId,option.resourceCost??1))return {state,message:`No ${resource(state,option.resourceId)?.name??option.resourceId} remain.`};
-    const existingGroup=option.switchGroup?overlayInSwitchGroup(character,state,option.switchGroup):undefined;const switchingSameSpell=Boolean(existingGroup&&option.switchGroup);
-    if(option.spellName&&!switchingSameSpell){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&state.turn.slotSpellCast)return {state,message:'2024 rule: a spell slot has already been expended to cast a spell on this turn.'};if(level>0&&!slotAvailable(state,character,level))return {state,message:`No level ${level} or higher spell slot remains.`};}
+    const existingGroup=option.switchGroup?overlayInSwitchGroup(character,state,option.switchGroup):undefined;const existingTiming=existingGroup?state.overlayTimings?.[existingGroup]:undefined;const switchingSameSpell=Boolean(existingGroup&&option.switchGroup);
+    if(option.spellName&&!switchingSameSpell){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&state.turn.slotSpellCast)return {state,message:'2024 rule: a spell slot has already been expended to cast a spell on this turn.'};if(level>0&&!castingOption(character,state,level,castingChoice?.level,castingChoice?.resourceId))return {state,message:castingChoice?.resourceId?'The selected Pact Magic slot is not available for this transformation spell.':`No level ${level} or higher spell slot remains.`};}
     if(option.concentration&&!switchingSameSpell&&state.rage.active)return {state,message:'Rage blocks Concentration.'};
     spendActionCost(state,option.actionCost,activeConditionImmunities(character,state));if(option.resourceId)spendResource(state,option.resourceId,option.resourceCost??1);
-    if(option.spellName&&!switchingSameSpell){const level=option.spellLevel??0;if(level>0){consumeAvailableSpellSlot(character,state,level);state.turn.slotSpellCast=true;}if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell'};}}
+    if(option.spellName&&!switchingSameSpell){const level=option.spellLevel??0;let castLevel=0;if(level>0){const choice=consumeAvailableCastingOption(character,state,level,castingChoice?.level,castingChoice?.resourceId);castLevel=choice?.level??0;state.turn.slotSpellCast=true;}if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell',...(castLevel?{castLevel}:{})};}}
     else if(option.concentration&&!switchingSameSpell){if(state.concentration)endConcentration(state,`${option.label} replaced the previous Concentration effect.`,character);state.concentration={name:option.label,source:option.source};}
     if(existingGroup)removeOverlay(state,existingGroup);if(!state.overlays.includes(id))state.overlays.push(id);
+    const timedTempHpSource=switchingSameSpell&&existingTiming?.tempHpSource?existingTiming.tempHpSource:option.effects?.temporaryHp?tempHpSourceName(option):undefined;
+    const timedConcentrationName=switchingSameSpell&&existingTiming?.concentrationName?existingTiming.concentrationName:option.concentration?option.spellName??option.label:undefined;
+    state.overlayTimings??={};state.overlayTimings[id]={startedTurn:switchingSameSpell&&existingTiming?existingTiming.startedTurn:state.turn.number,duration:switchingSameSpell&&existingTiming?existingTiming.duration:duration(character,option),label:option.label,...(timedTempHpSource?{tempHpSource:timedTempHpSource}:{}),...(timedConcentrationName?{concentrationName:timedConcentrationName}:{})};
     const incoming=incomingTempHp(character,option,false);const choice=applyIncomingTempHp(state,option,incoming);if(choice)return choice;
     return {state,message:`${option.label} ${switchingSameSpell?'changed':'activated'}${option.duration?` for ${option.duration}`:''}.`,...(option.effects?.activationActions?.length?{activationActions:option.effects.activationActions}:{})};
   }
@@ -451,16 +534,17 @@ export function startTransformation(character:Character,state:GameState,option:T
   const activeTransform=state.activeTransform;const active=activeTransform?.option;const switchingSameEffect=Boolean(active&&active.profile===option.profile&&((active.switchGroup&&active.switchGroup===option.switchGroup)||['wildshape','shapechange','animal-shapes'].includes(option.profile)));
   const switchingWildshape=active?.profile==='wildshape'&&option.profile==='wildshape';const switchingShapechange=active?.profile==='shapechange'&&option.profile==='shapechange';const switchingAnimalShapes=active?.profile==='animal-shapes'&&option.profile==='animal-shapes';
   const error=actionError(state,option.actionCost,activeConditionImmunities(character,state));if(error)return {state,message:error};if(option.profile==='wildshape'&&!hasResource(state,'wild-shape'))return {state,message:'No Wild Shape uses remaining.'};if(option.resourceId&&!hasResource(state,option.resourceId,option.resourceCost??1))return {state,message:`No ${resource(state,option.resourceId)?.name??option.resourceId} remain.`};
-  if(option.spellName&&!switchingSameEffect){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&state.turn.slotSpellCast)return {state,message:'2024 rule: a spell slot has already been expended to cast a spell on this turn.'};if(level>0&&!slotAvailable(state,character,level))return {state,message:`No level ${level} or higher spell slot remains.`};}
+  if(option.spellName&&!switchingSameEffect){if(state.rage.active)return {state,message:'Rage blocks spellcasting.'};const level=option.spellLevel??0;if(level>0&&state.turn.slotSpellCast)return {state,message:'2024 rule: a spell slot has already been expended to cast a spell on this turn.'};if(level>0&&!castingOption(character,state,level,castingChoice?.level,castingChoice?.resourceId))return {state,message:castingChoice?.resourceId?'The selected Pact Magic slot is not available for this transformation spell.':`No level ${level} or higher spell slot remains.`};}
   if(option.concentration&&!switchingSameEffect&&state.rage.active)return {state,message:'Rage blocks Concentration.'};
   spendActionCost(state,option.actionCost,activeConditionImmunities(character,state));if(option.profile==='wildshape')spendResource(state,'wild-shape');if(option.resourceId)spendResource(state,option.resourceId,option.resourceCost??1);
   const replacingDifferentEffect=Boolean(active&&!switchingSameEffect);const oldSource=active?tempHpSourceName(active):undefined;
   if(active&&(switchingWildshape||replacingDifferentEffect)&&activeTransform?.tempHpSource&&state.tempHpSource===oldSource){state.tempHp=0;delete state.tempHpSource;}
   if(activeTransform?.spellConcentration&&!switchingSameEffect&&state.concentration?.name===(activeTransform.option.spellName??activeTransform.option.label))endConcentration(state,`${activeTransform.option.label} was replaced by ${option.label}.`,character);
-  if(option.spellName&&!switchingSameEffect){const level=option.spellLevel??0;if(level>0){consumeAvailableSpellSlot(character,state,level);state.turn.slotSpellCast=true;}if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell'};}}
+  if(option.spellName&&!switchingSameEffect){const level=option.spellLevel??0;let castLevel=0;if(level>0){const choice=consumeAvailableCastingOption(character,state,level,castingChoice?.level,castingChoice?.resourceId);castLevel=choice?.level??0;state.turn.slotSpellCast=true;}if(option.concentration){if(state.concentration)endConcentration(state,`${option.spellName} replaced the previous Concentration effect.`,character);state.concentration={name:option.spellName,source:'Spell',...(castLevel?{castLevel}:{})};}}
   else if(option.concentration&&!switchingSameEffect){if(state.concentration)endConcentration(state,`${option.label} replaced the previous Concentration effect.`,character);state.concentration={name:option.label,source:option.source};}
   const incoming=incomingTempHp(character,option,switchingSameEffect);const retainsExistingTransformTemp=Boolean(switchingSameEffect&&activeTransform?.tempHpSource&&state.tempHpSource===tempHpSourceName(option));
-  clearActionRecharges(state);state.activeTransform={option,startedTurn:state.turn.number,duration:duration(character,option),tempHpSource:incoming>0||retainsExistingTransformTemp,...(option.concentration?{spellConcentration:true}:{})};
+  const retainsExistingDuration=Boolean(activeTransform&&(switchingShapechange||switchingAnimalShapes));
+  clearActionRecharges(state);state.activeTransform={option,startedTurn:retainsExistingDuration?activeTransform!.startedTurn:state.turn.number,duration:retainsExistingDuration?activeTransform!.duration:duration(character,option),tempHpSource:incoming>0||retainsExistingTransformTemp,...(option.concentration?{spellConcentration:true}:{})};
   const choice=applyIncomingTempHp(state,option,incoming);if(choice)return choice;
   const baseMessage=`${switchingWildshape?'Wild Shape changed to':switchingShapechange?'Shapechange shifted to':switchingAnimalShapes?'Animal Shapes changed to':switchingSameEffect?'Form changed to':'Transformed into'} ${option.label}.`;
   if(option.profile==='wildshape')return {state,message:`${baseMessage} A Bonus Action was spent; voluntarily ending Wild Shape also requires a Bonus Action.`};
@@ -510,9 +594,14 @@ export function rageStartError(character:Character,state:GameState){
   return null;
 }
 export function endRage(state:GameState,reason='Rage ended.'):TransitionResult{state.rage={active:false,startedAtTurn:0,endsAtTurn:0,usedThisTurn:false,recklessDeclared:false,extendedThisTurn:false};return {state,message:reason}}
+export function recklessAttackError(character:Character,state:GameState){
+  if(classLevel(character,'Barbarian')<2)return 'This character has no Reckless Attack feature.';
+  if(!retainedClassFeatures(activeOption(state)))return 'The current transformation does not retain Reckless Attack.';
+  if(state.turn.attackRollsMade>0)return 'The first attack-roll decision has passed this turn.';
+  return null;
+}
 export function declareRecklessAttack(character:Character,state:GameState):TransitionResult{
-  if(classLevel(character,'Barbarian')<2)return {state,message:'This character has no Reckless Attack feature.'};
-  if(state.turn.attackRollsMade>0)return {state,message:'Reckless Attack must be chosen before the first attack roll of the turn.'};
+  const error=recklessAttackError(character,state);if(error)return {state,message:error};
   state.rage.recklessDeclared=!state.rage.recklessDeclared;
   return {state,message:state.rage.recklessDeclared?'Reckless Attack declared for Strength attack rolls this turn.':'Reckless Attack canceled before the first attack roll.'};
 }
@@ -543,15 +632,20 @@ export function restoreDragonWings(character:Character,state:GameState):Transiti
   points.current-=3;wings.current=wings.max;return {state,message:'Spent 3 Sorcery Points to restore Dragon Wings.'};
 }
 
+export function actionSurgeError(character:Character,state:GameState){
+  if(classLevel(character,'Fighter')<2)return 'This character has no Action Surge.';
+  if(!retainedClassFeatures(activeOption(state)))return 'The current transformation does not retain Action Surge.';
+  if(state.turn.oncePerTurn['action-surge'])return 'Action Surge can be used only once on a turn.';
+  if(!hasResource(state,'action-surge'))return 'No Action Surge uses remain.';
+  return null;
+}
 export function useActionSurge(character:Character,state:GameState):TransitionResult{
-  if(classLevel(character,'Fighter')<2)return {state,message:'This character has no Action Surge.'};
-  if(!retainedClassFeatures(activeOption(state)))return {state,message:'The current transformation does not retain Action Surge.'};
-  if(state.turn.oncePerTurn['action-surge'])return {state,message:'Action Surge can be used only once on a turn.'};
-  if(!hasResource(state,'action-surge'))return {state,message:'No Action Surge uses remain.'};
+  const error=actionSurgeError(character,state);if(error)return {state,message:error};
   spendResource(state,'action-surge');state.turn.oncePerTurn['action-surge']=true;state.turn.surgeActionsRemaining++;
   return {state,message:'Action Surge added one action that cannot be used for the Magic action.'};
 }
 function restoreTurnBudget(state:GameState,advance=false){
+  delete state.pendingUncannyMetabolism;
   state.turn={number:state.turn.number+(advance?1:0),actionsRemaining:1,surgeActionsRemaining:0,bonusRemaining:1,reactionRemaining:1,slotSpellCast:false,attackRollsMade:0,oncePerTurn:{}};
   state.rage.usedThisTurn=false;state.rage.recklessDeclared=false;state.rage.extendedThisTurn=false;
 }
@@ -563,11 +657,33 @@ function expireTurnEffects(state:GameState){
   const expired:string[]=[];
   state.activeSpellEffects=state.activeSpellEffects.filter(effect=>{const turns=finiteDurationTurns(effect.duration);const ended=turns!==undefined&&effect.startedTurn!==undefined&&state.turn.number-effect.startedTurn>=turns;if(ended)expired.push(effect.name);return !ended;});
   state.receivedEffects=state.receivedEffects.filter(effect=>{const turns=finiteDurationTurns(effect.duration);const ended=turns!==undefined&&state.turn.number-effect.addedTurn>=turns;if(ended)expired.push(effect.name);return !ended;});
+  const active=state.activeTransform,activeTurns=active&&!active.permanentUntilDispelled?finiteDurationTurns(active.duration):undefined;
+  if(active&&activeTurns!==undefined&&state.turn.number-active.startedTurn>=activeTurns){const name=active.option.label;endTransformation(state,false);expired.push(name);}
+  for(const id of [...state.overlays]){
+    const timing=state.overlayTimings?.[id],turns=timing?finiteDurationTurns(timing.duration):undefined;
+    if(!timing||turns===undefined||state.turn.number-timing.startedTurn<turns)continue;
+    if(timing.tempHpSource&&state.tempHpSource===timing.tempHpSource){state.tempHp=0;delete state.tempHpSource;}
+    if(timing.concentrationName&&state.concentration?.name===timing.concentrationName){delete state.concentration;state.concentrationChecks=[];}
+    removeOverlay(state,id);expired.push(timing.label);
+  }
   if(state.concentration&&expired.includes(state.concentration.name))delete state.concentration;
   return [...new Set(expired)];
 }
 export function startCombat(state:GameState):TransitionResult{
-  restoreTurnBudget(state);state.turn.number=1;return {state,message:'Initiative rolled; combat turn counter reset to Turn 1.'};
+  restoreTurnBudget(state);state.turn.number=1;const focus=resource(state,'focus-points'),use=resource(state,'uncanny-metabolism');state.pendingUncannyMetabolism=Boolean(!state.life.dead&&!deadFromExhaustion(state)&&retainedClassFeatures(activeOption(state))&&focus&&focus.current<focus.max&&use&&use.current>0);
+  return {state,message:`Initiative rolled; combat turn counter reset to Turn 1.${state.pendingUncannyMetabolism?' Uncanny Metabolism is available as an optional recovery; it has not been spent automatically.':''}`};
+}
+export function uncannyMetabolismError(character:Character,state:GameState):string|null{
+  if(classLevel(character,'Monk')<2)return 'This character has no Uncanny Metabolism feature.';
+  if(!state.pendingUncannyMetabolism)return 'Uncanny Metabolism is available only when Initiative has just been rolled with expended Focus Points.';
+  if(state.life.dead||deadFromExhaustion(state))return 'A dead character cannot use Uncanny Metabolism.';if(!retainedClassFeatures(activeOption(state)))return 'The current transformation does not retain Uncanny Metabolism.';
+  const focus=resource(state,'focus-points');if(!focus)return 'The Focus Points resource is missing.';if(focus.current>=focus.max)return 'No Focus Points are expended.';
+  const use=resource(state,'uncanny-metabolism');if(!use||use.current<1)return 'Uncanny Metabolism has already been used since the last Long Rest.';return null;
+}
+export function useUncannyMetabolism(character:Character,state:GameState,random:()=>number=Math.random):TransitionResult{
+  const error=uncannyMetabolismError(character,state);if(error)return {state,message:error};const monk=classLevel(character,'Monk'),focus=resource(state,'focus-points')!,use=resource(state,'uncanny-metabolism')!,expended=focus.max-focus.current,die=monkDie(monk),rolled=rollDice(die,random).total,beforeHp=state.hp;
+  use.current--;focus.current=focus.max;heal(state,character,rolled+monk);delete state.pendingUncannyMetabolism;const message=`Used Uncanny Metabolism after Initiative: regained ${expended} Focus Point${expended===1?'':'s'} and ${state.hp-beforeHp} Hit Points (${die} rolled ${rolled} + Monk level ${monk}).`;
+  state.log.push(message);return {state,message};
 }
 export function startNewTurn(state:GameState,rechargeRoll=()=>rollDice('1d6').total):TransitionResult{
   restoreTurnBudget(state,true);
@@ -580,15 +696,24 @@ export function startNewTurn(state:GameState,rechargeRoll=()=>rollDice('1d6').to
   const expired=expireTurnEffects(state);
   return {state,message:`Turn ${state.turn.number} started.${expired.length?` ${expired.join(', ')} expired and were removed.`:''}${rechargeMessages.length?` ${rechargeMessages.join(' ')}`:''}`};
 }
+export function startOffTurnReactionWindow(state:GameState):TransitionResult{
+  state.turn.slotSpellCast=false;
+  return {state,message:'Off-turn Reaction window started. The spell-slot-per-turn limit is ready for this new turn; Action, Bonus Action, and Reaction availability are unchanged.'};
+}
 export function endTurn(character:Character,state:GameState):TransitionResult{
-  if(state.rage.active&&state.turn.number>=state.rage.startedAtTurn+100)return endRage(state,'Rage ended after its maximum duration of 10 minutes (100 rounds).');
-  if(state.rage.active&&classLevel(character,'Barbarian')<15&&state.turn.number>=state.rage.endsAtTurn)return endRage(state,'Rage ended because it was not extended.');
-  return {state,message:`Turn ${state.turn.number} ended.`};
+  let result:TransitionResult={state,message:`Turn ${state.turn.number} ended.`};
+  if(state.rage.active&&state.turn.number>=state.rage.startedAtTurn+100)result=endRage(state,'Rage ended after its maximum duration of 10 minutes (100 rounds).');
+  else if(state.rage.active&&classLevel(character,'Barbarian')<15&&state.turn.number>=state.rage.endsAtTurn)result=endRage(state,'Rage ended because it was not extended.');
+  startOffTurnReactionWindow(state);
+  return result;
 }
 export function addReceivedEffect(state:GameState,effect:ReceivedEffect):TransitionResult{
   const replaced=state.receivedEffects.find(active=>active.kind===effect.kind);
   state.receivedEffects=state.receivedEffects.filter(active=>active.kind!==effect.kind);
-  state.receivedEffects.push({...effect});
+  if(effect.kind==='guidance'){
+    const {skill:_legacyChosenSkill,...guidance}=effect;
+    state.receivedEffects.push({...guidance,autoChooseSkill:true});
+  }else state.receivedEffects.push({...effect});
   return {state,message:`${effect.name} added${effect.source?` from ${effect.source}`:''}.${replaced?' The previous instance was replaced; duplicate effects of the same name do not stack.':''}`};
 }
 export function endReceivedEffect(state:GameState,effectId:string):TransitionResult{
@@ -602,6 +727,8 @@ export function shortRest(state:GameState):TransitionResult{
   if(state.rage.active)endRage(state,'Rage ended during the Short Rest.');
   state.relentlessRageDc=10;delete state.pendingRelentlessRage;
   const expired=state.activeSpellEffects.filter(effect=>expiresDuringShortRest(effect.duration)).map(effect=>effect.name);state.activeSpellEffects=state.activeSpellEffects.filter(effect=>!expiresDuringShortRest(effect.duration));
+  const active=state.activeTransform;if(active&&!active.permanentUntilDispelled&&expiresDuringShortRest(active.duration)){endTransformation(state,false);expired.push(active.option.label);}
+  for(const id of [...state.overlays]){const timing=state.overlayTimings?.[id];if(!timing||!expiresDuringShortRest(timing.duration))continue;if(timing.tempHpSource&&state.tempHpSource===timing.tempHpSource){state.tempHp=0;delete state.tempHpSource;}if(timing.concentrationName&&state.concentration?.name===timing.concentrationName){delete state.concentration;state.concentrationChecks=[];}removeOverlay(state,id);expired.push(timing.label);}
   restoreTurnBudget(state);
   return {state,message:`Short Rest completed; eligible resources recovered and Rage ended if it was active.${expired.length?` ${expired.join(', ')} expired during the one-hour rest.`:''}`};
 }
@@ -617,6 +744,7 @@ export function longRest(character:Character,state:GameState):TransitionResult{
     else active.tempHpSource=false;
   }
   state.overlays=state.overlays.filter(id=>{const option=overlayOption(character,state,id);return Boolean(option&&!option.concentration&&durationPersistsThroughLongRest(option.duration));});
+  if(state.overlayTimings)for(const id of Object.keys(state.overlayTimings))if(!state.overlays.includes(id))delete state.overlayTimings[id];
   const endedSpellEffects=state.activeSpellEffects.filter(effect=>!durationPersistsThroughLongRest(effect.duration));state.activeSpellEffects=state.activeSpellEffects.filter(effect=>durationPersistsThroughLongRest(effect.duration));if(endedSpellEffects.length)notes.push(`${endedSpellEffects.map(effect=>effect.name).join(', ')} ended during the rest.`);
   for(const r of Object.values(state.resources))if(r.recovery!=='manual')r.current=r.max;
   for(const slot of Object.values(state.spellSlots))slot.current=slot.max;
@@ -649,18 +777,28 @@ export function endConcentration(state:GameState,reason='Concentration ended.',c
   return {state,message:name?`${name} ended. ${reason}`:reason};
 }
 
+export function secondWindError(character:Character,state:GameState){
+  if(classLevel(character,'Fighter')<1)return 'This character has no Second Wind.';
+  if(!retainedClassFeatures(activeOption(state)))return 'The current transformation does not retain Second Wind.';
+  const error=actionError(state,'bonus',activeConditionImmunities(character,state));if(error)return error;
+  if(!hasResource(state,'second-wind'))return 'No Second Wind uses remain.';
+  return null;
+}
 export function useSecondWind(character:Character,state:GameState,roll:number):TransitionResult{
-  const level=classLevel(character,'Fighter');if(level<1)return {state,message:'This character has no Second Wind.'};
-  if(!retainedClassFeatures(activeOption(state)))return {state,message:'The current transformation does not retain Second Wind.'};
-  const immunities=activeConditionImmunities(character,state);const error=actionError(state,'bonus',immunities);if(error)return {state,message:error};if(!hasResource(state,'second-wind'))return {state,message:'No Second Wind uses remain.'};
+  const level=classLevel(character,'Fighter');const error=secondWindError(character,state);if(error)return {state,message:error};
+  const immunities=activeConditionImmunities(character,state);
   spendActionCost(state,'bonus',immunities);spendResource(state,'second-wind');const amount=boundedWhole(roll,1,1,10)+level;const before=state.hp;state.hp=Math.min(character.hp.max,state.hp+amount);
   return {state,message:`Second Wind restored ${state.hp-before} Hit Points.`};
 }
+export function layOnHandsError(character:Character,state:GameState,amount=1){
+  if(classLevel(character,'Paladin')<1)return 'This character has no Lay On Hands.';
+  if(!retainedClassFeatures(activeOption(state)))return 'The current transformation does not retain Lay On Hands.';
+  const spend=boundedWhole(amount,1,1);const pool=resource(state,'lay-on-hands');if(!pool||pool.current<spend)return 'The Lay On Hands pool is too low.';
+  return actionError(state,'bonus',activeConditionImmunities(character,state));
+}
 export function useLayOnHands(character:Character,state:GameState,amount:number):TransitionResult{
-  if(classLevel(character,'Paladin')<1)return {state,message:'This character has no Lay On Hands.'};
-  if(!retainedClassFeatures(activeOption(state)))return {state,message:'The current transformation does not retain Lay On Hands.'};
-  const spend=boundedWhole(amount,1,1);const pool=resource(state,'lay-on-hands');if(!pool||pool.current<spend)return {state,message:'The Lay On Hands pool is too low.'};
-  const immunities=activeConditionImmunities(character,state);const error=actionError(state,'bonus',immunities);if(error)return {state,message:error};spendActionCost(state,'bonus',immunities);spendResource(state,'lay-on-hands',spend);const before=state.hp;state.hp=Math.min(character.hp.max,state.hp+spend);
+  const spend=boundedWhole(amount,1,1);const error=layOnHandsError(character,state,spend);if(error)return {state,message:error};
+  const immunities=activeConditionImmunities(character,state);spendActionCost(state,'bonus',immunities);spendResource(state,'lay-on-hands',spend);const before=state.hp;state.hp=Math.min(character.hp.max,state.hp+spend);
   return {state,message:`Lay On Hands restored ${state.hp-before} Hit Points and spent ${spend} points.`};
 }
 export function wildResurgenceError(character:Character,state:GameState,mode:'slot-to-shape'|'shape-to-slot'):string|null{
@@ -724,7 +862,7 @@ export function removeCondition(state:GameState,condition:string):TransitionResu
 export function clearConditions(state:GameState):TransitionResult{state.conditions=[];state.exhaustionLevel=0;return {state,message:'Conditions cleared.'}}
 export function concentrationSaveMode(character:Character,state:GameState){
   const advantage:string[]=[];const disadvantage:string[]=[];
-  if(character.features.some(f=>f.id==='eldritch-mind'))advantage.push('Eldritch Mind');
+  if(selectedInvocation(character,'Eldritch Mind'))advantage.push('Eldritch Mind');
   if(character.feats.some(f=>f.toLowerCase()==='war caster'))advantage.push('War Caster');
   return resolveAdvantage({advantage,disadvantage});
 }
@@ -735,21 +873,21 @@ export function resolveConcentrationCheck(state:GameState,total:number,character
   return {state,message:`Concentration failed with ${resolvedTotal} against DC ${pending.dc}; ${name} ended.`};
 }
 
-export function castSpell(character:Character,state:GameState,spellName:string,castLevel?:number):TransitionResult{
+export function castSpell(character:Character,state:GameState,spellName:string,castLevel?:number,castingResourceId?:string):TransitionResult{
   const sheet=resolveSheet(character,state);
   const spell=sheet.spells.find(s=>s.name===spellName);
   if(!spell)return {state,message:'Spell not found on the imported character sheet.'};
   if(!spell.available)return {state,message:spell.reason};
   const immunities=activeConditionImmunities(character,state);const error=actionError(state,spell.castingTime,immunities);if(error)return {state,message:error};
-  const minimumLevel=spell.slotLevel??spell.level;let usedLevel=0;const useFreeCast=minimumLevel>0&&freeSpellCastReady(state,spell);
+  const minimumLevel=spell.slotLevel??spell.level;let usedLevel=0;let usedCastingOption:SpellCastingOption|undefined;const useFreeCast=minimumLevel>0&&freeSpellCastReady(state,spell);
   if(minimumLevel>0&&!useFreeCast&&state.turn.slotSpellCast)return {state,message:'2024 rule: a spell slot has already been expended to cast a spell on this turn. You may still cast a cantrip if its action cost is available.'};
-  if(minimumLevel>0&&!useFreeCast){const requested=castLevel??nextSpellSlot(character,state,minimumLevel);if(requested===undefined||requested<minimumLevel)return {state,message:`No level ${minimumLevel} or higher spell slot remains.`};if(!availableSpellSlotLevels(character,state,minimumLevel).includes(requested))return {state,message:`A level ${requested} spell slot is not available.`};usedLevel=requested;}
-  spendActionCost(state,spell.castingTime,immunities);if(useFreeCast&&spell.freeCastResourceId)spendResource(state,spell.freeCastResourceId,spell.freeCastResourceCost??1);if(usedLevel>0){consumeSpellSlot(state,usedLevel);state.turn.slotSpellCast=true;}
+  if(minimumLevel>0&&!useFreeCast){usedCastingOption=castingOption(character,state,minimumLevel,castLevel,castingResourceId);if(!usedCastingOption){if(castingResourceId)return {state,message:`The selected Pact Magic slot is not available at level ${castLevel??minimumLevel}.`};if(castLevel!==undefined)return {state,message:`A level ${castLevel} spell slot is not available.`};return {state,message:`No level ${minimumLevel} or higher spell slot remains.`};}usedLevel=usedCastingOption.level;}
+  spendActionCost(state,spell.castingTime,immunities);if(useFreeCast&&spell.freeCastResourceId)spendResource(state,spell.freeCastResourceId,spell.freeCastResourceCost??1);if(usedCastingOption){consumeCastingOption(state,usedCastingOption);state.turn.slotSpellCast=true;}
   if((spell.components??'').toUpperCase().includes('V'))state.conditions=state.conditions.filter(condition=>condition!=='Hidden');
   if(spell.concentration){if(state.concentration)endConcentration(state,'A new Concentration spell was cast.',character);state.concentration={name:spell.name,source:spell.sourceClass,...(usedLevel?{castLevel:usedLevel}:{})};}
   const activeEffect=spellActiveEffect(spell);if(activeEffect){state.activeSpellEffects=state.activeSpellEffects.filter(effect=>effect.id!==activeEffect.id);state.activeSpellEffects.push({...activeEffect,name:spell.name,source:spell.sourceClass,startedTurn:state.turn.number,...(usedLevel?{castLevel:usedLevel}:{})});}
   const timing=spell.castingTime==='bonus'?` Bonus Action spent; your Action remains available.${normalized(spell.name)==='barkskin'?' Wild Shape and Rage also require a Bonus Action, so they must wait until a later turn.':''}`:'';
-  return {state,message:`Cast ${spell.name}${useFreeCast?' using its free cast':usedLevel>0?` using a level ${usedLevel} slot`:''}.${timing}`};
+  return {state,message:`Cast ${spell.name}${useFreeCast?' using its free cast':usedCastingOption?.kind==='pact-magic'?` using Pact Magic at level ${usedLevel}`:usedLevel>0?` using a level ${usedLevel} slot`:''}.${timing}`};
 }
 export function endSpellEffect(state:GameState,effectId:string):TransitionResult{
   const active=state.activeSpellEffects.find(effect=>effect.id===effectId);if(!active)return {state,message:'That spell effect is not active.'};
@@ -762,7 +900,7 @@ export function resolveAdvantage(sources:{advantage:string[];disadvantage:string
 }
 export function attackRollSources(character:Character,state:GameState,action:CreatureAction,sheet?:ResolvedSheet){
   const advantage:string[]=[],disadvantage:string[]=[],conditional:string[]=[];const immunities=new Set((sheet?.conditionImmunities??[]).map(value=>normalized(value)));const active=(condition:string)=>conditionApplies(state,condition,immunities);
-  if(action.type==='attack'&&state.rage.recklessDeclared&&classLevel(character,'Barbarian')>=2&&action.ability==='str')advantage.push('Reckless Attack');
+  if(action.type==='attack'&&state.rage.recklessDeclared&&retainedClassFeatures(activeOption(state))&&classLevel(character,'Barbarian')>=2&&action.ability==='str')advantage.push('Reckless Attack');
   if(active('Invisible'))advantage.push('Invisible');
   if(active('Hidden'))advantage.push('Hidden');
   if(active('Restrained'))disadvantage.push('Restrained');
@@ -795,7 +933,7 @@ export function attackBonuses(character:Character,state:GameState,sheet:Resolved
   if(state.rage.active&&retainedClassFeatures(activeOption(state))&&classLevel(character,'Barbarian')>=1&&action.ability==='str'&&(action.kind==='weapon'||unarmed))packets.push({expression:String(rageDamage(classLevel(character,'Barbarian'))),type:action.damage[0]?.type??'Bludgeoning',label:'Rage Damage'});
   const hasPrimalStrike=character.features.some(feature=>feature.id==='primal-strike');
   if(sheet.profile==='wildshape'&&hasPrimalStrike&&classLevel(character,'Druid')>=7&&!state.turn.oncePerTurn['primal-strike']&&(action.kind==='beast'||action.kind==='weapon')){
-    for(const type of ['Cold','Fire','Lightning','Thunder'] as DamageType[])packets.push({expression:classLevel(character,'Druid')>=15?'2d8':'1d8',type,label:`Optional Primal Strike — ${type}`});
+    for(const type of ['Cold','Fire','Lightning','Thunder'] as DamageType[])packets.push({expression:classLevel(character,'Druid')>=15?'2d8':'1d8',type,label:`Optional Primal Strike — ${type}`,choiceGroup:'primal-strike'});
   }
   if(sheet.profile==='wildshape'&&sameText(subclass(character,'Druid'),'Circle of the Moon')&&classLevel(character,'Druid')>=14&&!state.turn.oncePerTurn['lunar-form']&&action.kind==='beast')packets.push({expression:'2d10',type:'Radiant',label:'Optional Lunar Form'});
   if(sameText(state.concentration?.name,'Fount of Moonlight')&&action.range===undefined&&['beast','weapon','unarmed'].includes(action.kind))packets.push({expression:'2d6',type:'Radiant',label:'Fount of Moonlight'});
@@ -805,6 +943,14 @@ export function attackBonuses(character:Character,state:GameState,sheet:Resolved
     packets.push({expression:modifier.mode==='subtract'?`-${modifier.expression}`:modifier.expression,type:action.damage[0]?.type??'Bludgeoning',label:modifier.mode==='subtract'?'Reduce damage (minimum 1)':'Enlarge damage',doubleOnCritical:modifier.mode!=='subtract'});
   }
   return packets;
+}
+export function selectedOptionalDamagePackets(packets:DamagePacket[],selectedLabels:Iterable<string>){
+  const selected=new Set(selectedLabels),usedGroups=new Set<string>();return packets.filter(packet=>{
+    if(!packet.label||!selected.has(packet.label))return false;
+    if(!packet.choiceGroup)return true;
+    if(usedGroups.has(packet.choiceGroup))return false;
+    usedGroups.add(packet.choiceGroup);return true;
+  });
 }
 export function markOncePerTurn(state:GameState,id:string){state.turn.oncePerTurn[id]=true}
 

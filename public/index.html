@@ -26,11 +26,16 @@
         <button id="refresh-character" class="button primary" type="button">Refresh Character</button>
         <button id="open-help" class="button secondary" type="button">Help</button>
         <button id="open-import-center" class="button secondary" type="button" aria-label="Import character and private content">Import</button>
-        <button id="export-character" class="button secondary" type="button">Export</button>
+        <button id="export-character" class="button secondary" type="button">Export Character</button>
         <button id="open-settings" class="button secondary" type="button">Settings</button>
         <a id="account-signout" class="button secondary account-signout" href="/signout-with-chatgpt?return_to=%2F" hidden>Sign out</a>
       </div>
     </header>
+
+    <aside id="storage-warning" class="storage-warning" role="alert" hidden>
+      <div><strong>Not saved on this device</strong><span id="storage-warning-copy">Export your character now so your work is recoverable.</span></div>
+      <button id="storage-warning-export" class="button primary compact" type="button">Export Character JSON</button>
+    </aside>
 
     <section class="character-strip panel">
       <div>
@@ -87,6 +92,7 @@
           <div class="section-title"><h2 id="play-actions-title">Choose what to do</h2><span>Focused tools</span></div>
           <div class="task-launcher-grid">
             <button id="open-actions-view" class="task-launcher" type="button" data-open-tab="actions"><strong>Actions</strong><span>Attacks and form actions</span></button>
+            <button id="open-reactions-view" class="task-launcher" type="button" data-open-tab="reactions"><strong>Reactions</strong><span>Triggers and opportunity attacks</span></button>
             <button id="open-spells-view" class="task-launcher" type="button" data-open-tab="spells"><strong>Spells</strong><span>Cast and resolve effects</span></button>
             <button id="open-rolls-view" class="task-launcher" type="button" data-open-tab="rolls"><strong>Checks</strong><span>Saves, skills, initiative</span></button>
             <button id="open-features-view" class="task-launcher" type="button" data-open-tab="features"><strong>Abilities</strong><span id="play-resource-summary">Features and resources</span></button>
@@ -159,6 +165,20 @@
 
       <section id="workspace-task" class="workspace-view task-view panel" data-workspace-view="task" aria-labelledby="task-view-title" tabindex="0" hidden>
         <div class="workspace-heading"><div><span>Focused tool</span><h2 id="task-view-title" tabindex="-1">Actions</h2></div><button id="close-task-view" class="text-button" type="button">Back to Play</button></div>
+        <section id="character-snapshot" class="character-snapshot" aria-labelledby="character-snapshot-title" hidden>
+          <div class="character-snapshot-heading"><div><h3 id="character-snapshot-title">Current abilities</h3><small id="character-snapshot-context">Base character scores</small></div></div>
+          <div id="character-ability-scores" class="character-ability-scores" aria-label="Current ability scores"></div>
+          <div><strong class="character-passive-title">Passive mental scores</strong><div id="character-passive-scores" class="character-passive-scores" aria-label="Passive Perception, Investigation, and Insight"></div></div>
+          <details id="import-coverage" class="import-coverage">
+            <summary><span><strong>Import coverage</strong><small id="import-coverage-summary">Checking imported capabilities</small></span></summary>
+            <div class="import-coverage-content">
+              <div id="import-coverage-list" class="import-coverage-list" aria-live="polite"></div>
+              <p class="source-note">Character PDFs and owned-rule PDFs are private reference sources. Uploading one does not automatically unlock or invent executable mechanics.</p>
+              <p id="import-summons-note" class="import-summons-note" hidden>Imported familiars, companions, and summons are preserved as references, but their separate AC, HP, statistics, and initiative are not yet automated.</p>
+              <button id="coverage-open-import" class="button secondary compact" type="button">Review Import / Private Content</button>
+            </div>
+          </details>
+        </section>
         <section id="task-abilities" class="task-abilities" hidden>
           <section id="ability-use-now" class="ability-control-group" aria-labelledby="ability-actions-title" hidden>
             <div class="ability-group-heading"><h3 id="ability-actions-title">Use now</h3><span>Tap an available ability</span></div>
@@ -166,12 +186,13 @@
           </section>
           <details class="ability-resource-details">
             <summary><span><strong id="ability-resources-title">Resources left</strong><small id="ability-resource-summary">Open current counts</small></span></summary>
-            <div id="resource-strip" class="resource-strip"></div>
+            <div id="resource-strip" class="resource-strip" aria-live="polite"></div>
           </details>
         </section>
         <details id="active-effects" class="active-effects" aria-live="polite" hidden></details>
         <nav class="tabs" role="tablist" aria-label="Character sheet sections">
           <button id="tab-actions" class="tab active" data-tab="actions" type="button" role="tab" aria-selected="true" aria-controls="tab-content" tabindex="0">Actions</button>
+          <button id="tab-reactions" class="tab" data-tab="reactions" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Reactions</button>
           <button id="tab-rolls" class="tab" data-tab="rolls" type="button" role="tab" aria-selected="false" aria-controls="tab-content" aria-label="Checks: saves, skills, and initiative" tabindex="-1">Checks</button>
           <button id="tab-spells" class="tab" data-tab="spells" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Spells</button>
           <button id="tab-features" class="tab" data-tab="features" type="button" role="tab" aria-selected="false" aria-controls="tab-content" tabindex="-1">Abilities</button>
@@ -286,11 +307,13 @@
     </nav>
   </div>
 
-  <output id="roll-toast" class="roll-toast" role="status" aria-live="polite" aria-atomic="true" hidden>
+  <output id="roll-toast" class="roll-toast" role="status" aria-live="polite" aria-atomic="true" aria-label="Roll result. Tap or press Escape to dismiss." tabindex="0" hidden>
     <span class="roll-toast-kicker">Roll result</span>
     <strong id="roll-toast-title" class="roll-toast-title">Ready</strong>
     <b id="roll-toast-total" class="roll-toast-total">&mdash;</b>
     <span id="roll-toast-detail" class="roll-toast-detail"></span>
+    <span id="roll-toast-inspiration" class="roll-toast-inspiration" aria-live="polite" hidden></span>
+    <button id="roll-toast-dismiss" class="roll-toast-dismiss" type="button" aria-label="Dismiss roll result">Dismiss</button>
   </output>
 
   <section id="walkthrough" class="walkthrough" role="dialog" aria-modal="false" aria-labelledby="walkthrough-title" hidden>
@@ -362,7 +385,7 @@
         </details>
         <details class="help-topic" data-help-keywords="importing characters dnd beyond public json private content">
           <summary><span aria-hidden="true">⇩</span> Importing characters</summary>
-          <p>Open <strong>Import & Content</strong>. For D&amp;D Beyond, temporarily make the character Public, paste its link or ID, and review the result. If <strong>Needs Setup</strong> appears, use your authorized character page to enter only short playable mechanics; they remain private on this device and reapply automatically.</p>
+          <p>Open <strong>Import &amp; Content</strong> and choose one clearly labeled method. For D&amp;D Beyond, temporarily make the character Public, paste its link or ID, and review the result. If <strong>Needs Setup</strong> appears, use your authorized source to enter only short playable mechanics; those reviewed packs remain private on this device.</p>
         </details>
         <details class="help-topic" data-help-keywords="browsing forms search filters available locked">
           <summary><span aria-hidden="true">⌕</span> Browsing forms, search, and filters</summary>
@@ -402,7 +425,7 @@
         </details>
         <details class="help-topic" data-help-keywords="faq save offline paid content phone delete reset">
           <summary><span aria-hidden="true">?</span> FAQ</summary>
-          <p><strong>Does it save?</strong> Characters and validated JSON rules packs stay on the device; owned PDFs are private to your Altered login across devices. <strong>Does it work offline?</strong> The installed PWA keeps its validated built-in rules. <strong>How do PDFs affect a sheet?</strong> Altered cross-references readable feature names with the linked character’s current class, subclass, species, and level, then asks you to confirm the short mechanic before applying it. <strong>Can I use a phone?</strong> Yes; use the hosted link from any current phone browser.</p>
+          <p><strong>What syncs?</strong> Owned source PDFs are private to your Altered login across devices; characters, reviewed JSON packs, artwork, settings, and combat state currently stay on each device. <strong>Does it work offline?</strong> The hosted app requires a connection and sign-in; the portable desktop package can run locally. <strong>How do PDFs affect a sheet?</strong> A character PDF creates a reviewed basic sheet. An owned rulebook PDF can add matching private reference reminders, but does not silently unlock executable rules. <strong>Can I use a phone?</strong> Yes; use the hosted link from any current phone browser.</p>
         </details>
         <details class="help-topic" data-help-keywords="about version privacy legal rules 2024">
           <summary><span aria-hidden="true">A</span> About</summary>
@@ -430,8 +453,8 @@
         <div class="inline-actions"><button id="resume-private-setup" class="button primary compact" type="button">Resume Setup</button><button id="start-new-import" class="button secondary compact" type="button">Start Different Import</button></div>
       </section>
       <div class="import-grid">
-        <section class="import-block ddb-import-block">
-          <h3>D&amp;D Beyond character</h3>
+        <details id="import-method-ddb" class="import-block ddb-import-block" open>
+          <summary><span><strong>D&amp;D Beyond character</strong><small>Recommended · most complete</small></span></summary>
           <p>Temporarily make the character Public, paste its link or ID, and review the structured import before Altered changes your sheet.</p>
           <label for="dndbeyond-source">Public character link or ID</label>
           <div class="ddb-source-row">
@@ -455,20 +478,20 @@
               <button id="download-dndbeyond-json" class="button secondary" type="button">Download Altered JSON</button>
             </div>
           </section>
-        </section>
-        <section class="import-block">
-          <h3>Altered backup</h3>
-          <p>Import an Altered character JSON file. Altered validates it and shows a review before anything changes.</p>
+        </details>
+        <details id="import-method-json" class="import-block">
+          <summary><span><strong>Altered character JSON</strong><small>Move one reviewed character</small></span></summary>
+          <p>Import an Altered character JSON file. Altered validates it and shows a review before anything changes. Combat state, settings, artwork, and private packs are not included.</p>
           <label class="button primary file-button">Import Character JSON<input id="import-file" type="file" accept="application/json,.json"></label>
           <p class="source-note">Use this for a reviewed Altered export or a hand-authored character file. Every import is validated before it can replace the current sheet.</p>
           <section id="json-import-review" class="import-review" hidden aria-live="polite">
             <h4>JSON review</h4><p id="json-import-summary"></p><div id="json-import-warnings" class="review-warnings"></div>
             <div class="inline-actions"><button id="confirm-json-import" class="button primary" type="button">Confirm JSON Import</button><button id="cancel-json-import" class="button secondary" type="button">Cancel</button></div>
           </section>
-        </section>
-        <section class="import-block pdf-import-block">
-          <h3>Character PDF or scan</h3>
-          <p>Choose any character-sheet PDF. Altered reads embedded text first; scanned pages can use on-device OCR. You review every detected value before import.</p>
+        </details>
+        <details id="import-method-character-pdf" class="import-block pdf-import-block">
+          <summary><span><strong>Basic character from PDF</strong><small>Identity and core totals · review required</small></span></summary>
+          <p>Choose a character-sheet PDF. Altered reads embedded text first; scanned pages can use on-device OCR. This creates a basic sheet from identity, class, abilities, HP, AC, and Speed—not a complete spell, item, feature, or form import.</p>
           <label class="button primary file-button">Choose Character PDF<input id="pdf-character-file" type="file" accept="application/pdf,.pdf"></label>
           <p class="source-note">The PDF and rendered pages stay on this device. OCR downloads its English recognition model on first use.</p>
           <div id="pdf-import-progress" class="import-progress" role="status" aria-live="polite"></div>
@@ -487,10 +510,10 @@
             <div id="pdf-import-warnings" class="review-warnings"></div>
             <div class="inline-actions"><button id="confirm-pdf-import" class="button primary" type="button">Import Reviewed Character</button><button id="run-pdf-ocr" class="button secondary" type="button">Scan Pages with OCR</button><button id="cancel-pdf-import" class="button secondary" type="button">Cancel</button></div>
           </section>
-        </section>
-        <section class="import-block">
-          <h3>Add owned game content</h3>
-          <p><strong>Choose by file type:</strong> JSON installs already-structured rules. PDF stores your owned document, reads matching character features, and guides you through a short review before applying mechanics.</p>
+        </details>
+        <details id="import-method-owned" class="import-block">
+          <summary><span><strong>Add owned game content</strong><small>Private PDF sources or structured JSON</small></span></summary>
+          <p><strong>Choose by file type:</strong> JSON installs already-structured rules. A PDF is stored privately and can add matching reference reminders; executable mechanics still require structured or manual confirmation.</p>
           <label class="button primary file-button">Install JSON Rules Pack<input id="owned-pack-file" type="file" accept="application/json,.json"></label>
           <p class="source-note"><strong>JSON only:</strong> validated Altered rules packs up to 2 MB. For any PDF, use the clearly labeled PDF control below.</p>
           <div class="inline-actions import-actions">
@@ -499,7 +522,7 @@
           </div>
           <section class="private-pdf-library" aria-labelledby="private-pdf-library-title">
             <div class="section-title"><h4 id="private-pdf-library-title">Owned PDF — read &amp; apply</h4><span id="private-pdf-count"></span></div>
-            <p><strong>1.</strong> Upload your owned PDF up to 500 MB. <strong>2.</strong> Press <strong>Scan for this character</strong>. Altered finds only content matching the selected character’s class, subclass, species, level, feats, spells, and equipped items. <strong>3.</strong> Review the short match list and add it.</p>
+            <p><strong>1.</strong> Upload your owned PDF up to 500 MB. <strong>2.</strong> Press <strong>Scan for this character</strong>. Altered finds only names already present on the selected character. <strong>3.</strong> Review and add private reference reminders. Only the original PDF syncs across your signed-in devices; reviewed packs remain on this device.</p>
             <label class="button primary file-button">Upload Owned PDF<input id="private-pdf-file" type="file" accept="application/pdf,.pdf"></label>
             <progress id="private-pdf-progress" max="100" value="0" hidden aria-label="Private PDF upload progress"></progress>
             <div id="private-pdf-status" class="status" role="status" aria-live="polite"></div>
@@ -507,16 +530,16 @@
           </section>
           <details class="chatgpt-assist">
             <summary><span><strong>ChatGPT help when needed</strong><small>Optional · proposals are reviewed before use</small></span></summary>
-            <p>If Altered cannot confidently structure a rule, copy a character-scoped request and paste it into ChatGPT with the relevant source you own. ChatGPT proposes concise mechanics; Altered validates the returned JSON before anything is added.</p>
+            <p>If Altered cannot confidently structure a rule, copy a character-scoped request and paste it into ChatGPT with the relevant source you own. ChatGPT can propose concise mechanics; Altered validates the JSON structure and requires your review before anything is added.</p>
             <div class="inline-actions import-actions">
               <button id="copy-chatgpt-request" class="button secondary" type="button">Copy Request for ChatGPT</button>
               <a class="button secondary" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer">Open ChatGPT</a>
               <label class="button primary file-button">Review ChatGPT Proposal<input id="assistant-proposal-file" type="file" accept="application/json,.json"></label>
             </div>
-            <p class="source-note">Share only the source or excerpt you choose. ChatGPT cannot change Altered directly. Proposals may include applicable abilities, spells, items, forms, and enhancements for the selected character and level.</p>
+            <p class="source-note">Share only the source or excerpt you choose. ChatGPT cannot change Altered directly. Source links in a proposal are declared, not independently fetched or fact-checked by Altered; you remain the final reviewer.</p>
             <div id="assistant-proposal-status" class="status" role="status" aria-live="polite"></div>
           </details>
-        </section>
+        </details>
       </div>
       <section class="installed-packs-section">
         <div class="section-title"><h3>Installed private packs</h3><span id="installed-pack-count"></span></div>

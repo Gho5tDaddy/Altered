@@ -2,6 +2,14 @@ import {mkdir,readFile,readdir,copyFile,writeFile,rm,cp} from 'node:fs/promises'
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {build as esbuild} from 'esbuild';
+import {
+  androidReleaseArtifact,
+  appVersion,
+  deploymentLimits,
+  publicReleaseDirectory,
+  releaseArtifacts,
+  staticReleaseArtifacts,
+} from './release-config.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const build=path.join(root,'build');
@@ -11,7 +19,7 @@ await mkdir(path.join(dist,'.openai'),{recursive:true});
 await copyFile(path.join(root,'.openai','hosting.json'),path.join(dist,'.openai','hosting.json'));
 
 const publicNames=await readdir(path.join(root,'public'));
-for(const name of publicNames)await cp(path.join(root,'public',name),path.join(dist,name),{recursive:true});
+for(const name of publicNames)if(name!=='downloads')await cp(path.join(root,'public',name),path.join(dist,name),{recursive:true});
 await mkdir(path.join(dist,'tests'),{recursive:true});
 await mkdir(path.join(dist,'src'),{recursive:true});
 for(const name of await readdir(path.join(build,'tests')))if(name.endsWith('.js'))await copyFile(path.join(build,'tests',name),path.join(dist,'tests',name));
@@ -70,17 +78,21 @@ const toolAssets=Object.fromEntries(await Promise.all(['pdf.bundle.js','pdf.work
   `/${name}`,
   {type:'text/javascript; charset=utf-8',data:(await readFile(path.join(dist,name))).toString('base64')},
 ])));
-const downloadAssets=Object.fromEntries(await Promise.all([
-  ['Altered-Desktop-Mac-v0.29.32.zip','application/zip'],
-  ['Altered-Windows-Setup-v0.29.32.exe','application/octet-stream'],
-].map(async([name,type])=>[
-  `/downloads/${name}`,
-  {name,type,data:(await readFile(path.join(root,'public','downloads',name))).toString('base64')},
-])));
-// Android is distributed through the public GitHub release. Reading it here
-// keeps the local release audit strict without embedding a 6.5 MB APK in the
-// Worker bundle, which would exceed the hosting platform's script-size limit.
-await readFile(path.join(root,'public','downloads','Altered-Android-v0.29.32.apk'));
+// Keep historical installers in the release archive, not in the deployment.
+// A normal development build may run before the current installers are made;
+// release:verify becomes strict after packaging and requires all three files.
+const stagedDownloadDirectory=path.join(dist,'downloads');
+await mkdir(stagedDownloadDirectory,{recursive:true});
+const stagedArtifacts=[];
+for(const artifact of releaseArtifacts){
+  try{
+    await copyFile(path.join(publicReleaseDirectory,artifact.fileName),path.join(stagedDownloadDirectory,artifact.fileName));
+    stagedArtifacts.push(artifact.fileName);
+  }catch(error){
+    if(!(error&&typeof error==='object'&&'code' in error&&error.code==='ENOENT'))throw error;
+    console.warn(`Release artifact not staged yet: ${artifact.fileName}`);
+  }
+}
 const workerTemplate=await readFile(path.join(root,'scripts','hosted-worker.template.js'),'utf8');
 const hostedWorker=workerTemplate
   .replace('__ALTERED_PAGE_BASE64__',()=>JSON.stringify(hostedPage))
@@ -89,7 +101,10 @@ const hostedWorker=workerTemplate
   .replace('__ALTERED_SERVICE_WORKER__',()=>JSON.stringify(hostedServiceWorker))
   .replace('__ALTERED_ICONS__',()=>JSON.stringify(icons))
   .replace('__ALTERED_TOOL_ASSETS__',()=>JSON.stringify(toolAssets))
-  .replace('__ALTERED_DOWNLOAD_ASSETS__',()=>JSON.stringify(downloadAssets))
+  .replace('__ALTERED_DOWNLOAD_PATHS__',()=>JSON.stringify(staticReleaseArtifacts.map(artifact=>`/downloads/${artifact.fileName}`)))
+  .replace('__ALTERED_ANDROID_DOWNLOAD_PATH__',()=>JSON.stringify(`/downloads/${androidReleaseArtifact.fileName}`))
+  .replace('__ALTERED_ANDROID_DOWNLOAD_URL__',()=>JSON.stringify(`https://raw.githubusercontent.com/Gho5tDaddy/Altered/main/public/downloads/${androidReleaseArtifact.fileName}`))
   .replace('__ALTERED_FORM_IMAGES__',()=>JSON.stringify(formImages));
+if(Buffer.byteLength(hostedWorker,'utf8')>deploymentLimits.workerBytes)throw new Error(`Hosted Worker exceeds the ${deploymentLimits.workerBytes}-byte release limit.`);
 await writeFile(path.join(dist,'server','index.js'),hostedWorker);
-console.log(`Built ${dist}`);
+console.log(`Built Altered ${appVersion} at ${dist}; staged ${stagedArtifacts.length}/${releaseArtifacts.length} current release artifacts.`);

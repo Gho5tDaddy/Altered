@@ -139,7 +139,7 @@ export const RULE_LEDGER:ReadonlyArray<RuleLedgerEntry>=Object.freeze([
     'Gates Innate Sorcery and Metamagic on spellcasting and calculates supported Draconic Sorcery overlays.',
     ['rules-data.CLASS_FEATURES.Sorcerer','engine.restoreDragonWings'],['engine: Draconic Sorcery wings']),
   rule('class.warlock','Warlock interactions','classes','conditional',srd('Warlock'),
-    'Gates Pact Magic and invocations on imported prerequisites and calculates Eldritch Mind Concentration Advantage.',
+    'Gates Pact Magic and invocations on imported prerequisites and calculates Eldritch Mind Concentration Advantage only when that invocation is positively imported.',
     ['rules-data.CLASS_FEATURES.Warlock','engine.concentrationSaveMode'],['engine: Eldritch Mind']),
   rule('class.wizard','Wizard interactions','classes','conditional',srd('Wizard'),
     'Gates Spellcasting by form profile and retains it only where the transformation explicitly permits it.',

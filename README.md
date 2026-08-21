@@ -8,19 +8,14 @@ Altered is a rules-aware adaptive character sheet for 2024 fifth-edition transfo
 
 Open [Altered](https://altered-ferocitus.ghostdaddy.chatgpt.site) from a phone, tablet, or computer. The hosted build is the recommended test route because it does not depend on the PC being awake, Windows localhost, or a particular Wi-Fi network. Anyone with the link can sign in or create a free ChatGPT account; Altered never receives the password. Character saves, combat state, settings, artwork overrides, and private packs remain in that browser and are not shared with other visitors.
 
-### Android
+### Install choices
 
-Download `altered-standalone.html`, open it from Downloads, and choose Chrome or Samsung Internet.
+- Android can install the hosted PWA or the current `Altered-Android-v<version>.apk` wrapper. The wrapper opens the hosted service and needs connectivity.
+- Windows can install the hosted PWA or use `Altered-Windows-Setup-v<version>.exe`. The downloadable installer is unsigned, so Windows may display an Unknown publisher or SmartScreen warning.
+- macOS can install the hosted web app or extract `Altered-Desktop-Mac-v<version>.zip`. The ZIP is a portable browser package, not a signed native Mac installer.
+- iPhone and iPad use Safari's **Share → Add to Home Screen** flow. Altered does not distribute an IPA or App Store package.
 
-### Windows
-
-Double-click `altered-standalone.html` and open it in Edge, Chrome, or Firefox.
-
-### macOS
-
-Open `altered-standalone.html` in Safari, Chrome, or Firefox.
-
-The same standalone file is used on all three platforms. The `dist` directory contains the hostable Progressive Web App and its bounded server worker.
+The portable HTML works in current Safari, Chrome, Edge, and Firefox releases but does not update itself. A packaged release's `dist` directory contains the hostable Progressive Web App, its bounded server worker, and only the three artifacts for the current package version. See [INSTALL.md](INSTALL.md) for exact limitations and steps.
 
 Fresh downloads open with a one-time Add Character guide. It explains how to use a public D&D Beyond character link, offers JSON/PDF alternatives, and labels all optional sample sheets as demos. Existing saved characters are not replaced.
 

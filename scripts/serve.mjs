@@ -12,13 +12,17 @@ const port=Number.parseInt(process.env.PORT??'4173',10);
 const contentTypes=new Map([
   ['.css','text/css; charset=utf-8'],
   ['.html','text/html; charset=utf-8'],
+  ['.ico','image/x-icon'],
   ['.js','text/javascript; charset=utf-8'],
+  ['.jpeg','image/jpeg'],
+  ['.jpg','image/jpeg'],
   ['.json','application/json; charset=utf-8'],
+  ['.mjs','text/javascript; charset=utf-8'],
   ['.png','image/png'],
   ['.svg','image/svg+xml'],
   ['.webmanifest','application/manifest+json; charset=utf-8'],
 ]);
-const freshExtensions=new Set(['.css','.html','.js','.json','.webmanifest']);
+const freshExtensions=new Set(['.css','.html','.js','.json','.mjs','.webmanifest']);
 const ddbRoute=/^\/api\/dndbeyond\/character\/(\d{5,15})$/;
 const ddbOrigin='https://character-service.dndbeyond.com';
 const maxDdbResponseBytes=5*1024*1024;
@@ -32,7 +36,9 @@ const srdDomains=Object.freeze({
   weapons:38,armor:13,creatures:331,spells:339,weaponproperties:17,
 });
 const maxSrdResponseBytes=2*1024*1024;
-const contentSecurityPolicy="default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+// The OCR entry bundle is local. Tesseract's browser worker, WASM core, and
+// English model are loaded lazily from its pinned jsDelivr release on first use.
+const contentSecurityPolicy="default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 let srdStatusCache;
 
 function json(response,status,body){

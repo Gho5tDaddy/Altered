@@ -1,3 +1,27 @@
+# Altered v0.29.39 release notes
+
+## Root-cause character capability and table-play audit
+
+- Adds complete Astral Arms strike choices, Astral Flurry of Blows, Stunning Strike hit confirmation, Uncanny Metabolism, and automatic finite-duration cleanup while keeping legacy Astral Self rules clearly identified.
+- Applies Shillelagh's Wisdom attack and damage ability, 2024 level-scaled damage die, and optional Force damage without changing unrelated weapon math.
+- Imports Pact Magic as a separate Short-Rest slot pool, lets multiclass casters choose the exact pool, applies only proven Pact Weapon ability evidence, and exposes only evidence-backed Eldritch Smite automation.
+- Adds Reactions, ability/passive-score summaries, tracked class resources, explicit post-roll Heroic Inspiration, one-tap Guidance that ends after the next eligible skill check, and dismissible roll results without expanding the main dashboard.
+- Makes import coverage honest: executable, conditional, reference-only, and review-required mechanics are visibly separated instead of overpromising automation.
+- Fixes false Suggested Next and End Turn cues, preserves pending damage, improves short-phone and Galaxy Fold scrolling/touch targets, and retains keyboard focus and reduced-motion behavior.
+- Aligns all current Android, Windows, and portable Mac release artifacts with this app version and excludes historical installers from deployment payloads.
+
+# Altered v0.29.38 release notes
+
+## Stability, rules, and release audit
+
+- Protects active characters from uncertain background D&D Beyond refreshes; review-required updates remain pending until confirmed.
+- Treats private PDF matches as reference reminders instead of inventing executable mechanics, statistics, or Wild Shape retention.
+- Keeps damaged private packs quarantined and exportable instead of deleting recoverable user data.
+- Warns visibly when browser storage is not durable and offers immediate character export.
+- Corrects off-turn Reaction spell timing, 2024 Monk Martial Arts Bonus Action strikes, Monk-weapon eligibility, Reckless Attack retention, and mutually exclusive Primal Strike damage choices.
+- Fixes short-phone workspace clipping, 44-pixel touch targets, dynamic roll labels, Help scrolling, and A-menu keyboard focus.
+- Aligns all platform artifacts with the app version and removes historical installer bloat from hosted deployments.
+
 # Altered v0.29.37 release notes
 
 ## Folded-phone cockpit correction

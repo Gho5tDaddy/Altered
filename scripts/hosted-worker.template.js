@@ -5,9 +5,9 @@ const SERVICE_WORKER=__ALTERED_SERVICE_WORKER__;
 const ICONS=__ALTERED_ICONS__;
 const FORM_IMAGES=__ALTERED_FORM_IMAGES__;
 const TOOL_ASSETS=__ALTERED_TOOL_ASSETS__;
-const DOWNLOAD_ASSETS=__ALTERED_DOWNLOAD_ASSETS__;
-const ANDROID_DOWNLOAD_PATH='/downloads/Altered-Android-v0.29.32.apk';
-const ANDROID_DOWNLOAD_URL='https://raw.githubusercontent.com/Gho5tDaddy/Altered/main/public/downloads/Altered-Android-v0.29.32.apk';
+const DOWNLOAD_PATHS=__ALTERED_DOWNLOAD_PATHS__;
+const ANDROID_DOWNLOAD_PATH=__ALTERED_ANDROID_DOWNLOAD_PATH__;
+const ANDROID_DOWNLOAD_URL=__ALTERED_ANDROID_DOWNLOAD_URL__;
 const LOGIN_PAGE=`<!doctype html>
 <html lang="en">
 <head>
@@ -330,13 +330,18 @@ export default {
       const asset=TOOL_ASSETS[url.pathname];
       return new Response(request.method==='HEAD'?null:decodeBase64(asset.data),{headers:headers(asset.type,'public, max-age=31536000, immutable')});
     }
-    if(url.pathname in DOWNLOAD_ASSETS){
-      const asset=DOWNLOAD_ASSETS[url.pathname];
-      const bytes=decodeBase64(asset.data);
-      return new Response(request.method==='HEAD'?null:bytes,{headers:{...headers(asset.type,'public, max-age=31536000, immutable'),'Content-Disposition':`attachment; filename="${asset.name}"`,'Content-Length':String(bytes.byteLength)}});
-    }
     if(url.pathname===ANDROID_DOWNLOAD_PATH)return Response.redirect(ANDROID_DOWNLOAD_URL,302);
-    if(url.pathname.startsWith('/downloads/')&&env?.ASSETS?.fetch)return env.ASSETS.fetch(request);
+    if(DOWNLOAD_PATHS.includes(url.pathname)){
+      if(!env?.ASSETS?.fetch)return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
+      const asset=await env.ASSETS.fetch(request);
+      if(!asset.ok)return asset;
+      const assetHeaders=new Headers(asset.headers);
+      assetHeaders.set('Cache-Control','public, max-age=31536000, immutable');
+      assetHeaders.set('Content-Disposition',`attachment; filename="${url.pathname.split('/').pop()}"`);
+      assetHeaders.set('X-Content-Type-Options','nosniff');
+      return new Response(request.method==='HEAD'?null:asset.body,{status:asset.status,headers:assetHeaders});
+    }
+    if(url.pathname.startsWith('/downloads/'))return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
     if(url.pathname!=='/'&&url.pathname!=='/index.html')return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
     if(!authenticatedUser(request))return new Response(request.method==='HEAD'?null:LOGIN_PAGE,{headers:headers('text/html; charset=utf-8','private, no-store')});
     if(!pageBytes)pageBytes=decodeBase64(PAGE);

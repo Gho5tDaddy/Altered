@@ -1,7 +1,10 @@
-param([string]$Version = '0.29.32')
-
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$packageMetadata = Get-Content -LiteralPath (Join-Path $projectRoot 'package.json') -Raw | ConvertFrom-Json
+$Version = [string]$packageMetadata.version
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+  throw 'package.json does not contain a valid release version.'
+}
 $distDir = Join-Path $projectRoot 'dist'
 $downloadDir = Join-Path $projectRoot 'public\downloads'
 $workDir = Join-Path $projectRoot '.build\windows-installer'

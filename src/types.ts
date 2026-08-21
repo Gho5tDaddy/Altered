@@ -10,7 +10,7 @@ export type RuleAuditDomain = 'core'|'conditions'|'classes'|'subclasses'|'forms'
 
 export interface Abilities {str:number;dex:number;con:number;int:number;wis:number;cha:number}
 export interface Speeds {walk?:number;climb?:number;swim?:number;fly?:number;burrow?:number}
-export interface DamagePacket {expression:string;type:DamageType;label?:string;doubleOnCritical?:boolean}
+export interface DamagePacket {expression:string;type:DamageType;label?:string;doubleOnCritical?:boolean;choiceGroup?:string}
 export interface ConditionEffect {condition:string;duration?:string;escapeDc?:number;targetSizeMax?:string;note?:string}
 export interface AttackRider {
   id:string;label:string;prerequisite:string;damage?:DamagePacket[];effects?:ConditionEffect[];
@@ -25,20 +25,20 @@ export interface AutomaticActionChoice {
 export interface AttackAction {
   id:string;name:string;type:'attack';cost:ActionCost;attackBonus:number;ability:Ability;
   kind:'beast'|'weapon'|'unarmed'|'spell';reach?:number;range?:string;
-  damage:DamagePacket[];effects?:ConditionEffect[];riders?:AttackRider[];recharge?:{min:number;max:number};uses?:ActionUseLimit;resourceId?:string;resourceCost?:number;notes?:string;
+  damage:DamagePacket[];effects?:ConditionEffect[];riders?:AttackRider[];recharge?:{min:number;max:number};uses?:ActionUseLimit;resourceId?:string;resourceCost?:number;oncePerTurnId?:string;notes?:string;
 }
 export interface SaveAction {
   id:string;name:string;type:'save';cost:ActionCost;saveAbility:Ability;dc:number;
   saveAbilityOptions?:Ability[];
   range?:string;damageOnFail?:DamagePacket[];damageOnSuccess?:DamagePacket[];
-  halfOnSuccess?:boolean;effectsOnFail?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;resourceId?:string;resourceCost?:number;notes?:string;
+  halfOnSuccess?:boolean;effectsOnFail?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;resourceId?:string;resourceCost?:number;oncePerTurnId?:string;prerequisite?:string;notes?:string;
 }
 export interface AutomaticAction {
   id:string;name:string;type:'automatic';cost:ActionCost;damage?:DamagePacket[];
-  damageTiming?:string;effects?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;resourceId?:string;resourceCost?:number;prerequisite?:string;choices?:AutomaticActionChoice[];notes?:string;
+  damageTiming?:string;effects?:ConditionEffect[];recharge?:{min:number;max:number};uses?:ActionUseLimit;resourceId?:string;resourceCost?:number;oncePerTurnId?:string;prerequisite?:string;choices?:AutomaticActionChoice[];notes?:string;
 }
 export interface MultiattackVariant {id:string;label:string;sequence:string[]}
-export interface MultiattackAction {id:string;name:string;type:'multiattack';cost:ActionCost;sequence:string[];variants?:MultiattackVariant[];resourceId?:string;resourceCost?:number;notes?:string}
+export interface MultiattackAction {id:string;name:string;type:'multiattack';cost:ActionCost;sequence:string[];variants?:MultiattackVariant[];resourceId?:string;resourceCost?:number;oncePerTurnId?:string;notes?:string}
 export type CreatureAction = AttackAction|SaveAction|AutomaticAction|MultiattackAction;
 
 export interface Creature {
@@ -96,12 +96,17 @@ export interface TransformationGrant {
 export interface ImportedFeatureRule {
   id:string;name:string;source:string;level?:number;summary:string;
   automation?:RuleAutomationState;
+  origin?:{provider:'dndbeyond';kind:'eldritch-invocation'|'owned-class-feature'|'owned-subclass-feature';sourceIds:string[]};
   retention?:Partial<Record<Exclude<TransformProfile,'base'>,boolean>>;
   requires?:{spellcasting?:boolean;concentration?:boolean;speech?:boolean;weapon?:boolean;unarmed?:boolean;strengthAttack?:boolean;noArmor?:boolean;noShield?:boolean};
   grants?:{speedBonus?:number;resistances?:DamageType[];immunities?:DamageType[];saveBonusAbility?:Ability;saveBonusFromAbility?:Ability;acFormula?:{base:number;abilities:Ability[]}};
   activation?:ActionCost;
 }
-export interface ResourcePool {id:string;name:string;current:number;max:number;recovery:'short-one'|'short-all'|'long-all'|'manual'}
+export interface ResourcePool {
+  id:string;name:string;current:number;max:number;recovery:'short-one'|'short-all'|'long-all'|'manual';
+  // Pact casting contract: consume this pool (not ordinary spellSlots) at the exact recorded slotLevel.
+  kind?:'pact-magic-slots';slotLevel?:number;source?:string;
+}
 export interface EquipmentState {armorCategory:'none'|'light'|'medium'|'heavy';shield:boolean;transformBehavior:'merge'|'drop'|'wear';formCanWear?:boolean}
 export type CharacterRuleset='2024'|'legacy'|'mixed'|'unknown';
 export interface CharacterProvenance {provider:'local'|'dndbeyond';sourceId?:string;ruleset:CharacterRuleset;rulesetEvidence:string[];reviewRequired:boolean}
@@ -111,6 +116,7 @@ export interface CharacterItem {
   id:string;name:string;type:string;equipped:boolean;attuned:boolean;requiresAttunement:boolean;
   ruleset:CharacterRuleset;sourceIds:string[];mechanics:'included-in-imported-totals'|'reference-only'|'review-required';
   effects?:CharacterItemEffect[];
+  pactWeapon?:{provider:'dndbeyond';evidence:string[];attackAbility?:Ability};
   attack?:{ability:Ability;damage:string;damageType:DamageType;proficient:boolean;range?:number;longRange?:number;properties:string[];magicBonus:number};
 }
 
@@ -138,12 +144,13 @@ export interface ReceivedEffect {
   duration:string;remindAtTurn?:number;skill?:string;autoChooseSkill?:boolean;autoUseNextRoll?:boolean;die?:4|6|8|10|12;
 }
 export interface ActiveTransform {option:TransformationOption;startedTurn:number;duration:string;tempHpSource:boolean;spellConcentration?:boolean;permanentUntilDispelled?:boolean}
+export interface OverlayTiming {startedTurn:number;duration:string;label:string;tempHpSource?:string;concentrationName?:string}
 export interface ActionRecharge {name:string;min:number;max:number}
 export interface GameState {
   stateVersion:5;hp:number;tempHp:number;life:LifeState;exhaustionLevel:number;relentlessRageDc:number;pendingRelentlessRage?:PendingRelentlessRage;tempHpSource?:string;activeTransform?:ActiveTransform;concentration?:ConcentrationState;activeSpellEffects:ActiveSpellEffect[];receivedEffects:ReceivedEffect[];
   concentrationChecks:{dc:number;damage:number;source:string}[];
   rage:RageState;turn:TurnState;resources:Record<string,ResourcePool>;spellSlots:Record<string,{current:number;max:number}>;
-  conditions:string[];equipment:EquipmentState;overlays:string[];recharges:Record<string,ActionRecharge>;actionUses:Record<string,number>;log:string[];
+  conditions:string[];equipment:EquipmentState;overlays:string[];overlayTimings?:Record<string,OverlayTiming>;recharges:Record<string,ActionRecharge>;actionUses:Record<string,number>;pendingUncannyMetabolism?:boolean;log:string[];
 }
 
 export interface DerivedRoll {name:string;modifier:number;source:string;proficiency:ProficiencyRank;beastModifier?:number;advantageSources?:string[];disadvantageSources?:string[];conditionalSources?:string[];automaticFailure?:string;minimumD20?:number;minimumTotal?:number;minimumSource?:string;alternate?:{modifier:number;source:string;minimumD20?:number;minimumTotal?:number;minimumSource?:string}}

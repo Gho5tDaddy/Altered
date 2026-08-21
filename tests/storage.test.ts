@@ -1,12 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {installExtensionPack,listExtensionPackRecords,listExtensionPacks,loadArtOverride,loadBooleanSetting,removeArtOverride,removeExtensionPack,saveArtOverride,saveBooleanSetting} from '../src/storage.js';
+import {installExtensionPack,listExtensionPackRecords,listExtensionPacks,loadArtOverride,loadBooleanSetting,removeArtOverride,removeExtensionPack,saveArtOverride,saveBooleanSetting,setStorageFailureHandler} from '../src/storage.js';
 import {ownedContentTemplate,parseOwnedContentPack} from '../src/owned-content.js';
 
 test('settings use the in-memory fallback when browser storage is unavailable',async()=>{
   assert.equal(await loadBooleanSetting('test-setting',false),false);
   await saveBooleanSetting('test-setting',true);
   assert.equal(await loadBooleanSetting('test-setting',false),true);
+});
+
+test('in-memory-only writes report that the change is not durable',async()=>{
+  const messages:string[]=[];setStorageFailureHandler(message=>messages.push(message));
+  await saveBooleanSetting('durability-warning-test',true);
+  setStorageFailureHandler(undefined);
+  assert.equal(messages.length,1);assert.match(messages[0]??'',/may disappear after reload/);
+  assert.equal(await loadBooleanSetting('durability-warning-test',false),true);
 });
 
 test('walkthrough completion persists independently from character data',async()=>{

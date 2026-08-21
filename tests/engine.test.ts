@@ -4,8 +4,8 @@ import type {AttackAction,Character} from '../src/types.js';
 import {CLASS_FEATURES,CREATURES,SPECIES_FEATURES,SUBCLASS_FEATURES} from '../src/content-registry.js';
 import {parseCharacter} from '../src/schema.js';
 import {
-  applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,criticalDiceExpression,criticalHitThreshold,deathSaveMode,declareRecklessAttack,
-  actionExecutionError,addReceivedEffect,clearConditions,declareAttack,endConcentration,endReceivedEffect,endSpellEffect,endTransformation,endTurn,extendRage,extraAttackCount,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,remainingActionUses,removeCondition,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,shortRest,spendActionCost,spendActionExecution,startCombat,startNewTurn,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useWildResurgence,wildResurgenceError,wildShapeLimits
+  applyCondition,applyDamage,attackBonuses,attackRollSources,availableSpellCastingOptions,availableSpellSlotLevels,availableTransformations,boundedWhole,castSpell,completeTruePolymorph,concentrationCheckDc,concentrationSaveMode,createInitialState,criticalDiceExpression,criticalHitThreshold,deathSaveMode,declareRecklessAttack,
+  actionExecutionError,addReceivedEffect,clearConditions,declareAttack,endConcentration,endReceivedEffect,endSpellEffect,endTransformation,endTurn,extendRage,extraAttackCount,heal,longRest,markActionRechargeUsed,markLimitedActionUsed,pendingActionRecharge,proficiencyBonus,remainingActionUses,removeCondition,resolveConcentrationCheck,resolveDeathSave,resolveRelentlessRage,resolveSheet,resolveTempHpChoice,restoreDragonWings,rollAttackD20,selectedOptionalDamagePackets,shortRest,spendActionCost,spendActionExecution,startCombat,startNewTurn,startOffTurnReactionWindow,startRage,startTransformation,useActionSurge,useLayOnHands,useSecondWind,useUncannyMetabolism,useWildResurgence,wildResurgenceError,wildShapeLimits
 } from '../src/engine.js';
 
 function must<T>(value:T|undefined):T{if(value===undefined)throw new Error('Expected value was missing.');return value}
@@ -211,6 +211,21 @@ test('an Action and Bonus Action remain independent while 2024 limits slot spell
   startNewTurn(state);assert.equal(state.turn.slotSpellCast,false);assert.equal(resolveSheet(c,state).spells.find(spell=>spell.name==='Healing Word')?.available,true);
 });
 
+test('same-turn slot spells remain blocked while an off-turn Reaction window resets only that turn gate',()=>{
+  const c=character({classes:[{name:'Wizard',level:5}],totalLevel:5,spells:[
+    {name:'Moonbeam',level:2,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true},
+    {name:'Shield',level:1,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'reaction'},
+  ],spellSlots:{'1':{current:1,max:1},'2':{current:1,max:1}}});const state=createInitialState(c);
+  assert.match(castSpell(c,state,'Moonbeam').message,/Cast Moonbeam/);const sameTurn=castSpell(c,state,'Shield');assert.match(sameTurn.message,/already been expended/);assert.equal(state.turn.reactionRemaining,1);assert.equal(state.spellSlots['1']?.current,1);
+  const economy={actionsRemaining:state.turn.actionsRemaining,surgeActionsRemaining:state.turn.surgeActionsRemaining,bonusRemaining:state.turn.bonusRemaining,reactionRemaining:state.turn.reactionRemaining};endTurn(c,state);assert.equal(state.turn.slotSpellCast,false);assert.deepEqual({actionsRemaining:state.turn.actionsRemaining,surgeActionsRemaining:state.turn.surgeActionsRemaining,bonusRemaining:state.turn.bonusRemaining,reactionRemaining:state.turn.reactionRemaining},economy);
+  assert.match(castSpell(c,state,'Shield').message,/Cast Shield/);assert.equal(state.turn.reactionRemaining,0);assert.equal(state.turn.slotSpellCast,true);assert.equal(state.spellSlots['1']?.current,0);
+});
+
+test('opening an off-turn Reaction window directly preserves every action-economy counter',()=>{
+  const state=createInitialState(character());state.turn.actionsRemaining=0;state.turn.surgeActionsRemaining=1;state.turn.bonusRemaining=0;state.turn.reactionRemaining=1;state.turn.slotSpellCast=true;const before={...state.turn,oncePerTurn:{...state.turn.oncePerTurn}};
+  assert.match(startOffTurnReactionWindow(state).message,/Off-turn Reaction window/);assert.equal(state.turn.slotSpellCast,false);assert.deepEqual({...state.turn,slotSpellCast:true},before);
+});
+
 test('Fount of Moonlight is a Magic Action and powers melee beast attacks while concentrated',()=>{
   const c=character({classes:[{name:'Druid',level:7,subclass:'Circle of the Moon'}],totalLevel:7,knownForms:['dire-wolf'],spells:[
     {name:'Fount of Moonlight',level:4,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action',concentration:true},
@@ -232,6 +247,26 @@ test('an explicitly selected higher-level slot is consumed',()=>{
   const result=castSpell(c,state,'Moonbeam',3);assert.match(result.message,/level 3 slot/);assert.equal(must(state.spellSlots['2']).current,1);assert.equal(must(state.spellSlots['3']).current,0);assert.equal(state.concentration?.castLevel,3);
 });
 
+test('Pact Magic is a separate exact-level casting choice and recovers on a Short Rest',()=>{
+  const c=character({classes:[{name:'Warlock',level:5}],totalLevel:5,spells:[{name:'Hex',level:1,sourceClass:'Pact Magic',ability:'cha',prepared:true,castingTime:'bonus',concentration:true}],spellSlots:{},resources:[{id:'pact-magic-slots',name:'Pact Magic Slots (Level 3)',current:2,max:2,recovery:'short-all',kind:'pact-magic-slots',slotLevel:3,source:'fixture'}]});const state=createInitialState(c);
+  assert.deepEqual(availableSpellSlotLevels(c,state,1),[]);assert.deepEqual(availableSpellCastingOptions(c,state,1),[{id:'pact-magic-slots',kind:'pact-magic',level:3,label:'Pact Magic · Level 3',resourceId:'pact-magic-slots'}]);
+  assert.equal(resolveSheet(c,state).spells.find(spell=>spell.name==='Hex')?.available,true);const cast=castSpell(c,state,'Hex');assert.match(cast.message,/using Pact Magic at level 3/);assert.equal(state.resources['pact-magic-slots']?.current,1);assert.equal(state.turn.slotSpellCast,true);assert.equal(state.concentration?.castLevel,3);
+  shortRest(state);assert.equal(state.resources['pact-magic-slots']?.current,2);
+});
+
+test('ordinary and Pact Magic slots remain distinct and invalid Pact choices do not spend anything',()=>{
+  const c=character({classes:[{name:'Wizard',level:3},{name:'Warlock',level:5}],totalLevel:8,spells:[{name:'Shield',level:1,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'reaction'}],spellSlots:{'1':{current:1,max:1}},resources:[{id:'pact-magic-slots',name:'Pact Magic Slots (Level 3)',current:2,max:2,recovery:'short-all',kind:'pact-magic-slots',slotLevel:3,source:'fixture'}]});
+  const invalid=createInitialState(c),before={reaction:invalid.turn.reactionRemaining,pact:invalid.resources['pact-magic-slots']?.current};assert.match(castSpell(c,invalid,'Shield',2,'pact-magic-slots').message,/selected Pact Magic slot is not available/);assert.equal(invalid.turn.reactionRemaining,before.reaction);assert.equal(invalid.resources['pact-magic-slots']?.current,before.pact);
+  const ordinary=createInitialState(c);assert.deepEqual(availableSpellCastingOptions(c,ordinary,1).map(choice=>[choice.kind,choice.level]),[['ordinary',1],['pact-magic',3]]);assert.match(castSpell(c,ordinary,'Shield',1).message,/level 1 slot/);assert.equal(ordinary.spellSlots['1']?.current,0);assert.equal(ordinary.resources['pact-magic-slots']?.current,2);
+  const pact=createInitialState(c);assert.match(castSpell(c,pact,'Shield',3,'pact-magic-slots').message,/Pact Magic at level 3/);assert.equal(pact.spellSlots['1']?.current,1);assert.equal(pact.resources['pact-magic-slots']?.current,1);
+});
+
+test('transformation spells honor the explicitly selected ordinary or Pact Magic pool',()=>{
+  const c=character({classes:[{name:'Wizard',level:3},{name:'Warlock',level:5}],totalLevel:8,spells:[{name:'Alter Self',level:2,sourceClass:'Wizard',ability:'int',prepared:true,castingTime:'magic-action',concentration:true}],spellSlots:{'2':{current:1,max:1}},resources:[{id:'pact-magic-slots',name:'Pact Magic Slots (Level 3)',current:2,max:2,recovery:'short-all',kind:'pact-magic-slots',slotLevel:3,source:'fixture'}]});
+  const pact=createInitialState(c),pactOption=availableTransformations(c,pact).find(option=>option.id==='spell:alter-self:appearance');assert.ok(pactOption);assert.match(startTransformation(c,pact,pactOption,{level:3,resourceId:'pact-magic-slots'}).message,/activated/);assert.equal(pact.resources['pact-magic-slots']?.current,1);assert.equal(pact.spellSlots['2']?.current,1);assert.equal(pact.concentration?.castLevel,3);
+  const ordinary=createInitialState(c),ordinaryOption=availableTransformations(c,ordinary).find(option=>option.id==='spell:alter-self:appearance');assert.ok(ordinaryOption);startTransformation(c,ordinary,ordinaryOption,{level:2});assert.equal(ordinary.spellSlots['2']?.current,0);assert.equal(ordinary.resources['pact-magic-slots']?.current,2);assert.equal(ordinary.concentration?.castLevel,2);
+});
+
 test('spells clearly become unavailable after their Magic Action is spent',()=>{
   const c=character();const state=createInitialState(c);state.turn.actionsRemaining=0;
   const spell=resolveSheet(c,state).spells.find(entry=>entry.name==='Moonbeam');assert.equal(spell?.available,false);assert.match(spell?.reason??'',/Action remains/);
@@ -245,6 +280,10 @@ test('Altered table rule classifies beast-form physical attacks as Unarmed Strik
 
 test('Reckless Attack can be declared without Rage',()=>{
   const c=character();const state=createInitialState(c);const result=declareRecklessAttack(c,state);assert.match(result.message,/declared/);assert.equal(state.rage.recklessDeclared,true);
+});
+
+test('Reckless Attack is blocked when a replacement transformation does not retain class features',()=>{
+  const c=character({classes:[{name:'Barbarian',level:2}],totalLevel:2});const state=createInitialState(c);const option=availableTransformations(c,state).find(entry=>entry.profile==='polymorph'&&entry.formId==='polar-bear');assert.ok(option);assert.match(startTransformation(c,state,option).message,/transformed/i);assert.match(declareRecklessAttack(c,state).message,/does not retain Reckless Attack/);assert.equal(state.rage.recklessDeclared,false);
 });
 
 test('Action Surge is limited to once per turn',()=>{
@@ -344,11 +383,37 @@ test('activatable features are not labeled as already applied before activation'
   startRage(c,state);assert.equal(must(resolveSheet(c,state).features.find(feature=>feature.id==='rage')).status,'active');
 });
 
+test('supported instant and declared class features report ready, active, and spent states truthfully',()=>{
+  const barbarian=character({classes:[{name:'Barbarian',level:2}],totalLevel:2});const barbarianState=createInitialState(barbarian);
+  assert.equal(must(resolveSheet(barbarian,barbarianState).features.find(feature=>feature.id==='reckless-attack')).status,'conditional');
+  declareRecklessAttack(barbarian,barbarianState);assert.equal(must(resolveSheet(barbarian,barbarianState).features.find(feature=>feature.id==='reckless-attack')).status,'active');
+
+  const fighter=character({classes:[{name:'Fighter',level:2}],totalLevel:2,hp:{current:10,max:30}});const fighterState=createInitialState(fighter);let fighterFeatures=resolveSheet(fighter,fighterState).features;
+  assert.equal(must(fighterFeatures.find(feature=>feature.id==='second-wind')).status,'conditional');assert.equal(must(fighterFeatures.find(feature=>feature.id==='action-surge')).status,'conditional');
+  useActionSurge(fighter,fighterState);fighterFeatures=resolveSheet(fighter,fighterState).features;assert.equal(must(fighterFeatures.find(feature=>feature.id==='action-surge')).status,'active');
+  useSecondWind(fighter,fighterState,5);assert.equal(must(resolveSheet(fighter,fighterState).features.find(feature=>feature.id==='second-wind')).status,'inactive');
+
+  const paladin=character({classes:[{name:'Paladin',level:1}],totalLevel:1,hp:{current:5,max:20}});const paladinState=createInitialState(paladin);
+  assert.equal(must(resolveSheet(paladin,paladinState).features.find(feature=>feature.id==='lay-on-hands')).status,'conditional');
+  useLayOnHands(paladin,paladinState,2);assert.equal(must(resolveSheet(paladin,paladinState).features.find(feature=>feature.id==='lay-on-hands')).status,'inactive');
+});
+
 test('unarmored defense eligibility uses actual armor and equipped weapons become attacks',()=>{
   const c=character({items:[{id:'axe',name:'Greataxe',type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d12',damageType:'Slashing',proficient:true,properties:['Heavy','Two-Handed'],magicBonus:0}}]});const state=createInitialState(c);const sheet=resolveSheet(c,state);
   assert.equal(must(sheet.acCandidates.find(candidate=>candidate.name==='Barbarian Unarmored Defense')).legal,true);
   assert.equal(must(sheet.features.find(feature=>feature.id==='barbarian-unarmored-defense')).status,'active');
   const axe=must(sheet.actions.find(action=>action.id==='item-attack-axe'));assert.equal(axe.type,'attack');if(axe.type==='attack'){assert.equal(axe.attackBonus,4);assert.equal(axe.damage[0]?.expression,'1d12+1');}
+});
+
+test('a proven Pact Weapon uses its structured ability while retaining Monk die and magic bonus, and Eldritch Smite spends Pact Magic only after confirmation',()=>{
+  const c=character({classes:[{name:'Monk',level:6},{name:'Warlock',level:5}],totalLevel:11,abilities:{str:8,dex:16,con:12,int:10,wis:16,cha:18},spellSlots:{},resources:[{id:'pact-magic-slots',name:'Pact Magic Slots (Level 3)',current:2,max:2,recovery:'short-all',kind:'pact-magic-slots',slotLevel:3,source:'fixture'}],features:[{id:'ddb-invocation-smite',name:'Eldritch Smite',source:'D&D Beyond selected Eldritch Invocation',summary:'Name-only fixture.',automation:'reference',origin:{provider:'dndbeyond',kind:'eldritch-invocation',sourceIds:['definition:9101']}}],items:[{id:'hammer',name:'Light Hammer, +1',type:'Weapon',equipped:true,attuned:true,requiresAttunement:true,ruleset:'2024',sourceIds:['701'],mechanics:'included-in-imported-totals',pactWeapon:{provider:'dndbeyond',evidence:['enable-feature:enable-pact-weapon','characterValues:typeId=28'],attackAbility:'cha'},attack:{ability:'str',damage:'1d4',damageType:'Bludgeoning',proficient:true,properties:['Light','Thrown'],magicBonus:1}}]});const state=createInitialState(c),sheet=resolveSheet(c,state);
+  const hammer=must(sheet.actions.find(action=>action.id==='item-attack-hammer'));assert.equal(hammer.type,'attack');if(hammer.type==='attack'){assert.equal(hammer.ability,'cha');assert.equal(hammer.attackBonus,9);assert.equal(hammer.damage[0]?.expression,'1d8+5');assert.match(hammer.notes??'',/Proven Pact Weapon.*CHA/);assert.match(hammer.notes??'',/Martial Arts 1d8 damage die retained/);}
+  const smite=must(sheet.actions.find(action=>action.id==='eldritch-smite-hammer'));assert.equal(smite.type,'automatic');if(smite.type==='automatic'){assert.deepEqual(smite.damage,[{expression:'4d8',type:'Force'}]);assert.match(smite.prerequisite??'',/after Light Hammer, \+1.*hits/);assert.equal(spendActionExecution(c,state,smite),null);assert.equal(state.resources['pact-magic-slots']?.current,1);assert.equal(state.turn.oncePerTurn['eldritch-smite'],true);assert.match(actionExecutionError(c,state,smite)??'',/only once/);}
+  shortRest(state);assert.equal(state.resources['pact-magic-slots']?.current,2);
+});
+
+test('Pact Weapon ability and Eldritch Smite are not inferred without structured item and invocation evidence',()=>{
+  const c=character({classes:[{name:'Monk',level:6},{name:'Warlock',level:5}],totalLevel:11,abilities:{str:8,dex:16,con:12,int:10,wis:16,cha:18},spellSlots:{},resources:[{id:'pact-magic-slots',name:'Pact Magic Slots (Level 3)',current:2,max:2,recovery:'short-all',kind:'pact-magic-slots',slotLevel:3}],features:[{id:'manual-smite',name:'Eldritch Smite',source:'Manual text',summary:'Unproven name only.',automation:'reference'}],items:[{id:'hammer',name:'Light Hammer, +1',type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d4',damageType:'Bludgeoning',proficient:true,properties:['Light','Thrown'],magicBonus:1}}]});const sheet=resolveSheet(c,createInitialState(c)),hammer=must(sheet.actions.find(action=>action.id==='item-attack-hammer'));assert.equal(hammer.type,'attack');if(hammer.type==='attack')assert.equal(hammer.ability,'dex');assert.equal(sheet.actions.some(action=>action.id.startsWith('eldritch-smite-')),false);
 });
 
 test('structured equipment effects are visible in calculations once and respect form retention',()=>{
@@ -425,6 +490,10 @@ test('Primal Strike is not invented unless selected on the imported sheet',()=>{
   const base=character({classes:[{name:'Druid',level:8,subclass:'Circle of the Land'}],totalLevel:8,knownForms:['dire-wolf']});const state=createInitialState(base);const wolf=availableTransformations(base,state).find(o=>o.profile==='wildshape');assert.ok(wolf);startTransformation(base,state,wolf);const bite=resolveSheet(base,state).actions.find(a=>a.id==='bite');assert.ok(bite);assert.equal(attackBonuses(base,state,resolveSheet(base,state),bite).some(p=>p.label?.includes('Primal Strike')),false);
 });
 
+test('Primal Strike exposes one mutually exclusive elemental damage choice',()=>{
+  const c=character({classes:[{name:'Druid',level:7,subclass:'Circle of the Moon'}],totalLevel:7,knownForms:['dire-wolf'],seenForms:['dire-wolf'],features:[{id:'primal-strike',name:'Primal Strike',source:'Druid 7',summary:'Once per turn, choose one elemental damage type.'}]});const state=createInitialState(c);const wolf=availableTransformations(c,state).find(option=>option.profile==='wildshape'&&option.formId==='dire-wolf');assert.ok(wolf);startTransformation(c,state,wolf);const sheet=resolveSheet(c,state),bite=sheet.actions.find(action=>action.id==='bite');assert.ok(bite);const choices=attackBonuses(c,state,sheet,bite).filter(packet=>packet.choiceGroup==='primal-strike');assert.equal(choices.length,4);assert.deepEqual(choices.map(packet=>packet.type),['Cold','Fire','Lightning','Thunder']);const selected=selectedOptionalDamagePackets(choices,choices.flatMap(packet=>packet.label?[packet.label]:[]));assert.equal(selected.length,1);assert.equal(selected[0]?.choiceGroup,'primal-strike');
+});
+
 test('Wild Shape Temporary Hit Points vanish when the form ends or Incapacitation ends it',()=>{
   const c=character();const state=createInitialState(c);const wolf=availableTransformations(c,state).find(o=>o.profile==='wildshape'&&o.formId==='dire-wolf');assert.ok(wolf);
   startTransformation(c,state,wolf);assert.equal(state.tempHp,18);state.turn.bonusRemaining=1;endTransformation(state,true,c);assert.equal(state.tempHp,0);assert.equal(state.tempHpSource,undefined);
@@ -434,7 +503,7 @@ test('Wild Shape Temporary Hit Points vanish when the form ends or Incapacitatio
 test('Shapechange grants form HP as Temporary HP only for the first form and does not end at zero',()=>{
   const c=character({classes:[{name:'Wizard',level:17}],totalLevel:17});const state=createInitialState(c);
   const first=availableTransformations(c,state).find(o=>o.profile==='shapechange'&&o.formId==='polar-bear');assert.ok(first);startTransformation(c,state,first);assert.equal(state.tempHp,42);
-  startNewTurn(state);const second=availableTransformations(c,state).find(o=>o.profile==='shapechange'&&o.formId==='dire-wolf');assert.ok(second);startTransformation(c,state,second);assert.equal(state.tempHp,42);
+  startNewTurn(state);const second=availableTransformations(c,state).find(o=>o.profile==='shapechange'&&o.formId==='dire-wolf');assert.ok(second);startTransformation(c,state,second);assert.equal(state.tempHp,42);assert.equal(state.activeTransform?.startedTurn,1);
   applyDamage(state,resolveSheet(c,state),42,'Force',c);assert.ok(state.activeTransform);assert.equal(state.tempHp,0);assert.ok(state.concentration);
   endConcentration(state,'Test ended.',c);assert.equal(state.activeTransform,undefined);assert.equal(state.tempHp,0);
 });
@@ -442,7 +511,7 @@ test('Shapechange grants form HP as Temporary HP only for the first form and doe
 test('Animal Shapes switches forms without refreshing Temporary HP and zero THP does not end it',()=>{
   const c=character({classes:[{name:'Druid',level:15}],totalLevel:15,spells:[{name:'Animal Shapes',level:8,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'magic-action'}],spellSlots:{'8':{current:1,max:1}}});const state=createInitialState(c);
   const first=availableTransformations(c,state).find(o=>o.profile==='animal-shapes'&&o.formId==='polar-bear');assert.ok(first);startTransformation(c,state,first);assert.equal(state.tempHp,42);assert.equal(state.concentration,undefined);
-  startNewTurn(state);const second=availableTransformations(c,state).find(o=>o.profile==='animal-shapes'&&o.formId==='dire-wolf');assert.ok(second);startTransformation(c,state,second);assert.equal(state.tempHp,42);
+  startNewTurn(state);const second=availableTransformations(c,state).find(o=>o.profile==='animal-shapes'&&o.formId==='dire-wolf');assert.ok(second);startTransformation(c,state,second);assert.equal(state.tempHp,42);assert.equal(state.activeTransform?.startedTurn,1);
   applyDamage(state,resolveSheet(c,state),42,'Force',c);assert.ok(state.activeTransform);assert.equal(state.activeTransform?.option.profile,'animal-shapes');
 });
 
@@ -689,10 +758,22 @@ test('SRD subclass features are classified honestly and Berserker Mindless Rage 
   assert.equal(deathSaveMode(champion,state).mode,'advantage');resolveDeathSave(champion,state,18);assert.equal(state.hp,1);
 });
 
-test('private overlays substitute roll abilities, add activation saves, and can be ended',()=>{
+test('legacy Astral Arms compatibility exposes stable WIS Damage, Grapple, Shove, and Flurry choices without duplicate limits',()=>{
   const c=character({classes:[{name:'Monk',level:5,subclass:'Warrior of the Elements'}],totalLevel:5,abilities:{str:8,dex:14,con:12,int:10,wis:18,cha:10},proficiencies:{saves:{str:1,dex:1},skills:{Athletics:1}},transformationGrants:[{id:'astral-test',label:'Astral Arms',profile:'overlay',formIds:[],source:'Owned content',actionCost:'bonus',endActionCost:'none',effects:{checkAbilitySubstitution:{str:'wis'},saveAbilitySubstitution:{str:'wis'},activationActions:[{id:'astral-summon',name:'Astral Arms summon',type:'save',cost:'none',saveAbility:'dex',dc:15,damageOnFail:[{expression:'2d8',type:'Force'}]}],actions:[{id:'astral-strike',name:'Astral Arms Unarmed Strike',type:'attack',cost:'action',attackBonus:7,ability:'wis',kind:'unarmed',reach:10,damage:[{expression:'1d8+4',type:'Force'}]}]}}]});
-  const state=createInitialState(c);const option=availableTransformations(c,state).find(entry=>entry.grantId==='astral-test');assert.ok(option);const started=startTransformation(c,state,option);assert.equal(started.activationActions?.[0]?.id,'astral-summon');const sheet=resolveSheet(c,state);assert.equal(sheet.skills.Athletics?.modifier,7);assert.equal(sheet.saves.str.modifier,7);const ordinary=sheet.actions.find(action=>action.id==='monk-unarmed'),strike=sheet.actions.find(action=>action.id==='astral-strike');assert.ok(ordinary?.type==='attack');assert.equal(ordinary.ability,'dex');assert.equal(ordinary.damage[0]?.type,'Bludgeoning');assert.ok(strike?.type==='attack');assert.equal(strike.ability,'wis');assert.equal(strike.reach,10);assert.equal(strike.damage[0]?.type,'Force');assert.equal(sheet.actions.some(action=>action.id==='astral-summon'),false);
+  const state=createInitialState(c);const option=availableTransformations(c,state).find(entry=>entry.grantId==='astral-test');assert.ok(option);const started=startTransformation(c,state,option);assert.equal(started.activationActions?.[0]?.id,'astral-summon');let sheet=resolveSheet(c,state);assert.equal(sheet.skills.Athletics?.modifier,7);assert.equal(sheet.saves.str.modifier,7);const ordinary=sheet.actions.find(action=>action.id==='monk-unarmed'),strike=sheet.actions.find(action=>action.id==='astral-arms-unarmed-strike'),grapple=sheet.actions.find(action=>action.id==='astral-arms-unarmed-grapple'),shove=sheet.actions.find(action=>action.id==='astral-arms-unarmed-shove');assert.ok(ordinary?.type==='attack');assert.equal(ordinary.ability,'dex');assert.equal(ordinary.damage[0]?.type,'Bludgeoning');assert.ok(strike?.type==='attack');assert.equal(strike.ability,'wis');assert.equal(strike.reach,10);assert.deepEqual(strike.damage,[{expression:'1d8+4',type:'Force'}]);assert.match(strike.notes??'',/Legacy Astral Self compatibility/);assert.match(strike.notes??'',/table rule/);assert.ok(grapple?.type==='save');assert.equal(grapple.dc,15);assert.deepEqual(grapple.saveAbilityOptions,['str','dex']);assert.equal(grapple.range,'10 ft.');assert.ok(shove?.type==='save');assert.equal(shove.dc,15);assert.equal(shove.range,'10 ft.');assert.equal(sheet.actions.some(action=>action.id==='astral-strike'),false);assert.equal(sheet.actions.some(action=>action.id==='astral-summon'),false);
+  const flurry=sheet.actions.find(action=>action.id==='monk-flurry-of-blows');assert.ok(flurry?.type==='multiattack');if(flurry.type==='multiattack'){const allAstral=flurry.variants?.find(variant=>variant.id==='astral');assert.deepEqual(allAstral?.sequence,['astral-arms-unarmed-strike','astral-arms-unarmed-strike']);for(const id of allAstral?.sequence??[]){const child=sheet.actions.find(action=>action.id===id);assert.ok(child?.type==='attack');assert.equal(child.ability,'wis');assert.deepEqual(child.damage,[{expression:'1d8+4',type:'Force'}]);assert.equal(child.uses,undefined);}assert.deepEqual(flurry.variants?.find(variant=>variant.id==='astral-grapple')?.sequence,['astral-arms-unarmed-grapple','astral-arms-unarmed-grapple']);assert.deepEqual(flurry.variants?.find(variant=>variant.id==='astral-shove')?.sequence,['astral-arms-unarmed-shove','astral-arms-unarmed-shove']);}
+  startNewTurn(state);sheet=resolveSheet(c,state);const astralBonuses=sheet.actions.filter(action=>action.id==='monk-bonus-astral-arms-unarmed-strike'),astralBonus=astralBonuses[0];assert.equal(astralBonuses.length,1);assert.ok(astralBonus?.type==='attack');assert.equal(astralBonus.cost,'bonus');assert.equal(astralBonus.ability,'wis');assert.equal(astralBonus.damage[0]?.type,'Force');assert.equal(resolveSheet(c,state).actions.filter(action=>action.id==='monk-bonus-astral-arms-unarmed-strike').length,1);state.equipment.armorCategory='medium';assert.equal(resolveSheet(c,state).actions.some(action=>action.id==='monk-bonus-astral-arms-unarmed-strike'),false);state.equipment.armorCategory='none';state.equipment.shield=true;assert.equal(resolveSheet(c,state).actions.some(action=>action.id==='monk-bonus-astral-arms-unarmed-strike'),false);state.equipment.shield=false;
   const end=availableTransformations(c,state).find(entry=>entry.grantId==='astral-test'&&entry.deactivate);assert.ok(end);startTransformation(c,state,end);assert.equal(state.overlays.includes('astral-test'),false);
+});
+
+test('2024 Martial Arts supplies a Bonus Action Unarmed Strike only with eligible armor, Shield, and weapon state',()=>{
+  const makeMonk=(equipment:Character['equipment'],items:Character['items']=[])=>character({classes:[{name:'Monk',level:5}],totalLevel:5,abilities:{str:10,dex:16,con:12,int:10,wis:16,cha:8},knownForms:[],seenForms:[],spells:[],spellSlots:{},equipment,items});
+  const monk=makeMonk({armorCategory:'none',shield:false,transformBehavior:'merge'}),state=createInitialState(monk);const bonus=resolveSheet(monk,state).actions.find(action=>action.id==='monk-bonus-unarmed');assert.ok(bonus?.type==='attack');assert.equal(bonus.cost,'bonus');assert.equal(bonus.ability,'dex');assert.equal(bonus.damage[0]?.expression,'1d8+3');assert.equal(spendActionExecution(monk,state,bonus),null);assert.equal(state.turn.bonusRemaining,0);assert.equal(state.turn.actionsRemaining,1);
+  const armored=makeMonk({armorCategory:'medium',shield:false,transformBehavior:'merge'});assert.equal(resolveSheet(armored,createInitialState(armored)).actions.some(action=>action.id==='monk-bonus-unarmed'),false);
+  const shielded=makeMonk({armorCategory:'none',shield:true,transformBehavior:'merge'});assert.equal(resolveSheet(shielded,createInitialState(shielded)).actions.some(action=>action.id==='monk-bonus-unarmed'),false);
+  const weapon=(id:string,name:string,properties:string[],range?:number):Character['items'][number]=>({id,name,type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d6',damageType:'Piercing',proficient:true,properties,magicBonus:0,...(range===undefined?{}:{range,longRange:range*4})}});
+  const greataxe=makeMonk({armorCategory:'none',shield:false,transformBehavior:'merge'},[weapon('greataxe','Greataxe',['Heavy','Two-Handed'])]);assert.equal(resolveSheet(greataxe,createInitialState(greataxe)).actions.some(action=>action.id==='monk-bonus-unarmed'),false);
+  const thrownJavelin=makeMonk({armorCategory:'none',shield:false,transformBehavior:'merge'},[weapon('javelin','Javelin',['Thrown'],30)]);const thrownSheet=resolveSheet(thrownJavelin,createInitialState(thrownJavelin));assert.equal(thrownSheet.actions.some(action=>action.id==='monk-bonus-unarmed'),true);const javelin=thrownSheet.actions.find(action=>action.id==='item-attack-javelin');assert.ok(javelin?.type==='attack');assert.equal(javelin.ability,'dex');assert.equal(javelin.damage[0]?.expression,'1d8+3');
 });
 
 test('2024 Monk Focus actions share one pool and work with retained transformations',()=>{
@@ -711,15 +792,31 @@ test('2024 Monk Focus actions share one pool and work with retained transformati
 test('received effects initialize safely, replace duplicates, and end explicitly',()=>{
   const state=createInitialState(character());assert.deepEqual(state.receivedEffects,[]);
   addReceivedEffect(state,{id:'guidance-1',kind:'guidance',name:'Guidance',source:'Cleric',addedTurn:1,duration:'Up to 1 minute',skill:'Perception'});
-  assert.equal(state.receivedEffects.length,1);assert.equal(state.receivedEffects[0]?.skill,'Perception');
+  assert.equal(state.receivedEffects.length,1);assert.equal(state.receivedEffects[0]?.skill,undefined);assert.equal(state.receivedEffects[0]?.autoChooseSkill,true);
   const replaced=addReceivedEffect(state,{id:'guidance-2',kind:'guidance',name:'Guidance',source:'Druid',addedTurn:2,duration:'Up to 1 minute',skill:'Stealth'});
-  assert.equal(state.receivedEffects.length,1);assert.equal(state.receivedEffects[0]?.source,'Druid');assert.match(replaced.message,/do not stack/);
+  assert.equal(state.receivedEffects.length,1);assert.equal(state.receivedEffects[0]?.source,'Druid');assert.equal(state.receivedEffects[0]?.skill,undefined);assert.equal(state.receivedEffects[0]?.autoChooseSkill,true);assert.match(replaced.message,/do not stack/);
   assert.match(endReceivedEffect(state,'guidance-2').message,/ended/);assert.deepEqual(state.receivedEffects,[]);
 });
 
 test('2024 Monk weapons use the Martial Arts die and magic bonus for attack and damage',()=>{
   const monk=character({classes:[{name:'Monk',level:6,subclass:'Warrior of the Elements'}],totalLevel:6,abilities:{str:10,dex:16,con:12,int:10,wis:16,cha:8},knownForms:[],seenForms:[],spells:[],spellSlots:{},equipment:{armorCategory:'none',shield:false,transformBehavior:'merge'},items:[{id:'staff-plus-one',name:'Quarterstaff, +1',type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d6',damageType:'Bludgeoning',proficient:true,properties:['Versatile'],magicBonus:1}}]});
   const staff=resolveSheet(monk,createInitialState(monk)).actions.find(action=>action.id==='item-attack-staff-plus-one');assert.ok(staff?.type==='attack');if(staff.type==='attack'){assert.equal(staff.ability,'dex');assert.equal(staff.attackBonus,7);assert.equal(staff.damage[0]?.expression,'1d8+4');assert.match(staff.notes??'',/magic weapon bonus to attack and damage/);assert.match(staff.notes??'',/Martial Arts 1d8/);}
+});
+
+test('active 2024 Shillelagh uses its imported spell ability, total-character-level die, and exclusive normal or Force actions',()=>{
+  const expected=new Map([[1,'1d8'],[5,'1d10'],[11,'1d12'],[17,'2d6']]);for(const [level,die] of expected){const c=character({classes:[{name:'Druid',level}],totalLevel:level,abilities:{str:8,dex:16,con:12,int:10,wis:18,cha:14},knownForms:[],seenForms:[],spells:[{name:'Shillelagh',level:0,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'bonus'}],spellSlots:{},items:[{id:'staff',name:'Quarterstaff',type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d6',damageType:'Bludgeoning',proficient:true,properties:['Versatile'],magicBonus:0}}]});const state=createInitialState(c);assert.match(castSpell(c,state,'Shillelagh').message,/Cast Shillelagh/);const sheet=resolveSheet(c,state),normal=sheet.actions.find(action=>action.id==='item-attack-staff'),force=sheet.actions.find(action=>action.id==='item-attack-staff-shillelagh-force');assert.ok(normal?.type==='attack');assert.ok(force?.type==='attack');assert.equal(normal.ability,'wis');assert.equal(force.ability,'wis');assert.equal(normal.attackBonus,proficiencyBonus(level)+4);assert.deepEqual(normal.damage,[{expression:`${die}+4`,type:'Bludgeoning'}]);assert.deepEqual(force.damage,[{expression:`${die}+4`,type:'Force'}]);assert.equal(normal.damage.length,1);assert.equal(force.damage.length,1);assert.match(normal.notes??'',/choose this normal-damage action or the Force action.*never both/);assert.match(normal.notes??'',/WIS from the imported Druid spell/);endSpellEffect(state,'shillelagh');assert.equal(resolveSheet(c,state).actions.some(action=>action.id==='item-attack-staff-shillelagh-force'),false);}
+  const multiclass=character({classes:[{name:'Druid',level:1},{name:'Warlock',level:4}],totalLevel:5,abilities:{str:8,dex:16,con:12,int:10,wis:18,cha:16},knownForms:[],seenForms:[],spells:[{name:'Shillelagh',level:0,sourceClass:'Druid',ability:'wis',prepared:true,castingTime:'bonus'},{name:'Shillelagh',level:0,sourceClass:'Pact Magic',ability:'cha',prepared:true,castingTime:'bonus'}],spellSlots:{},items:[{id:'club',name:'Club',type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d4',damageType:'Bludgeoning',proficient:true,properties:['Light'],magicBonus:0}}]}),state=createInitialState(multiclass);state.activeSpellEffects.push({id:'shillelagh',name:'Shillelagh',source:'Pact Magic',duration:'1 minute',summary:'Fixture',startedTurn:1});const pactClub=resolveSheet(multiclass,state).actions.find(action=>action.id==='item-attack-club');assert.ok(pactClub?.type==='attack');assert.equal(pactClub.ability,'cha');assert.deepEqual(pactClub.damage,[{expression:'1d10+3',type:'Bludgeoning'}]);assert.match(pactClub.notes??'',/CHA from the imported Pact Magic spell/);
+});
+
+test('2024 Stunning Strike is a structured post-hit CON save that spends one Focus and gates once per turn',()=>{
+  const c=character({classes:[{name:'Monk',level:5}],totalLevel:5,abilities:{str:10,dex:16,con:12,int:10,wis:18,cha:8},knownForms:[],seenForms:[],spells:[],spellSlots:{}}),state=createInitialState(c);const stunning=resolveSheet(c,state).actions.find(action=>action.id==='monk-stunning-strike');assert.ok(stunning?.type==='save');assert.equal(stunning.saveAbility,'con');assert.equal(stunning.dc,15);assert.equal(stunning.cost,'none');assert.equal(stunning.resourceId,'focus-points');assert.equal(stunning.resourceCost,1);assert.equal(stunning.oncePerTurnId,'stunning-strike');assert.match(stunning.prerequisite??'',/after you hit.*Monk weapon or Unarmed Strike/i);assert.deepEqual(stunning.effectsOnFail,[{condition:'Stunned',duration:'Until the start of your next turn'}]);const before=state.resources['focus-points']?.current;assert.equal(spendActionExecution(c,state,stunning),null);assert.equal(state.resources['focus-points']?.current,(before??0)-1);assert.equal(state.turn.actionsRemaining,1);assert.match(actionExecutionError(c,state,stunning)??'',/only once on a turn/);startNewTurn(state);assert.equal(actionExecutionError(c,state,stunning),null);
+  const levelFour=character({classes:[{name:'Monk',level:4}],totalLevel:4,knownForms:[],seenForms:[],spells:[],spellSlots:{}});assert.equal(resolveSheet(levelFour,createInitialState(levelFour)).actions.some(action=>action.id==='monk-stunning-strike'),false);
+});
+
+test('2024 Uncanny Metabolism is an optional Initiative trigger with expended Focus and a Long Rest use',()=>{
+  const c=character({classes:[{name:'Monk',level:6}],totalLevel:6,abilities:{str:10,dex:16,con:12,int:10,wis:18,cha:8},hp:{current:20,max:60},knownForms:[],seenForms:[],spells:[],spellSlots:{}}),state=createInitialState(c),focus=must(state.resources['focus-points']),use=must(state.resources['uncanny-metabolism']);assert.equal(use.recovery,'long-all');assert.equal(use.current,1);assert.equal(/is available as an optional recovery/.test(startCombat(state).message),false);assert.equal(state.pendingUncannyMetabolism,false);
+  focus.current=2;const before={focus:focus.current,hp:state.hp,use:use.current};const initiative=startCombat(state);assert.match(initiative.message,/available as an optional recovery/);assert.deepEqual({focus:focus.current,hp:state.hp,use:use.current},before);assert.equal(state.pendingUncannyMetabolism,true);assert.ok(resolveSheet(c,state).actions.some(action=>action.id==='monk-uncanny-metabolism'));const recovered=useUncannyMetabolism(c,state,()=>0);assert.match(recovered.message,/regained 4 Focus Points and 7 Hit Points \(1d8 rolled 1 \+ Monk level 6\)/);assert.equal(focus.current,6);assert.equal(state.hp,27);assert.equal(use.current,0);assert.equal(state.pendingUncannyMetabolism,undefined);
+  focus.current=5;state.hp=20;assert.equal(/optional recovery/.test(startCombat(state).message),false);assert.equal(resolveSheet(c,state).actions.some(action=>action.id==='monk-uncanny-metabolism'),false);longRest(c,state);focus.current=4;state.hp=20;assert.match(startCombat(state).message,/optional recovery/);startNewTurn(state);assert.equal(state.pendingUncannyMetabolism,undefined);assert.equal(use.current,1);assert.equal(focus.current,4);assert.equal(state.hp,20);
 });
 
 test('initiative starts turn one and finite tracked effects expire at their turn duration',()=>{
@@ -729,4 +826,23 @@ test('initiative starts turn one and finite tracked effects expire at their turn
   addReceivedEffect(state,{id:'round-effect',kind:'guidance',name:'Round Effect',source:'Test',addedTurn:1,duration:'1 round',skill:'Perception'});
   const second=startNewTurn(state);assert.match(second.message,/Round Effect expired/);assert.equal(state.receivedEffects.length,0);assert.equal(state.activeSpellEffects.length,1);
   for(let turn=0;turn<9;turn++)startNewTurn(state);assert.equal(state.turn.number,11);assert.equal(state.activeSpellEffects.length,0);
+});
+
+test('finite replacement transformations and overlays expire from persisted turn metadata',()=>{
+  const c=character({transformationGrants:[
+    {id:'minute-aura',label:'Minute Aura',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',endActionCost:'none',duration:'1 minute',concentration:true,effects:{temporaryHp:{mode:'fixed',value:5}}},
+    {id:'astral-arms-timer',label:'Astral Arms',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',endActionCost:'none',duration:'10 minutes',effects:{}},
+    {id:'manual-aura',label:'Manual Aura',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',endActionCost:'none',effects:{}}
+  ]});
+  const replacement=createInitialState(c),wolf=availableTransformations(c,replacement).find(option=>option.profile==='wildshape'&&option.formId==='dire-wolf');assert.ok(wolf);startTransformation(c,replacement,wolf);assert.ok(replacement.activeTransform);replacement.activeTransform.duration='1 minute';replacement.turn.number=10;const replacementExpiry=startNewTurn(replacement);assert.match(replacementExpiry.message,/Dire Wolf expired/);assert.equal(replacement.activeTransform,undefined);assert.equal(replacement.tempHp,0);
+
+  const minute=createInitialState(c),minuteOption=availableTransformations(c,minute).find(option=>option.grantId==='minute-aura');assert.ok(minuteOption);startTransformation(c,minute,minuteOption);assert.deepEqual(minute.overlayTimings?.['minute-aura'],{startedTurn:1,duration:'1 minute',label:'Minute Aura',tempHpSource:'Minute Aura',concentrationName:'Minute Aura'});assert.equal(minute.tempHp,5);assert.equal(minute.concentration?.name,'Minute Aura');minute.turn.number=10;const minuteExpiry=startNewTurn(minute);assert.match(minuteExpiry.message,/Minute Aura expired/);assert.equal(minute.overlays.includes('minute-aura'),false);assert.equal(minute.overlayTimings?.['minute-aura'],undefined);assert.equal(minute.tempHp,0);assert.equal(minute.concentration,undefined);
+
+  const astral=createInitialState(c),astralOption=availableTransformations(c,astral).find(option=>option.grantId==='astral-arms-timer');assert.ok(astralOption);startTransformation(c,astral,astralOption);astral.turn.number=100;startNewTurn(astral);assert.equal(astral.overlays.includes('astral-arms-timer'),false);
+
+  const manual=createInitialState(c),manualOption=availableTransformations(c,manual).find(option=>option.grantId==='manual-aura');assert.ok(manualOption);startTransformation(c,manual,manualOption);manual.turn.number=10_000;startNewTurn(manual);assert.equal(manual.overlays.includes('manual-aura'),true);const manualEnd=availableTransformations(c,manual).find(option=>option.grantId==='manual-aura'&&option.deactivate);assert.ok(manualEnd);startTransformation(c,manual,manualEnd);assert.equal(manual.overlayTimings?.['manual-aura'],undefined);
+});
+
+test('older saves without overlay timing metadata remain active instead of being expired speculatively',()=>{
+  const c=character({transformationGrants:[{id:'legacy-timed-aura',label:'Legacy Timed Aura',profile:'overlay',formIds:[],source:'Fixture',actionCost:'bonus',endActionCost:'none',duration:'1 minute',effects:{}}]}),state=createInitialState(c),option=availableTransformations(c,state).find(entry=>entry.grantId==='legacy-timed-aura');assert.ok(option);startTransformation(c,state,option);delete state.overlayTimings;state.turn.number=100;startNewTurn(state);assert.equal(state.overlays.includes('legacy-timed-aura'),true);
 });

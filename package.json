@@ -1,6 +1,6 @@
 {
   "name": "altered-rules-engine",
-  "version": "0.29.37",
+  "version": "0.29.39",
   "private": true,
   "type": "commonjs",
   "scripts": {
@@ -15,7 +15,9 @@
     "test": "npm run build && node --test dist/tests/*.test.js",
     "verify": "npm run typecheck && npm test",
     "browser:audit": "node scripts/browser-audit.mjs",
-    "audit": "npm run verify && npm run browser:audit && node scripts/audit.mjs"
+    "audit": "npm run verify && npm run browser:audit && node scripts/audit.mjs",
+    "platform:verify": "node scripts/verify-release.mjs --source-only && node scripts/verify-local-server.mjs",
+    "release:verify": "node scripts/verify-release.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.9",

@@ -1247,6 +1247,8 @@ input{
 .import-intro{margin:0;color:var(--muted);line-height:1.55}
 .import-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .import-block,.installed-packs-section,.advanced-builder{position:relative;border:1px solid var(--line);padding:13px;background:var(--panel-2);clip-path:polygon(9px 0,calc(100% - 9px) 0,100% 9px,100% calc(100% - 9px),calc(100% - 9px) 100%,9px 100%,0 calc(100% - 9px),0 9px)}
+.import-block>summary{display:flex;align-items:center;justify-content:space-between;min-block-size:48px;margin:-13px;padding:12px 14px;cursor:pointer;list-style:none;border-bottom:1px solid transparent;color:var(--text)}
+.import-block>summary::-webkit-details-marker{display:none}.import-block>summary::after{content:'+';flex:0 0 auto;color:var(--magic-cyan,#62e5df);font-size:1.2rem;font-weight:900}.import-block[open]>summary{margin-bottom:13px;border-bottom-color:var(--line);background:linear-gradient(90deg,rgba(46,151,154,.12),transparent)}.import-block[open]>summary::after{content:'−'}.import-block>summary span,.import-block>summary strong,.import-block>summary small{display:block}.import-block>summary strong{font-size:.88rem;text-transform:uppercase;letter-spacing:.07em}.import-block>summary small{margin-top:2px;color:var(--muted);font-size:.68rem;font-weight:650}.import-block>summary:focus-visible{outline:3px solid color-mix(in srgb,var(--magic-cyan,#62e5df) 62%,transparent);outline-offset:-4px}
 .ddb-import-block{grid-column:1/-1}
 .pdf-import-block{grid-column:1/-1}.import-review{margin-top:12px;padding:11px;border:1px solid var(--magic-cyan,#48d8d1);border-radius:10px;background:rgba(5,15,18,.72)}.import-review h4{margin:0 0 8px;color:var(--text)}.pdf-review-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.pdf-review-grid label{margin:0}.pdf-review-grid textarea{width:100%;resize:vertical;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--text);padding:10px}.pdf-review-grid .wide-field{grid-column:1/-1}.review-warnings{display:grid;gap:4px;margin:9px 0;color:#ffd784;font-size:.78rem}.import-progress{min-height:1.25em;color:var(--magic-cyan,#62e5df);font-size:.78rem}.privacy-note{font-size:.74rem}
 @media(max-width:700px){.pdf-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -1279,6 +1281,7 @@ input{
 .installed-pack-list{display:grid;gap:7px;margin-top:8px}
 .installed-pack{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;align-items:center;border:1px solid var(--line);padding:9px;background:rgba(7,9,10,.42);clip-path:polygon(7px 0,calc(100% - 7px) 0,100% 7px,100% calc(100% - 7px),calc(100% - 7px) 100%,7px 100%,0 calc(100% - 7px),0 7px)}
 .installed-pack strong{font-size:.86rem}.installed-pack span,.installed-pack small{color:var(--muted);font-size:.7rem}.installed-pack small{grid-column:1/-1}.pack-actions{display:flex;gap:5px;grid-row:1/3;grid-column:2}
+.installed-pack.invalid-pack{border-color:var(--state-warning,#ffd36b);background:rgba(55,39,10,.25)}
 .builder-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .ability-builder-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .builder-wide{grid-column:1/-1}
@@ -1301,6 +1304,8 @@ input{
 @media(prefers-reduced-motion:reduce){.app-shell:not(.motion-forced) .tracked-active{animation:none!important;filter:none!important}}
 @media(max-width:520px){.received-effect-form,.received-effect-entry{grid-template-columns:1fr}.received-effect-actions{justify-content:stretch}.received-effect-actions .button{flex:1}.received-effect-form .button{grid-column:1}}
 @media(forced-colors:active){.tracked-active{animation:none!important;box-shadow:none!important;border:2px solid Highlight}}
+.storage-warning{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:2px solid var(--state-error,#ff5b73);padding:10px 12px;background:linear-gradient(135deg,rgba(78,8,24,.96),rgba(19,8,20,.98));box-shadow:0 0 18px rgba(255,91,115,.24);color:#fff;z-index:12}.storage-warning[hidden]{display:none}.storage-warning strong,.storage-warning span{display:block}.storage-warning span{margin-top:2px;color:#ffdce3;font-size:.76rem;line-height:1.4}
+@media(max-width:520px){.storage-warning{grid-template-columns:1fr}.storage-warning .button{width:100%}}
 .pending-damage-list{display:grid;gap:8px;margin:0 0 13px;padding:10px;border:1px solid color-mix(in srgb,var(--state-ready,#53ff99) 58%,var(--line));background:rgba(10,28,22,.72)}.pending-damage-list h3{margin:0;color:#d9ffe7}.pending-damage-card{--tracked-glow:var(--state-ready,#53ff99);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:center;padding:10px;border:1px solid var(--state-ready,#53ff99);background:rgba(8,18,16,.9)}.pending-damage-card strong,.pending-damage-card small{display:block}.pending-damage-card small{margin-top:3px;color:var(--muted);line-height:1.4}
 @media(max-width:520px){.pending-damage-card{grid-template-columns:1fr}.pending-damage-card .inline-actions{display:grid;grid-template-columns:1fr 1fr}}
 
@@ -2521,7 +2526,7 @@ body::after{
 @media(pointer:coarse){.art-framing-card .button,.art-framing-controls select,.art-framing-controls input{min-block-size:44px}}
 @media(forced-colors:active){.art-framing-preview{box-shadow:none;border:2px solid Highlight}}
 
-/* v0.29.37 folded-phone cockpit boundary.
+/* v0.29.38 folded-phone cockpit boundary.
    The artwork-first cockpit is content-sized; legacy fixed phone rows allowed it
    to paint underneath the focused workspace. Let the first row own its complete
    height so HP, defenses, quick effects, and turn controls are never obscured. */
@@ -2535,3 +2540,91 @@ body::after{
   }
   .persistent-form-visual{overflow:hidden}
 }
+
+/* v0.29.38 accessibility and short-screen safety.
+   Normal phones keep the artwork-first split. Very short phones use one clear
+   workspace scroller so the focused tool can never collapse into a tiny slit. */
+@media(max-width:700px) and (max-height:650px){
+  .app-shell .workspace{
+    display:block;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+    scroll-padding-block:8px 18px
+  }
+  .app-shell .persistent-form-visual{height:auto;margin-bottom:5px}
+  .app-shell .workspace-stage{height:auto;min-height:96px;overflow:visible}
+  .app-shell .workspace-view{height:auto;min-height:96px;overflow:visible;scrollbar-gutter:auto}
+}
+
+/* Keep primary play and roll controls reliably tappable on touch screens and
+   equally reachable for mouse users with limited dexterity. */
+#toggle-app-menu{min-inline-size:44px;min-block-size:44px}
+#show-next-step,
+.persistent-quick-effects .button,
+.persistent-end-form,
+.persistent-turn-controls .button,
+.task-view .button,
+.task-view .tab,
+.roll-row .button,
+.play-utility-row .button{min-block-size:44px}
+
+/* Help has one predictable scroll owner on phones: the dialog itself. */
+@media(max-width:700px){
+  #help-dialog .help-topics{max-height:none;overflow:visible;overscroll-behavior:auto}
+}
+
+/* Critical cockpit and guidance copy stays at an 11px floor without forcing
+   single-line overflow. Existing ellipsis and wrapping rules remain intact. */
+.persistent-form-kicker,
+.persistent-form-open,
+.persistent-form-primary .persistent-form-stats small,
+.persistent-health-stat em,
+.persistent-effects-summary>span,
+.persistent-effects-summary>small,
+.persistent-turn-controls span,
+.next-step-guide small,
+.topbar .next-step-guide small,
+.topbar .next-step-guide p,
+.play-latest-result>span,
+.play-latest-result small{font-size:.6875rem}
+.persistent-effects-summary>strong,
+.tab-help{font-size:.75rem}
+.persistent-action-economy .economy-chip{
+  font-size:.6875rem;line-height:1.1;white-space:normal;text-overflow:clip
+}
+
+/* Compact character facts, honest import coverage, and focused Reaction access. */
+.task-launcher-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+.task-view .tabs{grid-template-columns:repeat(7,minmax(0,1fr))}
+.character-snapshot{display:grid;gap:7px;margin:0 0 7px;padding:8px;border:1px solid rgba(121,247,255,.28);border-radius:10px;background:rgba(10,16,21,.72)}
+.character-snapshot[hidden]{display:none}
+.character-snapshot-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.character-snapshot-heading h3{margin:0;color:#f5fdff;font-size:.76rem;text-transform:uppercase;letter-spacing:.07em}
+.character-snapshot-heading small{color:var(--muted);font-size:.64rem}
+.character-ability-scores{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.character-ability-score,.character-passive-score{min-width:0;display:grid;grid-template-columns:1fr auto;align-items:center;gap:1px 4px;padding:5px 6px;border:1px solid var(--line);border-radius:8px;background:rgba(7,10,13,.58)}
+.character-ability-score small,.character-passive-score small{overflow:hidden;color:var(--muted);font-size:.58rem;font-weight:800;text-overflow:ellipsis;text-transform:uppercase;white-space:nowrap}
+.character-ability-score b,.character-passive-score b{grid-row:1/3;grid-column:2;color:#f4ffff;font-size:.9rem}
+.character-ability-score em{color:var(--accent-2);font-size:.57rem;font-style:normal}
+.character-passive-title{display:block;margin-bottom:3px;color:var(--muted);font-size:.6rem;text-transform:uppercase;letter-spacing:.065em}
+.character-passive-scores{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.import-coverage{border:1px solid var(--line);border-radius:8px;background:rgba(7,10,13,.48);overflow:hidden}
+.import-coverage>summary{min-height:40px;display:flex;align-items:center;padding:6px 8px;cursor:pointer;list-style:none}
+.import-coverage>summary::-webkit-details-marker{display:none}.import-coverage>summary>span{display:grid;gap:1px;min-width:0}.import-coverage>summary strong{font-size:.7rem}.import-coverage>summary small{overflow:hidden;color:var(--muted);font-size:.6rem;text-overflow:ellipsis;white-space:nowrap}.import-coverage>summary::after{content:"+";margin-left:auto;color:var(--accent-2)}.import-coverage[open]>summary::after{content:"−"}
+.import-coverage-content{display:grid;gap:6px;padding:0 8px 8px}.import-coverage-list{display:grid;gap:4px}.import-coverage-row{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:7px}.import-coverage-row small{overflow:hidden;color:var(--muted);font-size:.62rem;text-overflow:ellipsis;white-space:nowrap}.import-coverage-content p{margin:0}.import-summons-note{padding:6px 7px;border-left:3px solid #ffd166;background:rgba(96,70,14,.16);color:#ffe9ae;font-size:.66rem}
+.reaction-empty{margin-top:2px;padding:10px}
+
+/* One authoritative class-resource control replaces duplicate raw pool chips. */
+.ability-resource-details .resource-strip{display:grid;grid-template-columns:1fr;gap:5px;overflow:visible}
+.resource-control-help{margin:0;color:var(--muted);font-size:.65rem;line-height:1.35}
+.tracked-resource{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px;padding:6px 7px;border:1px solid var(--line);border-radius:8px;background:rgba(7,10,13,.58)}
+.tracked-resource>div:first-child{display:grid;gap:1px;min-width:0}.tracked-resource strong{overflow:hidden;font-size:.72rem;text-overflow:ellipsis;white-space:nowrap}.tracked-resource small{color:var(--muted);font-size:.6rem}.tracked-resource-count{color:var(--accent-2);font-size:.78rem}.tracked-resource-controls{display:flex;gap:4px}.tracked-resource-controls .button{min-width:70px}.spell-slot-strip{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-top:2px}.spell-slot-strip>strong{margin-right:2px;font-size:.68rem}
+
+/* Roll results remain timed, but are immediately dismissible and can host an
+   explicit Heroic Inspiration decision without spending it automatically. */
+.roll-toast{grid-template-areas:"kicker total" "title total" "detail detail" "inspiration inspiration";pointer-events:auto;cursor:pointer;padding-right:38px}
+.roll-toast-inspiration{grid-area:inspiration;display:block;margin-top:7px}.roll-toast-inspiration[hidden]{display:none}
+.heroic-reroll-controls{display:flex;align-items:center;gap:5px;flex-wrap:wrap}.heroic-reroll-controls>small{flex:1 0 100%;color:#fff1af;font-size:.66rem}.heroic-reroll-controls .button{min-height:38px;flex:1}
+.roll-toast-dismiss{position:absolute;top:5px;right:6px;min-width:28px;min-height:28px;padding:3px 5px;border:0;border-radius:7px;background:rgba(255,255,255,.08);color:var(--muted);font-size:0;cursor:pointer}.roll-toast-dismiss::after{content:"×";font-size:1rem}.roll-toast-dismiss:hover,.roll-toast-dismiss:focus-visible{background:rgba(121,247,255,.16);color:#fff}
+
+@media(max-width:760px){.task-launcher-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.task-launcher-grid .task-launcher:last-child{grid-column:1/-1}.character-ability-scores{grid-template-columns:repeat(3,minmax(0,1fr))}.tracked-resource{grid-template-columns:minmax(0,1fr) auto}.tracked-resource-controls{grid-column:1/-1}.tracked-resource-controls .button{flex:1}.task-view .tabs{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:430px){.task-view .tabs{grid-template-columns:repeat(3,minmax(0,1fr))}.character-passive-scores{grid-template-columns:1fr}.import-coverage-row{grid-template-columns:1fr;gap:2px}.import-coverage-row small{white-space:normal}.roll-toast{padding-right:34px}.heroic-reroll-controls .button{flex-basis:100%}}
+@media(forced-colors:active){.character-snapshot,.tracked-resource,.import-coverage{border:1px solid CanvasText}.roll-toast-dismiss{border:1px solid ButtonText}}

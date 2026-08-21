@@ -182,6 +182,11 @@ function parseFeature(v:unknown,i:number):ImportedFeatureRule{
   const out:ImportedFeatureRule={id:str(v.id,`features[${i}].id`),name:str(v.name,`features[${i}].name`),source:str(v.source,`features[${i}].source`),summary:str(v.summary,`features[${i}].summary`,500)};
   if(typeof v.level==='number')out.level=num(v.level,`features[${i}].level`,1,20);
   if(typeof v.automation==='string'){if(!['calculated','conditional','reference','unsupported'].includes(v.automation))throw new Error(`features[${i}].automation is unsupported.`);out.automation=v.automation as RuleAutomationState;}
+  if(v.origin!==undefined){
+    if(!isObject(v.origin)||v.origin.provider!=='dndbeyond'||!['eldritch-invocation','owned-class-feature','owned-subclass-feature'].includes(String(v.origin.kind)))throw new Error(`features[${i}].origin is unsupported.`);
+    if(!Array.isArray(v.origin.sourceIds))throw new Error(`features[${i}].origin.sourceIds must be an array.`);
+    out.origin={provider:'dndbeyond',kind:v.origin.kind as NonNullable<ImportedFeatureRule['origin']>['kind'],sourceIds:[...new Set(v.origin.sourceIds.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).slice(0,20).map(value=>value.trim().slice(0,120)))]};
+  }
   if(isObject(v.retention))out.retention={wildshape:bool(v.retention.wildshape),polymorph:bool(v.retention.polymorph),'true-polymorph':bool(v.retention['true-polymorph']),shapechange:bool(v.retention.shapechange),'animal-shapes':bool(v.retention['animal-shapes']),overlay:bool(v.retention.overlay),custom:bool(v.retention.custom)};
   if(isObject(v.requires))out.requires={spellcasting:bool(v.requires.spellcasting),concentration:bool(v.requires.concentration),speech:bool(v.requires.speech),weapon:bool(v.requires.weapon),unarmed:bool(v.requires.unarmed),strengthAttack:bool(v.requires.strengthAttack),noArmor:bool(v.requires.noArmor),noShield:bool(v.requires.noShield)};
   if(isObject(v.grants)){
@@ -210,8 +215,15 @@ function parseResource(v:unknown,i:number):ResourcePool{
   const max=num(v.max,`resources[${i}].max`,0,999);const current=num(v.current,`resources[${i}].current`,0,max);
   const recovery=['short-one','short-all','long-all','manual'].includes(String(v.recovery))?v.recovery as ResourcePool['recovery']:'manual';
   const rawId=str(v.id,`resources[${i}].id`);const normalized=rawId.trim().toLowerCase().replace(/[\s_]+/g,'-');
-  const id=['focus','focus-points','ki','ki-points'].includes(normalized)?'focus-points':rawId;
-  return {id,name:id==='focus-points'?'Focus Points':str(v.name,`resources[${i}].name`),current,max,recovery};
+  const id=['focus','focus-points','ki','ki-points'].includes(normalized)?'focus-points':['pact-magic','pact-magic-slots','pact-slots'].includes(normalized)?'pact-magic-slots':rawId;
+  const out:ResourcePool={id,name:id==='focus-points'?'Focus Points':str(v.name,`resources[${i}].name`),current,max,recovery};
+  if(v.kind!==undefined){
+    if(v.kind!=='pact-magic-slots'||id!=='pact-magic-slots')throw new Error(`resources[${i}].kind is unsupported for this resource.`);
+    if(recovery!=='short-all')throw new Error(`resources[${i}] Pact Magic slots must recover with short-all.`);
+    out.kind='pact-magic-slots';out.slotLevel=num(v.slotLevel,`resources[${i}].slotLevel`,1,5);
+  }else if(v.slotLevel!==undefined)throw new Error(`resources[${i}].slotLevel requires kind pact-magic-slots.`);
+  if(typeof v.source==='string')out.source=str(v.source,`resources[${i}].source`,200);
+  return out;
 }
 function parseItem(v:unknown,i:number):Character['items'][number]{
   if(!isObject(v))throw new Error(`items[${i}] must be an object.`);
@@ -220,6 +232,11 @@ function parseItem(v:unknown,i:number):Character['items'][number]{
   const out:Character['items'][number]={id:str(v.id,`items[${i}].id`,120),name:str(v.name,`items[${i}].name`,160),type:typeof v.type==='string'?v.type.slice(0,120):'Item',equipped:bool(v.equipped),attuned:bool(v.attuned),requiresAttunement:bool(v.requiresAttunement),ruleset,sourceIds:Array.isArray(v.sourceIds)?[...new Set(v.sourceIds.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).slice(0,20).map(value=>value.trim().slice(0,80)))]:[],mechanics};
   const effectKinds=new Set(['armor-class','saving-throws','natural-attack-rolls','natural-attack-damage']);
   if(Array.isArray(v.effects))out.effects=v.effects.slice(0,20).map((raw,j)=>{if(!isObject(raw)||!effectKinds.has(String(raw.kind)))throw new Error(`items[${i}].effects[${j}] is unsupported.`);return {kind:String(raw.kind) as NonNullable<Character['items'][number]['effects']>[number]['kind'],value:num(raw.value,`items[${i}].effects[${j}].value`,-10,10),includedInImportedTotals:bool(raw.includedInImportedTotals)};});
+  if(v.pactWeapon!==undefined){
+    if(!isObject(v.pactWeapon)||v.pactWeapon.provider!=='dndbeyond'||!Array.isArray(v.pactWeapon.evidence))throw new Error(`items[${i}].pactWeapon is unsupported.`);
+    const evidence=[...new Set(v.pactWeapon.evidence.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).slice(0,20).map(value=>value.trim().slice(0,160)))];if(!evidence.length)throw new Error(`items[${i}].pactWeapon.evidence must identify at least one D&D Beyond field.`);
+    out.pactWeapon={provider:'dndbeyond',evidence,...(v.pactWeapon.attackAbility!==undefined?{attackAbility:ability(v.pactWeapon.attackAbility,`items[${i}].pactWeapon.attackAbility`)}:{})};
+  }
   if(isObject(v.attack)){const damage=str(v.attack.damage,`items[${i}].attack.damage`,40).replace(/\s+/g,'');if(!DICE.test(damage))throw new Error(`items[${i}].attack.damage is not a safe dice expression.`);const damageType=str(v.attack.damageType,`items[${i}].attack.damageType`,30);if(!DAMAGE_TYPES.has(damageType))throw new Error(`items[${i}].attack.damageType is not supported.`);out.attack={ability:ability(v.attack.ability,`items[${i}].attack.ability`),damage,damageType:damageType as DamageType,proficient:bool(v.attack.proficient),properties:Array.isArray(v.attack.properties)?[...new Set(v.attack.properties.filter((entry):entry is string=>typeof entry==='string'&&Boolean(entry.trim())).slice(0,20).map(entry=>entry.trim().slice(0,60)))]:[],magicBonus:typeof v.attack.magicBonus==='number'?num(v.attack.magicBonus,`items[${i}].attack.magicBonus`,-5,10):0,...(typeof v.attack.range==='number'?{range:num(v.attack.range,`items[${i}].attack.range`,0,10000)}:{}),...(typeof v.attack.longRange==='number'?{longRange:num(v.attack.longRange,`items[${i}].attack.longRange`,0,10000)}:{})};}
   return out;
 }

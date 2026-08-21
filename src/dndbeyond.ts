@@ -1,5 +1,5 @@
-import type {Ability,ActionCost,Character,CharacterItem,CharacterRuleset,Creature,DamagePacket,DamageType,ProficiencyRank,ResourcePool,Spell,TransformationEffects,TransformationGrant} from './types.js';
-import {CREATURES,MOON_FORM_SPELL_LEVELS,SPECIES_FEATURES,SUBCLASS_FEATURES} from './content-registry.js';
+import type {Ability,ActionCost,Character,CharacterItem,CharacterRuleset,Creature,DamagePacket,DamageType,ImportedFeatureRule,ProficiencyRank,ResourcePool,Spell,TransformationEffects,TransformationGrant} from './types.js';
+import {CLASS_FEATURES,CREATURES,MOON_FORM_SPELL_LEVELS,SPECIES_FEATURES,SUBCLASS_FEATURES} from './content-registry.js';
 import {parseCharacter} from './schema.js';
 import {DDB_FEAT_SELECTION_EVIDENCE} from './data-migrations.js';
 
@@ -10,6 +10,7 @@ export interface DdbImportWarning {
   code:string;
   severity:'info'|'warning';
   message:string;
+  fields?:string[];
 }
 
 export interface DdbImportCoverage {
@@ -296,6 +297,29 @@ function parseSpellSlots(data:JsonObject,classes:Character['classes']):Character
   return result;
 }
 
+interface DdbPactMagicImport {resource?:ResourcePool;unresolvedFields:string[];evidence:string[]}
+function parsePactMagic(data:JsonObject):DdbPactMagicImport{
+  const classes=array(data.classes);const warlockIndex=classes.findIndex(raw=>string(object(object(raw).definition).name).toLowerCase()==='warlock');
+  if(warlockIndex<0)return {unresolvedFields:['data.classes[Warlock]'],evidence:[]};
+  const rawClass=object(classes[warlockIndex]),warlockLevel=finite(rawClass.level),unresolved:string[]=[];
+  if(warlockLevel===undefined||!Number.isInteger(warlockLevel)||warlockLevel<1||warlockLevel>20)unresolved.push(`data.classes[${warlockIndex}].level`);
+  const slotTable=object(object(rawClass.definition).spellRules).levelSpellSlots;const slotPath=`data.classes[${warlockIndex}].definition.spellRules.levelSpellSlots[${warlockLevel??'level'}]`;
+  const levelRow=Array.isArray(slotTable)&&warlockLevel!==undefined?slotTable[warlockLevel]:undefined;
+  if(!Array.isArray(levelRow))unresolved.push(slotPath);
+  const positiveSlots:Array<{level:number;max:number}>=[];
+  if(Array.isArray(levelRow))for(let index=0;index<levelRow.length;index++){const max=finite(levelRow[index]);if(max!==undefined&&Number.isInteger(max)&&max>0)positiveSlots.push({level:index+1,max});}
+  if(Array.isArray(levelRow)&&positiveSlots.length!==1)unresolved.push(`${slotPath} (exactly one positive Pact slot level)`);
+  const slot=positiveSlots.length===1?positiveSlots[0]:undefined;
+  if(!Array.isArray(data.pactMagic))unresolved.push('data.pactMagic');
+  const pactRows=Array.isArray(data.pactMagic)?data.pactMagic:[];const matching=slot?pactRows.map((raw,index)=>({row:object(raw),index})).filter(entry=>finite(entry.row.level)===slot.level):[];
+  if(slot&&Array.isArray(data.pactMagic)&&matching.length!==1)unresolved.push(`data.pactMagic[level=${slot.level}]`);
+  const match=matching.length===1?matching[0]:undefined,used=finite(match?.row.used);
+  if(match&&(used===undefined||!Number.isInteger(used)||used<0||slot&&used>slot.max))unresolved.push(`data.pactMagic[${match.index}].used`);
+  if(unresolved.length||!slot||!match||used===undefined)return {unresolvedFields:[...new Set(unresolved)],evidence:[]};
+  const usedPath=`data.pactMagic[${match.index}].used`;const source=`${slotPath}; ${usedPath}`;
+  return {resource:{id:'pact-magic-slots',name:`Pact Magic Slots (Level ${slot.level})`,current:slot.max-used,max:slot.max,recovery:'short-all',kind:'pact-magic-slots',slotLevel:slot.level,source},unresolvedFields:[],evidence:[`${slotPath}: level ${slot.level}, max ${slot.max}`,`${usedPath}: ${used}`]};
+}
+
 function spellAbility(raw:JsonObject,parent:JsonObject,classesById:Map<number,JsonObject>):{ability:Ability;sourceClass:string}{
   let id=whole(raw.spellCastingAbilityId)||whole(object(raw.definition).spellCastingAbilityId);
   const characterClassId=whole(parent.characterClassId);const classEntry=classesById.get(characterClassId);
@@ -437,13 +461,17 @@ function definitionRuleset(definition:JsonObject):CharacterRuleset{
   const text=[definition.rulesVersion,definition.ruleset,definition.source,definition.sourceName,definition.book].map(string).join(' ').toLowerCase();
   const sources=array(definition.sources).map(raw=>{const source=object(raw);return [source.name,source.sourceName,source.book,source.description].map(string).join(' ');}).join(' ').toLowerCase();
   if(definition.isLegacy===true||definition.is2014===true||/\b(2014|legacy)\b/.test(`${text} ${sources}`))return 'legacy';
-  if(definition.is2024===true||definition.isLegacy===false||/\b(2024|revised)\b/.test(`${text} ${sources}`))return '2024';
+  // "Not legacy" is not affirmative evidence that a definition uses the
+  // revised 2024 rules. D&D Beyond also uses false for older, non-deprecated
+  // material, so only an explicit 2024 marker can certify it here.
+  if(definition.is2024===true||/\b(2024|revised)\b/.test(`${text} ${sources}`))return '2024';
   return 'unknown';
 }
 function rulesetAssessment(data:JsonObject):{ruleset:CharacterRuleset;evidence:string[];reviewRequired:boolean}{
   const definitions:JsonObject[]=[];
   const add=(raw:unknown)=>{const entry=object(raw),definition=object(entry.definition);if(Object.keys(definition).length)definitions.push(definition);const subclass=object(entry.subclassDefinition);if(Object.keys(subclass).length)definitions.push(subclass);};
   array(data.classes).forEach(add);selectedFeatEntries(data).entries.forEach(add);array(data.inventory).forEach(add);add({definition:data.race});
+  for(const group of Object.values(object(data.options)))array(group).forEach(add);
   for(const group of Object.values(object(data.spells)))array(group).forEach(add);
   for(const parent of array(data.classSpells))array(object(parent).spells).forEach(add);
   const states=definitions.map(definitionRuleset);const current=states.filter(value=>value==='2024').length,legacy=states.filter(value=>value==='legacy').length,unknown=states.filter(value=>value==='unknown').length;
@@ -456,20 +484,81 @@ function rulesetAssessment(data:JsonObject):{ruleset:CharacterRuleset;evidence:s
     reviewRequired:ruleset!=='2024'||unknown>0,
   };
 }
+
+interface DdbOwnedFeatureImport {features:ImportedFeatureRule[];invocationNames:string[];unresolvedFields:string[]}
+function parseWarlockOwnedFeatures(data:JsonObject):DdbOwnedFeatureImport{
+  const result:ImportedFeatureRule[]=[];const invocationNames:string[]=[];const unresolvedFields:string[]=[];const seen=new Set<string>();
+  const add=(feature:ImportedFeatureRule)=>{const key=`${feature.origin?.kind??'feature'}:${feature.name.toLowerCase()}`;if(!seen.has(key)){seen.add(key);result.push(feature);}};
+  const warlocks=array(data.classes).map(object).filter(entry=>string(object(entry.definition).name).toLowerCase()==='warlock');
+  const invocationParentIds=new Set<number>();const builtInClassNames=new Set((CLASS_FEATURES.Warlock??[]).map(feature=>feature.name.toLowerCase()));
+  for(const rawClass of warlocks){
+    const level=whole(rawClass.level);const definition=object(rawClass.definition);const baseFeatures=array(definition.classFeatures).map(object);const baseIds=new Set(baseFeatures.map(feature=>finite(feature.id)).filter((value):value is number=>value!==undefined));const baseNames=new Set(baseFeatures.map(feature=>string(feature.name).toLowerCase()).filter(Boolean));
+    for(const feature of baseFeatures){
+      const name=string(feature.name),required=whole(feature.requiredLevel??feature.level,1),definitionId=finite(feature.id);if(!name||required>level)continue;
+      if(name.toLowerCase()==='eldritch invocations'){if(definitionId!==undefined)invocationParentIds.add(definitionId);continue;}
+      if(builtInClassNames.has(name.toLowerCase())||/^core .* traits$/i.test(name)||/ability score improvement/i.test(name)||/^warlock subclass$/i.test(name))continue;
+      const sourceIds=[definitionId!==undefined?`definition:${definitionId}`:'',finite(definition.id)!==undefined?`class:${finite(definition.id)}`:''].filter(Boolean);
+      add({id:`ddb-warlock-feature-${definitionId??slug(name)}`,name,source:'D&D Beyond owned Warlock feature',level:Math.max(1,required),summary:'Imported feature name only. Altered does not copy owned text or infer mechanics; use the authorized source until structured support is reviewed.',automation:'reference',origin:{provider:'dndbeyond',kind:'owned-class-feature',sourceIds}});
+    }
+    const subclass=object(rawClass.subclassDefinition),subclassName=string(subclass.name)||'Warlock subclass';const builtInSubclassNames=new Set((SUBCLASS_FEATURES[subclassName]??[]).map(feature=>feature.name.toLowerCase()));
+    for(const feature of array(subclass.classFeatures).map(object)){
+      const name=string(feature.name),required=whole(feature.requiredLevel??feature.level,1),definitionId=finite(feature.id);if(!name||required>level||baseNames.has(name.toLowerCase())||(definitionId!==undefined&&baseIds.has(definitionId))||builtInSubclassNames.has(name.toLowerCase()))continue;
+      const sourceIds=[definitionId!==undefined?`definition:${definitionId}`:'',finite(subclass.id)!==undefined?`subclass:${finite(subclass.id)}`:''].filter(Boolean);
+      add({id:`ddb-warlock-subclass-feature-${definitionId??slug(name)}`,name,source:`D&D Beyond owned ${subclassName} feature`,level:Math.max(1,required),summary:'Imported feature name only. Altered does not copy owned text or infer mechanics; use the authorized source until structured support is reviewed.',automation:'reference',origin:{provider:'dndbeyond',kind:'owned-subclass-feature',sourceIds}});
+    }
+  }
+  if(!warlocks.length)return {features:[],invocationNames:[],unresolvedFields:[]};
+  if(!invocationParentIds.size)unresolvedFields.push('data.classes[Warlock].definition.classFeatures[Eldritch Invocations].id');
+  const options=array(object(data.options).class);
+  for(let index=0;index<options.length;index++){
+    const option=object(options[index]),componentId=finite(option.componentId);if(componentId===undefined||!invocationParentIds.has(componentId))continue;
+    const definition=object(option.definition),name=string(definition.name);if(!name){unresolvedFields.push(`data.options.class[${index}].definition.name`);continue;}
+    const definitionId=finite(definition.id),componentTypeId=finite(option.componentTypeId);const sourceIds=[definitionId!==undefined?`definition:${definitionId}`:'',`component:${componentId}`,componentTypeId!==undefined?`component-type:${componentTypeId}`:''].filter(Boolean);
+    invocationNames.push(name);add({id:`ddb-invocation-${definitionId??slug(name)}`,name,source:'D&D Beyond selected Eldritch Invocation',summary:'Imported selected invocation name only. Altered does not copy owned text or infer mechanics; use the authorized source until structured support is reviewed.',automation:'reference',origin:{provider:'dndbeyond',kind:'eldritch-invocation',sourceIds}});
+  }
+  if(!invocationNames.length)unresolvedFields.push(options.length?'data.options.class[].componentId / definition.name (Eldritch Invocation selections)':'data.options.class');
+  return {features:result.slice(0,500),invocationNames:[...new Set(invocationNames)],unresolvedFields:[...new Set(unresolvedFields)]};
+}
 function weaponProficiencies(data:JsonObject){const result=new Set<string>();for(const rawGroup of Object.values(object(data.modifiers)))for(const raw of array(rawGroup)){const entry=object(raw);if(string(entry.type).toLowerCase()==='proficiency'){const subtype=string(entry.subType).toLowerCase();if(subtype)result.add(subtype);}}return result;}
 function itemEffects(data:JsonObject,definitionId:number){
   const result:NonNullable<CharacterItem['effects']>=[];const map:Record<string,NonNullable<CharacterItem['effects']>[number]['kind']>={'bonus:armor-class':'armor-class','bonus:saving-throws':'saving-throws','bonus:natural-attacks':'natural-attack-rolls','damage:natural-attacks':'natural-attack-damage'};
   for(const raw of array(object(data.modifiers).item)){const modifier=object(raw);if(whole(modifier.componentId)!==definitionId||modifier.isGranted===false)continue;const kind=map[`${string(modifier.type).toLowerCase()}:${string(modifier.subType).toLowerCase()}`];const value=finite(modifier.value)??finite(modifier.fixedValue);if(kind&&value!==undefined)result.push({kind,value,includedInImportedTotals:kind==='armor-class'||kind==='saving-throws'});}
   return result;
 }
+interface DdbPactWeaponContext {enabled:boolean;attackAbility?:Ability;evidence:string[];selectedItems:Map<string,string[]>}
+function pactWeaponContext(data:JsonObject):DdbPactWeaponContext{
+  const optionIds=new Set<number>();const evidence:string[]=[];
+  const options=array(object(data.options).class);
+  for(let index=0;index<options.length;index++){
+    const option=object(options[index]),definition=object(option.definition);if(!/^pact of the blade(?:\s*\(|$)/i.test(string(definition.name)))continue;
+    const id=finite(definition.id);if(id!==undefined){optionIds.add(id);evidence.push(`data.options.class[${index}].definition.id=${id}`);}
+  }
+  let enabled=false;const abilities=new Set<Ability>();
+  for(let index=0;index<array(object(data.modifiers).class).length;index++){
+    const modifierEntry=object(array(object(data.modifiers).class)[index]),componentId=finite(modifierEntry.componentId);if(componentId===undefined||!optionIds.has(componentId))continue;
+    const type=string(modifierEntry.type).toLowerCase(),subType=string(modifierEntry.subType).toLowerCase();
+    if(type==='enable-feature'&&subType==='enable-pact-weapon'){enabled=true;evidence.push(`data.modifiers.class[${index}]=enable-feature:enable-pact-weapon`);}
+    if(type==='replace-weapon-ability'){
+      const statId=finite(modifierEntry.statId)??finite(modifierEntry.entityId);const byId=statId!==undefined?ABILITIES[Math.trunc(statId)-1]:undefined;const byNameIndex=ABILITY_NAMES.findIndex(name=>subType===`${name}-score`);const selected=byId??(byNameIndex>=0?ABILITIES[byNameIndex]:undefined);
+      if(selected){abilities.add(selected);evidence.push(`data.modifiers.class[${index}]=replace-weapon-ability:${subType||`stat-${statId}`}`);}
+    }
+  }
+  const selectedItems=new Map<string,string[]>();
+  for(let index=0;index<array(data.characterValues).length;index++){
+    const value=object(array(data.characterValues)[index]);if(whole(value.typeId)!==28||value.value!==true)continue;const itemId=string(value.valueId)||String(whole(value.valueId));const entityType=string(value.valueTypeId)||String(whole(value.valueTypeId));if(!itemId||itemId==='0'||!entityType||entityType==='0')continue;
+    selectedItems.set(`${entityType}:${itemId}`,[`data.characterValues[${index}].typeId=28`,`data.characterValues[${index}].valueId=${itemId}`,`data.characterValues[${index}].valueTypeId=${entityType}`]);
+  }
+  return {enabled,...(abilities.size===1?{attackAbility:[...abilities][0]}:{}),evidence:[...new Set(evidence)],selectedItems};
+}
 function parseItems(data:JsonObject,abilities:Character['abilities']):CharacterItem[]{
-  const proficiencies=weaponProficiencies(data);
+  const proficiencies=weaponProficiencies(data);const pact=pactWeaponContext(data);
   return array(data.inventory).slice(0,300).flatMap((raw,index)=>{
     const item=object(raw),definition=object(item.definition);const name=string(definition.name);if(!name)return [];
     const definitionId=whole(definition.id);const id=String(whole(item.id)||definitionId||slug(`${name}-${index}`));const requiresAttunement=Boolean(definition.canAttune)||Boolean(definition.requiresAttunement);const equipped=Boolean(item.equipped),attuned=Boolean(item.isAttuned);
     const sourceIds=[finite(definition.sourceId),...array(definition.sources).flatMap(source=>[finite(object(source).sourceId),finite(object(source).id)])].filter((value):value is number=>value!==undefined).map(String);
     const ruleset=definitionRuleset(definition);const included=equipped&&(!requiresAttunement||attuned);const properties=array(definition.properties).map(rawProperty=>string(object(rawProperty).name)).filter(Boolean).slice(0,20);const damage=string(object(definition.damage).diceString);const damageType=DAMAGE_TYPES[string(definition.damageType).toLowerCase()];const category=whole(definition.categoryId);const weapon=string(definition.filterType).toLowerCase()==='weapon'&&Boolean(damage)&&Boolean(damageType);const weaponSlug=slug(name);const proficient=category===1?proficiencies.has('simple-weapons'):category===2?proficiencies.has('martial-weapons'):proficiencies.has(weaponSlug)||proficiencies.has(`${weaponSlug}s`);const ranged=whole(definition.attackType)===2;const finesse=properties.some(property=>property.toLowerCase()==='finesse');const ability:Ability=ranged?'dex':finesse&&abilities.dex>abilities.str?'dex':'str';const namedBonus=Number(name.match(/(?:^|[,\s])\+(\d+)\s*$/)?.[1]??0);const explicitBonus=finite(definition.magicBonus)??finite(definition.attackBonus);const magicBonus=Math.max(-5,Math.min(10,Math.trunc(explicitBonus??namedBonus)));
-    const effects=itemEffects(data,definitionId);return [{id:`ddb-item-${id}`,name,type:string(definition.type)||'Item',equipped,attuned,requiresAttunement,ruleset,sourceIds:[...new Set(sourceIds)].slice(0,20),mechanics:included?'included-in-imported-totals':ruleset==='legacy'||ruleset==='mixed'?'review-required':'reference-only',...(effects.length?{effects}:{}),...(weapon&&damageType?{attack:{ability,damage,damageType,proficient,properties,magicBonus,...(finite(definition.range)!==undefined?{range:whole(definition.range)}:{}),...(finite(definition.longRange)!==undefined?{longRange:whole(definition.longRange)}:{})}}:{})} satisfies CharacterItem];
+    const itemEntityType=string(item.entityTypeId)||String(whole(item.entityTypeId));const itemId=string(item.id)||String(whole(item.id));const linkedEvidence=itemEntityType!=='0'&&itemId!=='0'?pact.selectedItems.get(`${itemEntityType}:${itemId}`):undefined;const directlyMarked=item.isPactWeapon===true||definition.isPactWeapon===true;const pactEvidence=directlyMarked?[...(item.isPactWeapon===true?[`data.inventory[${index}].isPactWeapon=true`]:[]),...(definition.isPactWeapon===true?[`data.inventory[${index}].definition.isPactWeapon=true`]:[])]:pact.enabled&&linkedEvidence?[...pact.evidence,...linkedEvidence]:[];
+    const effects=itemEffects(data,definitionId);return [{id:`ddb-item-${id}`,name,type:string(definition.type)||'Item',equipped,attuned,requiresAttunement,ruleset,sourceIds:[...new Set(sourceIds)].slice(0,20),mechanics:included?'included-in-imported-totals':ruleset==='legacy'||ruleset==='mixed'?'review-required':'reference-only',...(effects.length?{effects}:{}),...(pactEvidence.length?{pactWeapon:{provider:'dndbeyond' as const,evidence:[...new Set(pactEvidence)],...(pact.attackAbility?{attackAbility:pact.attackAbility}:{})}}:{}),...(weapon&&damageType?{attack:{ability,damage,damageType,proficient,properties,magicBonus,...(finite(definition.range)!==undefined?{range:whole(definition.range)}:{}),...(finite(definition.longRange)!==undefined?{longRange:whole(definition.longRange)}:{})}}:{})} satisfies CharacterItem];
   });
 }
 
@@ -559,7 +648,7 @@ function ddbAstralEnhancements(data:JsonObject,classes:Character['classes'],abil
   const actions=array(object(data.actions).class).map(object);const summon=actions.find(action=>/^arms of the astral self: summon$/i.test(string(action.name)));if(!summon)return [];
   const pb=proficiencyBonus(classes.reduce((sum,entry)=>sum+entry.level,0)),wis=modifier(abilities.wis),martialDie=monk.level>=17?12:monk.level>=11?10:monk.level>=5?8:6;const fixedDc=finite(summon.fixedSaveDc);const dc=fixedDc??8+pb+wis;const damageModifier=wis>0?`+${wis}`:wis<0?String(wis):'';
   const grants:TransformationGrant[]=[{id:'ddb-astral-arms',label:'Astral Arms',profile:'overlay',formIds:[],source:'D&D Beyond character enhancement',actionCost:'bonus',endActionCost:'none',duration:'10 minutes',resourceId:'focus-points',resourceCost:1,effects:{checkAbilitySubstitution:{str:'wis'},saveAbilitySubstitution:{str:'wis'},endsOnIncapacitated:true,activationActions:[{id:'astral-arms-summon',name:'Astral Arms Summon',type:'save',cost:'none',saveAbility:'dex',dc,range:'Each chosen visible creature within 10 ft.',damageOnFail:[{expression:`2d${martialDie}`,type:'Force'}],notes:'This saving throw and damage resolve immediately when Astral Arms is activated; its Bonus Action and Focus Point have already been spent.'}],actions:[{id:'astral-arms-unarmed-strike',name:'Astral Arms Unarmed Strike',type:'attack',cost:'action',attackBonus:pb+wis,ability:'wis',kind:'unarmed',reach:10,damage:[{expression:`1d${martialDie}${damageModifier}`,type:'Force'}],notes:'Separate spectral-arm strike. It uses Wisdom for attack and damage, the current 2024 Monk Martial Arts die, and 10-foot reach on your turn. Ordinary unarmed strikes remain available separately.'}]}}];
-  const visage=actions.find(action=>/^visage of the astral self$/i.test(string(action.name)));if(monk.level>=6&&visage){const visageEffects:TransformationEffects={endsOnIncapacitated:true,senses:['See normally in magical and nonmagical darkness to 120 ft.'],skillAdvantage:['Insight','Intimidation'],actions:[{id:'astral-visage-word-of-spirit',name:'Word of the Spirit',type:'automatic',cost:'none',notes:'Choose private speech or an amplified voice while Astral Visage is active.',choices:[{id:'private',label:'Private speech',resolution:'activate',notes:'One visible creature within 60 ft. can hear you.'},{id:'amplified',label:'Amplified voice',resolution:'activate',notes:'All creatures within 600 ft. can hear you.'}]}]};grants.push({id:'ddb-astral-visage',label:'Astral Visage',profile:'overlay',formIds:[],source:'D&D Beyond character enhancement',actionCost:'bonus',endActionCost:'none',duration:'10 minutes',resourceId:'focus-points',resourceCost:1,effects:visageEffects});const armsEffects=grants[0]!.effects!;grants.push({id:'ddb-astral-arms-visage',label:'Astral Arms + Visage',profile:'overlay',formIds:[],source:'D&D Beyond character enhancement',actionCost:'bonus',endActionCost:'none',duration:'10 minutes',resourceId:'focus-points',resourceCost:2,effects:{...armsEffects,senses:visageEffects.senses!,skillAdvantage:visageEffects.skillAdvantage!,actions:[...(armsEffects.actions??[]),...(visageEffects.actions??[])]}});}return grants;
+  const visage=actions.find(action=>/^visage of the astral self$/i.test(string(action.name)));if(monk.level>=6&&visage){const visageEffects:TransformationEffects={endsOnIncapacitated:true,senses:['See normally in magical and nonmagical darkness to 120 ft.'],skillAdvantage:['Insight','Intimidation'],actions:[{id:'astral-visage-word-of-spirit',name:'Word of the Spirit',type:'automatic',cost:'none',notes:'Choose private speech or an amplified voice while Astral Visage is active.',choices:[{id:'private',label:'Private speech',resolution:'activate',notes:'One visible creature within 60 ft. can hear you.'},{id:'amplified',label:'Amplified voice',resolution:'activate',notes:'All creatures within 600 ft. can hear you.'}]}]};grants.push({id:'ddb-astral-visage',label:'Astral Visage',profile:'overlay',formIds:[],source:'D&D Beyond character enhancement',actionCost:'bonus',endActionCost:'none',duration:'10 minutes',resourceId:'focus-points',resourceCost:1,effects:visageEffects});}return grants;
 }
 
 function homebrewCount(data:JsonObject):number{
@@ -601,14 +690,19 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
   const ruleset=rulesetAssessment(data);const blocked=ruleset.ruleset==='legacy'||ruleset.ruleset==='mixed';const blockReason=blocked?`Altered is configured for 2024 rules only, but D&D Beyond identified this character as ${ruleset.ruleset} rules. Update the character to 2024 rules before importing.`:undefined;
   if(blocked)warnings.push({code:'non-2024-ruleset',severity:'warning',message:blockReason!});
   else if(ruleset.reviewRequired)warnings.push({code:'ruleset-review',severity:'warning',message:'Some D&D Beyond definitions did not include a reliable 2024/legacy marker. The character has positive 2024 evidence, but verify the unmarked subclass, feats, spells, and items before confirming.'});
-  const classes=parseClasses(data);const totalLevel=classes.reduce((sum,entry)=>sum+entry.level,0);
+  const classes=parseClasses(data);const totalLevel=classes.reduce((sum,entry)=>sum+entry.level,0);const hasWarlock=classes.some(entry=>entry.name.toLowerCase()==='warlock');const pactMagic=hasWarlock?parsePactMagic(data):{unresolvedFields:[],evidence:[]} satisfies DdbPactMagicImport;const ownedFeatures=hasWarlock?parseWarlockOwnedFeatures(data):{features:[],invocationNames:[],unresolvedFields:[]} satisfies DdbOwnedFeatureImport;
+  if(hasWarlock){
+    if(pactMagic.resource)warnings.push({code:'pact-magic-review',severity:'warning',message:`Imported ${pactMagic.resource.current}/${pactMagic.resource.max} level ${pactMagic.resource.slotLevel} Pact Magic slots from ${pactMagic.resource.source} with short-rest recovery. Altered offers this as a separate casting choice, spends it only after a valid cast, and restores it on a Short Rest.`});
+    else warnings.push({code:'pact-magic-review',severity:'warning',message:`Pact Magic was not given a guessed slot count or level. Unresolved D&D Beyond fields: ${pactMagic.unresolvedFields.join(', ')}.`,fields:pactMagic.unresolvedFields});
+    if(!ownedFeatures.invocationNames.length)warnings.push({code:'eldritch-invocations-not-provided',severity:'warning',message:`D&D Beyond did not provide linkable selected Eldritch Invocation names. Unresolved fields: ${ownedFeatures.unresolvedFields.join(', ')}.`,fields:ownedFeatures.unresolvedFields});
+  }
   if(totalLevel<1||totalLevel>20)throw new Error(`D&D Beyond reported an invalid total level (${totalLevel}).`);
   const modifiers=collectModifiers(data);const abilities=parseAbilities(data,modifiers);const race=parseRace(data);
   const proficiencies=parseProficiencies(abilities,totalLevel,modifiers);const hp=parseHitPoints(data,abilities,totalLevel,modifiers);
   const defense=parseEquipmentAndAc(data,abilities,classes,modifiers);const formSelection=legalKnownForms(data,classes,warnings);const knownForms=formSelection.knownForms;
   const druid=classes.find(entry=>entry.name.toLowerCase()==='druid');
   if(druid&&druid.level>=2&&knownForms.length===0)warnings.push({code:'wild-shape-not-provided',severity:'warning',message:'D&D Beyond did not provide recognizable Wild Shape selections. No forms were guessed; add or review known forms in Altered before transforming.'});
-  const parsedSpells=parseSpells(data,abilities,totalLevel);const moonSpells=restoreMoonCircleSpells(parsedSpells,classes,abilities,totalLevel);const spells=moonSpells.spells;const featSelection=parseFeats(data);const feats=featSelection.feats;const resources=parseResources(data,totalLevel);const items=parseItems(data,abilities);const transformationGrants=ddbAstralEnhancements(data,classes,abilities);
+  const parsedSpells=parseSpells(data,abilities,totalLevel);const moonSpells=restoreMoonCircleSpells(parsedSpells,classes,abilities,totalLevel);const spells=moonSpells.spells;const featSelection=parseFeats(data);const feats=featSelection.feats;const resources=parseResources(data,totalLevel).filter(resource=>!['pact-magic','pact-magic-slots','pact-slots'].includes(resource.id));if(pactMagic.resource)resources.push(pactMagic.resource);const items=parseItems(data,abilities);const transformationGrants=ddbAstralEnhancements(data,classes,abilities);
   if(featSelection.ignored.length)warnings.push({code:'incomplete-feat-choice',severity:'info',message:`Altered ignored ${featSelection.ignored.join(', ')} because D&D Beyond returned ${featSelection.ignored.length===1?'it as an unfinished feat choice':'them as unfinished feat choices'}, not selected character features.`});
   if(moonSpells.added)warnings.push({code:'circle-moon-spells-restored',severity:'info',message:`D&D Beyond omitted ${moonSpells.added} always-prepared Circle of the Moon spell${moonSpells.added===1?'':'s'} from its character payload. Altered restored the current 2024 Circle spell list for this Druid level.`});
   const activeItems=array(data.inventory).filter(raw=>Boolean(object(raw).equipped));
@@ -618,7 +712,7 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
   const raw={
     schemaVersion:1,id:`ddb-${sourceId}`,name:string(data.name)||`D&D Beyond ${sourceId}`,species:race.species,creatureType:'Humanoid',size:race.size,totalLevel,classes,abilities,hp,
     ac:defense.ac,speed:parseSpeed(data,race.speed,modifiers),proficiencies:proficiencies.proficiencies,skillBonuses:proficiencies.skillBonuses,saveBonuses:proficiencies.saveBonuses,
-    knownForms,seenForms:knownForms,spells,spellSlots:parseSpellSlots(data,classes),feats,features:[],resources,equipment:defense.equipment,items,provenance:{provider:'dndbeyond',sourceId,ruleset:ruleset.ruleset,rulesetEvidence:[...ruleset.evidence,DDB_FEAT_SELECTION_EVIDENCE],reviewRequired:ruleset.reviewRequired},transformationGrants,customForms:[],
+    knownForms,seenForms:knownForms,spells,spellSlots:parseSpellSlots(data,classes),feats,features:ownedFeatures.features,resources,equipment:defense.equipment,items,provenance:{provider:'dndbeyond',sourceId,ruleset:ruleset.ruleset,rulesetEvidence:[...ruleset.evidence,DDB_FEAT_SELECTION_EVIDENCE,...pactMagic.evidence,...(hasWarlock?[pactMagic.resource?'Pact Magic is available as a separate exact-level casting pool with Short Rest recovery':`Pact Magic unresolved: ${pactMagic.unresolvedFields.join(', ')}`]:[]),...(ownedFeatures.invocationNames.length?[`D&D Beyond provided ${ownedFeatures.invocationNames.length} selected Eldritch Invocation name${ownedFeatures.invocationNames.length===1?'':'s'} as reference-only evidence`]:[])],reviewRequired:ruleset.reviewRequired||hasWarlock},transformationGrants,customForms:[],
   };
   const character=parseCharacter(raw);
   const privateSetup=setupNeeds(data,classes,feats,items,spells,homebrew);
@@ -628,7 +722,8 @@ export function importDdbCharacter(payload:unknown,expectedId?:string):DdbImport
     {label:'Ability scores, HP, and speed',status:'verified',detail:`${ABILITIES.map(key=>`${key.toUpperCase()} ${character.abilities[key]}`).join(' · ')} · HP ${character.hp.current}/${character.hp.max} · ${character.speed} ft.`},
     {label:'Armor Class and equipment',status:defense.review?'review':'verified',detail:`AC ${character.ac} · ${character.equipment.armorCategory} armor · ${character.equipment.shield?'shield':'no shield'}`},
     {label:'Saving throws and skills',status:'verified',detail:`${Object.values(character.proficiencies.saves).filter(rank=>rank>0).length} save proficiencies · ${Object.values(character.proficiencies.skills).filter(rank=>rank>0).length} skill proficiencies`},
-    {label:'Prepared and known spells',status:spells.length?'verified':'not-provided',detail:`${spells.length} spell${spells.length===1?'':'s'} available${moonSpells.added?` · ${moonSpells.added} Circle spell${moonSpells.added===1?'':'s'} restored`:''} · ${Object.keys(character.spellSlots).length} slot levels`},
+    {label:'Prepared and known spells',status:hasWarlock?'review':spells.length?'verified':'not-provided',detail:hasWarlock?`${spells.length} spell${spells.length===1?'':'s'} imported · ordinary slots: ${Object.keys(character.spellSlots).length} levels · Pact Magic is reported separately`:`${spells.length} spell${spells.length===1?'':'s'} available${moonSpells.added?` · ${moonSpells.added} Circle spell${moonSpells.added===1?'':'s'} restored`:''} · ${Object.keys(character.spellSlots).length} slot levels`},
+    ...(hasWarlock?[{label:'Pact Magic',status:pactMagic.resource?'verified' as const:'review' as const,detail:pactMagic.resource?`${pactMagic.resource.current}/${pactMagic.resource.max} level ${pactMagic.resource.slotLevel} slots · separate casting choice · spent after a valid cast · restored on a Short Rest`:`Not imported; unresolved: ${pactMagic.unresolvedFields.join(', ')} · no count or slot level guessed`},{label:'Owned Warlock features',status:'review' as const,detail:ownedFeatures.invocationNames.length?`${ownedFeatures.invocationNames.length} selected invocation name${ownedFeatures.invocationNames.length===1?'':'s'} imported as reference-only evidence: ${ownedFeatures.invocationNames.join(', ')}`:`No selected invocation names imported; unresolved: ${ownedFeatures.unresolvedFields.join(', ')}`}]:[]),
     {label:'Wild Shape selections',status:druid&&druid.level>=2?(knownForms.length?'verified':'review'):'not-provided',detail:knownForms.length?knownForms.map(id=>CREATURES[id]?.name??id).join(', '):'No form names were provided or matched'},
     {label:'Items and homebrew',status:activeItems.length||homebrew?'review':'not-provided',detail:`${items.length} item record${items.length===1?'':'s'} · ${activeItems.length} equipped · ${homebrew} homebrew entr${homebrew===1?'y':'ies'}`},
   ];

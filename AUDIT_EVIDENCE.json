@@ -1,7 +1,7 @@
 {
   "artifact": "Altered D&D 5e 2024 rules audit evidence",
-  "version": "0.29.32",
-  "generatedAt": "2026-08-15T19:36:10.683Z",
+  "version": "0.29.39",
+  "generatedAt": "2026-08-21T02:27:33.208Z",
   "rules": {
     "rules": 48,
     "functions": 16,
@@ -23,14 +23,14 @@
       "product": 2
     },
     "verifiedThrough": "2026-08-13",
-    "ledgerSha256": "c556d3ff7d8b287b377fb5aedc686bf1a3487c919ebcba1360552f15d2e08d1c"
+    "ledgerSha256": "6df8365d0e87d672d867aa9ee87c5663342a212a72da3009e5e4aed73d63e393"
   },
   "content": {
     "packs": [
       {
         "id": "altered-srd-creatures",
         "domain": "creatures",
-        "version": "0.29.32",
+        "version": "0.29.39",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 16,
@@ -39,16 +39,16 @@
       {
         "id": "altered-core-class-features",
         "domain": "class-features",
-        "version": "0.29.32",
+        "version": "0.29.39",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
-        "records": 96,
-        "sha256": "4aa48a1cd1f7e2bb7949291e7ea5ec62132b716443fbb595af779ec87f926ea2"
+        "records": 95,
+        "sha256": "6f2ed027830acc12b09480789cbca98cccb8af94503a7551c7e8a6eb4a9829ca"
       },
       {
         "id": "altered-core-species-features",
         "domain": "species-features",
-        "version": "0.29.32",
+        "version": "0.29.39",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 11,
@@ -57,7 +57,7 @@
       {
         "id": "altered-core-feat-hooks",
         "domain": "feats",
-        "version": "0.29.32",
+        "version": "0.29.39",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 1,
@@ -66,7 +66,7 @@
       {
         "id": "altered-spell-hooks",
         "domain": "spells",
-        "version": "0.29.32",
+        "version": "0.29.39",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 13,
@@ -75,7 +75,7 @@
       {
         "id": "altered-item-hooks",
         "domain": "items",
-        "version": "0.29.32",
+        "version": "0.29.39",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 0,
@@ -84,7 +84,7 @@
       {
         "id": "altered-core-conditions",
         "domain": "conditions",
-        "version": "0.29.32",
+        "version": "0.29.39",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 15,
@@ -93,15 +93,15 @@
       {
         "id": "altered-transformation-profiles",
         "domain": "transformation-profiles",
-        "version": "0.29.32",
+        "version": "0.29.39",
         "ruleset": "2024 Revised Fifth Edition",
         "verified": "2026-08-13",
         "records": 8,
         "sha256": "899b51877067ea7c30752993b5e8fe9f18ba86be3f1f5d787f6e981555767cf4"
       }
     ],
-    "totalRecords": 160,
-    "manifestSha256": "bf3ebc780bfa0450f9d31fd621a209831adfcdc624587f4aa322a558f21bc922"
+    "totalRecords": 159,
+    "manifestSha256": "888b7904937f351829f3ff8bece6ed25269175a8e5e43629e9d2054eef097b86"
   },
   "interactionMatrix": [
     {

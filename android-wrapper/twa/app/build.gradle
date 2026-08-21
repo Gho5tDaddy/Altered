@@ -15,10 +15,19 @@
  */
 
 import groovy.xml.MarkupBuilder
+import groovy.json.JsonSlurper
 
 plugins {
     id 'com.android.application'
 }
+
+def packageMetadata = new JsonSlurper().parse(file('../../../package.json'))
+def releaseVersion = packageMetadata.version as String
+def releaseVersionParts = releaseVersion.tokenize('-')[0].tokenize('.').collect { it as Integer }
+if (releaseVersionParts.size() != 3) {
+    throw new GradleException('package.json does not contain a valid release version.')
+}
+def releaseVersionCode = releaseVersionParts[0] * 1000000 + releaseVersionParts[1] * 1000 + releaseVersionParts[2]
 
 def twaManifest = [
     applicationId: 'com.ghostdaddy.altered',
@@ -57,8 +66,8 @@ android {
         applicationId "com.ghostdaddy.altered"
         minSdkVersion 21
         targetSdkVersion 36
-        versionCode 66
-        versionName "0.29.32"
+        versionCode releaseVersionCode
+        versionName releaseVersion
 
         // The name for the application
         resValue "string", "appName", twaManifest.name

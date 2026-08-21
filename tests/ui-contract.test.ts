@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 test('static shell exposes accessible tabs, dialogs, and condition input',()=>{
   const html=readFileSync('public/index.html','utf8');
   assert.match(html,/role="tablist"/);
-  assert.equal((html.match(/role="tab"/g)??[]).length,6);
+  assert.equal((html.match(/role="tab"/g)??[]).length,7);
   assert.match(html,/id="tab-content"[^>]*role="tabpanel"[^>]*aria-labelledby="tab-actions"/);
   assert.match(html,/for="condition-select">Condition<\/label>/);
   for(const id of ['received-effect-kind','add-received-effect-button','received-effect-list'])assert.match(html,new RegExp(`id="${id}"`));
@@ -20,11 +20,58 @@ test('received effects stay compact and attacks separate hit from damage',()=>{
   const html=readFileSync('public/index.html','utf8'),source=readFileSync('src/app.ts','utf8'),styles=readFileSync('public/styles.css','utf8');
   assert.match(html,/Effects &amp; Conditions/);assert.match(html,/Guidance/);assert.match(html,/Bardic Inspiration/);
   assert.match(source,/receivedRollBonus\('attack'\)/);assert.match(source,/receivedRollBonus\('skill',/);assert.match(source,/queueDamageRoll/);assert.match(source,/Roll Damage/);assert.match(source,/Miss · Clear/);
-  assert.match(source,/quick-guidance/);assert.match(source,/quick-inspiration/);assert.match(source,/autoChooseSkill/);assert.match(source,/Guidance chose \$\{skill\}/);
-  assert.match(html,/id="quick-initiative"/);assert.match(html,/id="persistent-undo-turn"/);assert.match(source,/autoUseNextRoll/);assert.match(source,/Heroic Inspiration rerolled/);assert.match(source,/startCombat\(state\)/);assert.match(source,/Choose Damage, Grapple, or Shove/);
+  assert.match(source,/quick-guidance/);assert.match(source,/quick-inspiration/);assert.match(source,/autoChooseSkill/);assert.match(source,/Guidance chose \$\{skill\} and ended after this check/);assert.match(source,/active\.id!==effect\.id/);
+  assert.match(html,/id="quick-initiative"/);assert.match(html,/id="persistent-undo-turn"/);assert.equal(/autoUseNextRoll/.test(source),false);assert.match(source,/never spent automatically/);assert.match(source,/pendingHeroicRoll/);assert.match(source,/resolveHeroicReroll/);assert.match(source,/startCombat\(state\)/);assert.match(source,/Choose Damage, Grapple, or Shove/);
   for(const id of ['battlefield-facts','fact-ally-near-target','fact-attacker-unseen','fact-target-unseen'])assert.match(html,new RegExp(`id="${id}"`));
   assert.match(source,/confirmed ally beside target/);assert.match(source,/nextAttackFacts\.clear\(\)/);assert.match(source,/Rules confidence/);
   assert.match(styles,/alteredTrackedEffect/);assert.match(styles,/\.app-shell\.reduce-motion \.tracked-active/);
+});
+
+test('turn guidance never skips pending damage or a remaining Action and ignores unusable Bonus Actions',()=>{
+  const source=readFileSync('src/app.ts','utf8');
+  assert.match(source,/function hasExecutableBonusAction\(\)/);
+  assert.match(source,/state\.turn\.bonusRemaining===0\|\|!hasExecutableBonusAction\(\)/);
+  assert.match(source,/secondWindReady=classLevel\(character,'Fighter'\)>=1&&!secondWindError\(character,state\)/);
+  assert.match(source,/layOnHandsReady=classLevel\(character,'Paladin'\)>=1&&!layOnHandsError\(character,state,1\)/);
+  assert.match(source,/configuredPrivateReady=sheet\.features\.some/);
+  assert.equal(/const featureReady=sheet\.features\.some\(feature=>feature\.activation==='bonus'/.test(source),false,'unimplemented activation metadata must not block End Turn');
+  assert.match(source,/pendingDamageRolls\.size===0/);
+  assert.match(source,/if\(pendingDamageRolls\.size\)return \{title:'Resolve damage'/);
+  assert.match(source,/if\(state\.turn\.actionsRemaining>0\|\|state\.turn\.surgeActionsRemaining>0\|\|\(state\.turn\.attackAction\?\.remaining\?\?0\)>0\)return \{title:'Use your remaining Action'/);
+  assert.match(source,/no executable Bonus Action remains/);
+});
+
+test('Reactions are a focused, honest tool that reuses executable action paths',()=>{
+  const html=readFileSync('public/index.html','utf8'),source=readFileSync('src/app.ts','utf8'),styles=readFileSync('public/styles.css','utf8');
+  for(const id of ['open-reactions-view','tab-reactions'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(html,/data-open-tab="reactions"/);assert.match(source,/reactions:'Reactions'/);assert.match(source,/action\.cost==='reaction'/);assert.match(source,/spell\.castingTime==='reaction'/);
+  assert.match(source,/function renderReactions\(\)/);assert.match(source,/renderActions\('reactions'\)/);assert.match(source,/Opportunity Attack/);assert.match(source,/Deflect Attacks/);
+  assert.match(source,/reference card does not spend the Reaction/);assert.match(source,/resolveAttackAction\(action\)/);assert.match(source,/castAndResolveSpell\(spell\)/);
+  assert.match(styles,/\.task-view \.tabs\{grid-template-columns:repeat\(7/);
+});
+
+test('Character shows compact scores, controlled resources, and honest import coverage',()=>{
+  const html=readFileSync('public/index.html','utf8'),source=readFileSync('src/app.ts','utf8'),styles=readFileSync('public/styles.css','utf8');
+  for(const id of ['character-snapshot','character-ability-scores','character-passive-scores','import-coverage','import-coverage-list','coverage-open-import','import-summons-note'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(html,/Passive mental scores/);assert.match(source,/passiveSkillScore\('Perception'\)/);assert.match(source,/passiveSkillScore\('Investigation'\)/);assert.match(source,/passiveSkillScore\('Insight'\)/);
+  assert.match(html,/Uploading one does not automatically unlock or invent executable mechanics/);assert.match(source,/Not yet automated:/);assert.match(source,/does not yet track separate AC, HP, statistics, or initiative/);
+  assert.match(source,/Calculated \/ executable/);assert.match(source,/Tracked \/ confirm/);assert.match(source,/spell\.resolution!=='manual'/);assert.match(source,/private user-reviewed pack/);
+  assert.match(source,/function adjustTrackedResource/);assert.match(source,/Mark used/);assert.match(source,/actions spend these automatically/i);assert.match(styles,/\.tracked-resource\{/);assert.match(styles,/\.character-ability-scores\{/);
+});
+
+test('roll toast dismisses on pointer or keyboard and Heroic Inspiration waits for confirmation',()=>{
+  const html=readFileSync('public/index.html','utf8'),source=readFileSync('src/app.ts','utf8'),styles=readFileSync('public/styles.css','utf8');
+  assert.match(html,/id="roll-toast"[^>]*aria-label="Roll result\. Tap or press Escape to dismiss\."[^>]*tabindex="0"/);
+  for(const id of ['roll-toast-inspiration','roll-toast-dismiss'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(source,/function dismissRollToast\(\)/);assert.match(source,/rollToast\.addEventListener\('click'/);assert.match(source,/\['Enter',' ','Escape'\]/);assert.match(source,/window\.setTimeout\(dismissRollToast,8000\)/);
+  assert.match(source,/Spend Heroic Inspiration\?/);assert.match(source,/replacement die must be used/i);assert.match(source,/state\.receivedEffects=state\.receivedEffects\.filter/);assert.equal(/effect\.kind==='heroic-inspiration'&&effect\.autoUseNextRoll/.test(source),false);
+  assert.match(styles,/\.roll-toast\{grid-template-areas:[^}]*pointer-events:auto/);assert.match(styles,/\.heroic-reroll-controls/);
+});
+
+test('post-hit save actions require visible confirmation before spending resources',()=>{
+  const source=readFileSync('src/app.ts','utf8');
+  assert.match(source,/function actionPrerequisiteKey\(action:CreatureAction/);assert.match(source,/function resolveSaveAction[\s\S]*Confirm the visible prerequisite[\s\S]*prepareLimitedAction\(action\)/);
+  assert.match(source,/action\.prerequisite\?`Trigger:/);assert.match(source,/Confirm the hit or trigger above/);assert.match(source,/confirmedActionPrerequisites\.delete\(key\)/);
 });
 
 test('paid mechanics use a compact private completion flow without credentials or copied rules text',()=>{
@@ -33,6 +80,15 @@ test('paid mechanics use a compact private completion flow without credentials o
   assert.match(source,/ddbSetupPackId\(report\.sourceId,need\.id\)/);assert.match(source,/privateMechanicPack\(/);assert.match(source,/reapplied automatically whenever this character is imported/);
   assert.match(html,/id="resume-private-setup"/);assert.match(html,/id="more-resume-setup"/);assert.match(source,/PENDING_DDB_SETTING='pending-ddb-import-v1'/);assert.match(source,/saveJsonSetting\(PENDING_DDB_SETTING,report\)/);assert.match(source,/loadJsonSetting<unknown>\(PENDING_DDB_SETTING\)/);
   assert.match(importer,/setupNeeds:DdbSetupNeed\[\]/);assert.match(importer,/SUBCLASS_FEATURES/);assert.match(owned,/schemaVersion:1,kind:'altered-owned-content-pack'/);
+});
+
+test('import methods use progressive disclosure and persistence failures stay recoverable',()=>{
+  const html=readFileSync('public/index.html','utf8'),source=readFileSync('src/app.ts','utf8'),storage=readFileSync('src/storage.ts','utf8');
+  for(const id of ['import-method-ddb','import-method-json','import-method-character-pdf','import-method-owned'])assert.match(html,new RegExp(`<details id="${id}"`));
+  assert.match(html,/id="import-method-ddb"[^>]*open/);assert.match(html,/id="storage-warning"[^>]*role="alert"[^>]*hidden/);assert.match(html,/id="storage-warning-export"/);
+  assert.match(source,/storageSchemaVersion:1/);assert.match(source,/invalidPackRecords\.push/);assert.equal(/catch\{invalidPackCount\+\+;await removeExtensionPack/.test(source),false);
+  assert.match(storage,/setStorageFailureHandler/);assert.match(storage,/may disappear after reload/);
+  assert.match(source,/provenance\.reviewRequired/);assert.match(source,/Your saved character was not replaced/);
 });
 
 test('every static button is connected to an application control path',()=>{
@@ -200,22 +256,34 @@ test('the exact hosted build executes before optional mobile storage hydration',
 });
 
 test('hosted release downloads use the platform static-asset binding',()=>{
-  const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const build=readFileSync('scripts/build.mjs','utf8');
+  const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const build=readFileSync('scripts/build.mjs','utf8');const config=readFileSync('scripts/release-config.mjs','utf8');const verifier=readFileSync('scripts/verify-release.mjs','utf8');
   assert.match(worker,/async fetch\(request,env\)/);
-  assert.match(build,/__ALTERED_DOWNLOAD_ASSETS__/);assert.match(worker,/const DOWNLOAD_ASSETS=__ALTERED_DOWNLOAD_ASSETS__/);
-  assert.match(worker,/ANDROID_DOWNLOAD_PATH='\/downloads\/Altered-Android-v0\.29\.32\.apk'/);
-  assert.match(worker,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/Altered-Android-v0\.29\.32\.apk/);
+  assert.match(build,/from '\.\/release-config\.mjs'/);assert.match(build,/if\(name!==['"]downloads['"]\)/);assert.match(build,/for\(const artifact of releaseArtifacts\)/);
+  assert.match(config,/Altered-Android-v\$\{appVersion\}\.apk/);assert.match(config,/Altered-Windows-Setup-v\$\{appVersion\}\.exe/);assert.match(config,/Altered-Desktop-Mac-v\$\{appVersion\}\.zip/);
+  assert.equal((config.match(/fileName:/g)??[]).length,3);
+  assert.match(worker,/const DOWNLOAD_PATHS=__ALTERED_DOWNLOAD_PATHS__/);assert.match(worker,/ANDROID_DOWNLOAD_PATH=__ALTERED_ANDROID_DOWNLOAD_PATH__/);assert.match(worker,/ANDROID_DOWNLOAD_URL=__ALTERED_ANDROID_DOWNLOAD_URL__/);
+  assert.equal(worker.includes('DOWNLOAD_ASSETS'),false);assert.equal(build.includes('__ALTERED_DOWNLOAD_ASSETS__'),false);
+  assert.match(build,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/\$\{androidReleaseArtifact\.fileName\}/);
   assert.match(worker,/Content-Disposition.*attachment/);
-  assert.match(worker,/url\.pathname\.startsWith\('\/downloads\/'\)&&env\?\.ASSETS\?\.fetch/);
+  assert.match(worker,/DOWNLOAD_PATHS\.includes\(url\.pathname\)/);assert.match(worker,/env\.ASSETS\.fetch\(request\)/);
+  assert.match(verifier,/dist\/downloads must contain exactly the three current advertised artifacts/);assert.match(verifier,/deploymentLimits\.workerBytes/);assert.match(verifier,/deploymentLimits\.distBytes/);
+});
+
+test('local server supplies image/module MIME types and the bounded OCR policy',()=>{
+  const server=readFileSync('scripts/serve.mjs','utf8');
+  assert.match(server,/\['\.jpg','image\/jpeg'\]/);assert.match(server,/\['\.jpeg','image\/jpeg'\]/);
+  assert.match(server,/\['\.mjs','text\/javascript; charset=utf-8'\]/);assert.match(server,/\['\.ico','image\/x-icon'\]/);
+  assert.match(server,/script-src 'self' 'wasm-unsafe-eval' https:\/\/cdn\.jsdelivr\.net/);
+  assert.match(server,/connect-src 'self' https:\/\/cdn\.jsdelivr\.net/);assert.match(server,/worker-src 'self' blob:/);
 });
 
 test('private PDFs use account-scoped hosted storage without weakening structured pack validation',()=>{
   const html=readFileSync('public/index.html','utf8');const source=readFileSync('src/app.ts','utf8');const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const hosting=JSON.parse(readFileSync('.openai/hosting.json','utf8')) as {r2?:unknown};const owned=readFileSync('src/owned-content.ts','utf8');
   for(const id of ['private-pdf-file','private-pdf-progress','private-pdf-status','private-pdf-list','private-pdf-result-dialog','private-pdf-result-summary','private-pdf-result-list','scan-private-pdf-result'])assert.match(html,new RegExp(`id="${id}"`));
-  assert.match(html,/up to 500 MB/);assert.match(html,/Install JSON Rules Pack/);assert.match(html,/Owned PDF — read &amp; apply/);assert.match(html,/Scan for this character/);assert.match(html,/private-pdf-review-dialog/);assert.match(html,/Add Selected Content/);assert.match(source,/PRIVATE_PDF_LIMIT=500\*1024\*1024/);assert.match(source,/PRIVATE_PDF_PART_SIZE=5\*1024\*1024/);assert.match(source,/action=create/);assert.match(source,/action=part/);assert.match(source,/action=complete/);assert.match(source,/findPrivatePdfCharacterMechanics/);assert.match(source,/hostedPrivatePdfDocument/);assert.match(source,/pdf\.worker\.min\.mjs/);assert.match(source,/disableAutoFetch:true/);assert.match(source,/credentials:'same-origin'/);
+  assert.match(html,/up to 500 MB/);assert.match(html,/Install JSON Rules Pack/);assert.match(html,/Owned PDF — read &amp; apply/);assert.match(html,/Scan for this character/);assert.match(html,/private-pdf-review-dialog/);assert.match(source,/Add \$\{count\} Reference/);assert.match(source,/PRIVATE_PDF_LIMIT=500\*1024\*1024/);assert.match(source,/PRIVATE_PDF_PART_SIZE=5\*1024\*1024/);assert.match(source,/action=create/);assert.match(source,/action=part/);assert.match(source,/action=complete/);assert.match(source,/findPrivatePdfCharacterMechanics/);assert.match(source,/hostedPrivatePdfDocument/);assert.match(source,/pdf\.worker\.min\.mjs/);assert.match(source,/disableAutoFetch:true/);assert.match(source,/credentials:'same-origin'/);
   assert.ok(html.indexOf('private-pdf-review-actions')<html.indexOf('id="private-pdf-review-list"'),'PDF add controls must remain visible before the scrolling match list');
   assert.equal(hosting.r2,'PRIVATE_FILES');assert.match(worker,/maxPrivatePdfBytes=500\*1024\*1024/);assert.match(worker,/maxPrivatePdfPartBytes=5\*1024\*1024/);assert.match(worker,/createMultipartUpload/);assert.match(worker,/resumeMultipartUpload/);assert.match(worker,/privatePdfUploadId/);assert.match(worker,/maxPrivatePdfParts/);assert.match(worker,/privatePdfPrefix\(user\)/);assert.match(worker,/env\?\.PRIVATE_FILES/);assert.match(worker,/oai-authenticated-user-id/);assert.match(worker,/private, no-store/);assert.match(worker,/'Accept-Ranges':'bytes'/);assert.match(worker,/Content-Range/);assert.match(worker,/range:\{offset:start,length\}/);assert.match(worker,/rangeRead\?2400:60/);
-  assert.match(source,/showPrivatePdfResult\('PDF saved — scan next'/);assert.match(source,/showPrivatePdfResult\('Content added'/);assert.match(source,/Scanned \$\{review\.pages\} pages/);
+  assert.match(source,/showPrivatePdfResult\('PDF saved — scan next'/);assert.match(source,/showPrivatePdfResult\('Reference reminders added'/);assert.match(source,/Scanned \$\{review\.pages\} pages/);assert.match(source,/retainInWildShape:false,activation:'none'/);
   assert.match(owned,/raw\.length>2_000_000/);
 });
 
@@ -325,12 +393,13 @@ test('linked D&D Beyond characters refresh safely and can keep a saved version',
 });
 
 test('Windows installer packages the app icon and creates user shortcuts',()=>{
-  const installer=readFileSync('scripts/build-windows-installer.ps1','utf8');const build=readFileSync('scripts/build.mjs','utf8');
+  const installer=readFileSync('scripts/build-windows-installer.ps1','utf8');const build=readFileSync('scripts/build.mjs','utf8');const android=readFileSync('android-wrapper/twa/app/build.gradle','utf8');
   assert.match(installer,/Altered-Windows-Setup-v\$Version\.exe/);assert.match(installer,/desktop 'Altered\.lnk'/i);
   assert.match(installer,/CreateShortcut/);assert.match(installer,/Altered\.ico/);assert.match(installer,/Uninstall-Altered\.ps1/);
   assert.match(installer,/https:\/\/altered-ferocitus\.ghostdaddy\.chatgpt\.site\//);assert.match(installer,/Altered Offline\.lnk/);
-  assert.match(build,/Altered-Windows-Setup-v0\.29\.32\.exe/);assert.match(build,/Altered-Desktop-Mac-v0\.29\.32\.zip/);
-  assert.match(build,/Altered-Android-v0\.29\.32\.apk/);
+  assert.match(installer,/package\.json/);assert.match(installer,/ConvertFrom-Json/);assert.equal(/param\(\[string\]\$Version\s*=/.test(installer),false);
+  assert.match(build,/releaseArtifacts/);assert.match(build,/publicReleaseDirectory/);assert.match(build,/stagedDownloadDirectory/);
+  assert.match(android,/packageMetadata\.version/);assert.match(android,/versionName releaseVersion/);assert.match(android,/versionCode releaseVersionCode/);
 });
 
 test('combat state and spell availability are explained before a click',()=>{
@@ -361,7 +430,9 @@ test('combat state and spell availability are explained before a click',()=>{
   assert.match(source,/table rule treats Beast-form physical attacks as Unarmed Strikes/);
   assert.match(source,/Available now \(\$\{ready\.length\}\)/);
   assert.match(source,/Unavailable right now \(\$\{blocked\.length\}\)/);
-  assert.match(source,/availableSpellSlotLevels\(character,state,slotLevel\)/);
+  assert.match(source,/availableSpellCastingOptions\(character,state,slotLevel\)/);
+  assert.match(source,/selectedSpellCastingOptions\.set\(spellKey\(spell\),select\.value\)/);
+  assert.match(source,/castSpell\(character,state,spell\.name,choice\?\.level,choice\?\.resourceId\)/);
   assert.match(source,/actionExecutionError\(character,state,action,sheet\.conditionImmunities\)/);
   assert.match(source,/Extra Attack: \$\{state\.turn\.attackAction\.remaining\} remaining/);
 });
@@ -408,7 +479,7 @@ test('active beast identity and conditional form traits remain visually and mech
 
 test('turn completion and form-family cues stay accurate, semantic, and motion-safe',()=>{
   const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
-  assert.match(source,/function turnReadyToEnd\(\)/);assert.match(source,/actionsRemaining===0&&state\.turn\.surgeActionsRemaining===0&&state\.turn\.bonusRemaining===0/);
+  assert.match(source,/function turnReadyToEnd\(\)/);assert.match(source,/actionsRemaining===0&&state\.turn\.surgeActionsRemaining===0&&bonusComplete/);
   assert.match(source,/state\.turn\.attackAction\?\.remaining\?\?0/);assert.match(source,/!state\.pendingRelentlessRage/);assert.match(source,/state\.concentrationChecks\.length===0/);
   assert.match(source,/\['#end-turn','#persistent-end-turn'\]/);assert.match(source,/classList\.toggle\('turn-complete-cue',ready\)/);
   for(const family of ['aura-aquatic','aura-venom','aura-feline','aura-ursine','aura-lupine','aura-avian']){assert.match(source,new RegExp(family));assert.match(styles,new RegExp(`\\.app-shell\\.${family}`));}
@@ -521,7 +592,7 @@ test('every primary workspace uses consistent names and phone-safe controls',()=
   assert.match(html,/id="nav-play-label">Play</);assert.match(source,/returning\?'Back to Play':'Play'/);assert.match(source,/\$\('#next-step-guide'\)\.hidden=true/);
   assert.match(html,/class="topbar"[\s\S]*id="next-step-guide"[\s\S]*id="top-actions"/);
   assert.match(styles,/compact header guidance and portrait-edge aura/);assert.match(styles,/\.form-aura-pulse\{[\s\S]*?inset:0/);
-  assert.match(source,/latestRollTitle==='Initiative'/);assert.match(source,/state\.rage\.active[\s\S]*Use Rage — choose an attack/);assert.match(source,/recommendationSafeControl/);
+  assert.match(source,/latestRollTitle\.startsWith\('Initiative'\)/);assert.match(source,/state\.rage\.active[\s\S]*Use Rage — choose an attack/);assert.match(source,/recommendationSafeControl/);
 });
 
 test('focused action pages prioritize executable controls without losing advanced choices',()=>{
@@ -556,6 +627,20 @@ test('additive forms always expose an end path while preserving workspace scroll
 test('every static form control has an accessible name',()=>{
   const html=readFileSync('public/index.html','utf8');
   for(const match of html.matchAll(/<(input|select|textarea)\b([^>]*)>/g)){const id=/\bid="([^"]+)"/.exec(match[2]??'')?.[1];if(!id)continue;const lineStart=html.lastIndexOf('\n',match.index)+1;const lineEnd=html.indexOf('\n',match.index);const line=html.slice(lineStart,lineEnd<0?html.length:lineEnd);const before=line.slice(0,line.indexOf(match[0]));const named=new RegExp(`for="${id}"`).test(html)||/aria-label=/.test(match[2]??'')||/<label\b/.test(before);assert.ok(named,`${id} has no accessible label`);}
+});
+
+test('short phones, primary touch controls, dynamic rolls, Help, and the A menu remain accessible',()=>{
+  const source=readFileSync('src/app.ts','utf8');const styles=readFileSync('public/styles.css','utf8');
+  assert.match(styles,/@media\(max-width:700px\) and \(max-height:650px\)[\s\S]*?\.app-shell \.workspace\{[\s\S]*?display:block;overflow-y:auto/);
+  assert.match(styles,/#toggle-app-menu\{min-inline-size:44px;min-block-size:44px\}/);
+  assert.match(styles,/#show-next-step,[\s\S]*?\.roll-row \.button,[\s\S]*?min-block-size:44px/);
+  assert.match(styles,/#help-dialog \.help-topics\{max-height:none;overflow:visible/);
+  assert.match(styles,/\.persistent-health-stat em,[\s\S]*?font-size:\.6875rem/);
+  assert.match(source,/const saveLabel=\/\\bsave\\b\/i\.test\(value\.name\)\?value\.name:`\$\{value\.name\} save`/);
+  assert.match(source,/roll\.setAttribute\('aria-label',value\.automaticFailure\?/);
+  assert.match(source,/skillRoll\.setAttribute\('aria-label',`Roll \$\{value\.name\} skill check`\)/);
+  assert.match(source,/if\(open\)setTimeout\([\s\S]*?first\?\.focus\(\{preventScroll:true\}\)/);
+  assert.match(source,/setAppMenuOpen\(open,!open\)/);
 });
 
 test('ChatGPT assistance is optional, character-scoped, and review-first',()=>{

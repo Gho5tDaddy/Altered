@@ -109,7 +109,7 @@ export function privateMechanicPack(character:Character,completion:PrivateMechan
   };
   return parseOwnedContentPack({
     schemaVersion:1,kind:'altered-owned-content-pack',
-    metadata:{id:completion.packId,name:`${completion.name} — Private Mechanics`,version:'1.0.0',source:completion.source,description:'User-confirmed private mechanics. Contains no source-book text or artwork.',privateUse:true,createdAt:new Date().toISOString()},
+    metadata:{id:completion.packId,name:`${completion.name} — Private Mechanics`,version:'1.0.0',source:completion.source,description:'Private, user-reviewed mechanics or reference text. This pack is not an independently verified public rules source.',privateUse:true,createdAt:new Date().toISOString()},
     appliesTo:[{characterId:character.id}],
     content:{customForms:[],knownForms:[],seenForms:[],transformationGrants:[],features:[feature],resources:[],spells:[]}
   });

@@ -6,6 +6,12 @@ const base={name:'Safe',species:'Human',classes:[{name:'Druid',level:2}],abiliti
 
 test('normalizes a valid character and adds core resources',()=>{const c=parseCharacter(base);assert.equal(c.totalLevel,2);assert.equal(c.resources.find(r=>r.id==='wild-shape')?.max,2)});
 test('merges legacy Monk Focus aliases into one authoritative resource without restoring spent points',()=>{const c=parseCharacter({...base,classes:[{name:'Monk',level:6}],knownForms:[],seenForms:[],resources:[{id:'focus',name:'Focus Points',current:6,max:6,recovery:'short-all'},{id:'focus-points',name:'Focus Points',current:4,max:6,recovery:'short-all'}]});assert.deepEqual(c.resources.filter(resource=>resource.name==='Focus Points'),[{id:'focus-points',name:'Focus Points',current:4,max:6,recovery:'short-all'}]);});
+test('preserves validated Pact Magic tracking metadata and rejects incomplete or unsafe slot metadata',()=>{
+  const c=parseCharacter({...base,classes:[{name:'Warlock',level:5}],knownForms:[],seenForms:[],resources:[{id:'pact-slots',name:'Pact Magic Slots (Level 3)',current:1,max:2,recovery:'short-all',kind:'pact-magic-slots',slotLevel:3,source:'data.pactMagic[2]'}]});
+  assert.deepEqual(c.resources.find(resource=>resource.id==='pact-magic-slots'),{id:'pact-magic-slots',name:'Pact Magic Slots (Level 3)',current:1,max:2,recovery:'short-all',kind:'pact-magic-slots',slotLevel:3,source:'data.pactMagic[2]'});
+  assert.throws(()=>parseCharacter({...base,resources:[{id:'pact-magic-slots',name:'Pact Magic',current:1,max:2,recovery:'short-all',kind:'pact-magic-slots'}]}),/slotLevel/);
+  assert.throws(()=>parseCharacter({...base,resources:[{id:'pact-magic-slots',name:'Pact Magic',current:1,max:2,recovery:'long-all',kind:'pact-magic-slots',slotLevel:3}]}),/short-all/);
+});
 test('rejects mismatched total level',()=>assert.throws(()=>parseCharacter({...base,totalLevel:3}),/does not equal/));
 test('rejects unsafe damage expressions',()=>assert.throws(()=>parseCharacter({...base,spells:[{name:'Bad',level:1,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',damage:[{expression:'1d6;alert(1)',type:'Fire'}]}]}),/safe dice expression/));
 test('rejects unknown damage types',()=>assert.throws(()=>parseCharacter({...base,spells:[{name:'Bad',level:1,sourceClass:'Druid',ability:'wis',castingTime:'magic-action',damage:[{expression:'1d6',type:'Laser'}]}]}),/supported damage type/));
@@ -21,6 +27,14 @@ test('preserves structured item effects without accepting arbitrary effect kinds
   const c=parseCharacter({...base,items:[{id:'cloak',name:'Cloak',type:'Wondrous item',equipped:true,attuned:true,requiresAttunement:true,ruleset:'2024',sourceIds:[],mechanics:'included-in-imported-totals',effects:[{kind:'armor-class',value:1,includedInImportedTotals:true}]}]});
   assert.deepEqual(c.items[0]?.effects,[{kind:'armor-class',value:1,includedInImportedTotals:true}]);
   assert.throws(()=>parseCharacter({...base,items:[{id:'bad',name:'Bad',type:'Item',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'reference-only',effects:[{kind:'execute-code',value:1}]}]}),/unsupported/);
+});
+
+test('preserves name-only D&D Beyond feature origins and pact-weapon evidence without inferring an attack ability',()=>{
+  const c=parseCharacter({...base,features:[{id:'ddb-invocation-1',name:'Owned Invocation',source:'D&D Beyond selected Eldritch Invocation',summary:'Name only.',automation:'reference',origin:{provider:'dndbeyond',kind:'eldritch-invocation',sourceIds:['definition:1']}}],items:[{id:'hammer',name:'Light Hammer',type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:['701'],mechanics:'reference-only',pactWeapon:{provider:'dndbeyond',evidence:['data.characterValues[0].typeId=28']}}]});
+  assert.deepEqual(c.features[0]?.origin,{provider:'dndbeyond',kind:'eldritch-invocation',sourceIds:['definition:1']});
+  assert.deepEqual(c.items[0]?.pactWeapon,{provider:'dndbeyond',evidence:['data.characterValues[0].typeId=28']});
+  assert.equal(c.items[0]?.pactWeapon?.attackAbility,undefined);
+  assert.throws(()=>parseCharacter({...base,items:[{id:'bad',name:'Bad',type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:[],mechanics:'reference-only',pactWeapon:{provider:'local',evidence:['guess']}}]}),/pactWeapon is unsupported/);
 });
 
 test('rejects unknown spell action costs instead of silently defaulting',()=>assert.throws(()=>parseCharacter({...base,spells:[{name:'Bad Timing',level:1,sourceClass:'Druid',ability:'wis',castingTime:'instant'}]}),/castingTime must be one of/));
