@@ -659,7 +659,7 @@ function homebrewCount(data:JsonObject):number{
   return count;
 }
 
-const BUILT_IN_FEAT_MECHANICS=new Set(['alert','tough','war caster','weapon mastery']);
+const BUILT_IN_FEAT_MECHANICS=new Set(['alert','sentinel','tough','war caster','weapon mastery']);
 function setupNeeds(data:JsonObject,classes:Character['classes'],feats:string[],items:CharacterItem[],spells:Spell[],homebrew:number):DdbSetupNeed[]{
   const needs:DdbSetupNeed[]=[];const add=(need:DdbSetupNeed)=>{if(!needs.some(entry=>entry.id===need.id))needs.push(need);};
   const knownSubclasses=new Set([...Object.keys(SUBCLASS_FEATURES),'Circle of the Moon'].map(name=>name.toLowerCase()));

@@ -183,9 +183,9 @@ test('normalizes a Ferocitus-shaped multiclass character without guessing core v
   assert.ok(report.warnings.some(item=>item.code==='item-text-review'));
   assert.ok(report.warnings.some(item=>item.code==='circle-moon-spells-restored'));
   assert.deepEqual(report.setupNeeds.map(need=>[need.kind,need.label]),[
-    ['feat','Sentinel'],['item','Cloak of Protection'],['item','Insignia of Claws'],
+    ['item','Cloak of Protection'],['item','Insignia of Claws'],
   ]);
-  assert.equal(ddbSetupPackId(report.sourceId,report.setupNeeds[0]!.id),'ddb-152187683-feat-sentinel');
+  assert.equal(ddbSetupPackId(report.sourceId,report.setupNeeds[0]!.id),'ddb-152187683-item-ddb-item-100');
 });
 
 test('keeps leveled spells granted by feats even when D&D Beyond omits prepared flags',()=>{

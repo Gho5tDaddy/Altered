@@ -103,11 +103,11 @@ test('validates imported creature action-use limits',()=>{
 test('validates attack riders, save choices, and Multiattack variants in private forms',()=>{
   const form={id:'tactical',name:'Tactical Beast',type:'Beast',cr:1,size:'Large',ac:12,hp:20,hitDice:'3d10+3',abilities:{str:16,dex:12,con:12,int:4,wis:10,cha:6},saves:{},skills:{},speeds:{walk:40},senses:[],resistances:[],immunities:[],vulnerabilities:[],traits:[],actions:[
     {id:'multiattack',name:'Multiattack',type:'multiattack',cost:'action',sequence:['ram','ram'],variants:[{id:'ram-shove',label:'Ram + Shove',sequence:['ram','shove']}]},
-    {id:'ram',name:'Ram',type:'attack',cost:'action',attackBonus:5,ability:'str',kind:'beast',damage:[{expression:'1d6+3',type:'Bludgeoning'}],riders:[{id:'charge',label:'Charge',prerequisite:'Moved 20 feet straight.',damage:[{expression:'2d4',type:'Bludgeoning'}],effects:[{condition:'Prone',targetSizeMax:'Large'}]}]},
-    {id:'shove',name:'Shove',type:'save',cost:'action',saveAbility:'str',saveAbilityOptions:['str','dex'],dc:13,effectsOnFail:[{condition:'Prone'}]},
+    {id:'ram',name:'Ram',type:'attack',cost:'action',attackBonus:5,ability:'str',kind:'beast',prerequisite:'The target is within reach.',damage:[{expression:'1d6+3',type:'Bludgeoning'}],riders:[{id:'charge',label:'Charge',prerequisite:'Moved 20 feet straight.',damage:[{expression:'2d4',type:'Bludgeoning'}],effects:[{condition:'Prone',targetSizeMax:'Large'}]}]},
+    {id:'shove',name:'Shove',type:'save',cost:'action',saveAbility:'str',saveAbilityOptions:['str','dex'],dc:13,prerequisite:'The attack hit.',effectsOnFail:[{condition:'Prone'}]},
   ],source:{ruleset:'Private',page:'Fixture',verified:'Test'}};
   const parsed=parseCharacter({...base,customForms:[form]});const actions=parsed.customForms.tactical?.actions??[];
-  const ram=actions.find(action=>action.id==='ram');assert.equal(ram?.type,'attack');if(ram?.type==='attack')assert.equal(ram.riders?.[0]?.damage?.[0]?.expression,'2d4');
-  const shove=actions.find(action=>action.id==='shove');assert.equal(shove?.type,'save');if(shove?.type==='save')assert.deepEqual(shove.saveAbilityOptions,['str','dex']);
+  const ram=actions.find(action=>action.id==='ram');assert.equal(ram?.type,'attack');if(ram?.type==='attack'){assert.equal(ram.prerequisite,'The target is within reach.');assert.equal(ram.riders?.[0]?.damage?.[0]?.expression,'2d4');}
+  const shove=actions.find(action=>action.id==='shove');assert.equal(shove?.type,'save');if(shove?.type==='save'){assert.equal(shove.prerequisite,'The attack hit.');assert.deepEqual(shove.saveAbilityOptions,['str','dex']);}
   const multi=actions.find(action=>action.id==='multiattack');assert.equal(multi?.type,'multiattack');if(multi?.type==='multiattack')assert.deepEqual(multi.variants?.[0]?.sequence,['ram','shove']);
 });

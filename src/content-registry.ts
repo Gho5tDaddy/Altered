@@ -65,12 +65,13 @@ const spellEntries:Record<string,CatalogEntry>={
 };
 
 const featEntries:Record<string,CatalogEntry>={
+  sentinel:{id:'sentinel',name:'Sentinel',summary:'Exposes confirmed-trigger Opportunity Attacks using the character’s currently legal melee attacks.',source:'2024 character import',tags:['reaction','opportunity-attack']},
   'war-caster':{id:'war-caster',name:'War Caster',summary:'Recognized by Altered for Concentration-save Advantage when present on the imported sheet.',source:'2024 character import',tags:['concentration']}
 };
 
 const itemEntries:Record<string,CatalogEntry>={};
 
-const PACK_VERSION='0.29.39';
+const PACK_VERSION='0.29.40';
 const PACKS=[
   {metadata:metadata({id:'altered-srd-creatures',name:'SRD 5.2.1 Creature Forms',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'creatures',priority:100,license:'CC BY 4.0 source data; original Altered presentation',source:'Official SRD 5.2.1',verified:RULES_VERSION.reviewed,builtIn:true,description:'Verified creature stat blocks available to bundled transformations.'}),records:records(RAW_CREATURES)},
   {metadata:metadata({id:'altered-core-class-features',name:'Core Class and Subclass Interaction Rules',version:PACK_VERSION,ruleset:RULES_VERSION.label,domain:'class-features',priority:100,license:'CC BY 4.0 mechanical summaries authored for Altered',source:'Official SRD 5.2.1',verified:RULES_VERSION.reviewed,builtIn:true,description:'Structured transformation-relevant mechanics for the twelve SRD classes and their SRD subclasses; additional owned subclasses can be supplied by private packs.'}),records:featureRecord({...RAW_CLASS_FEATURES,...Object.fromEntries(Object.entries(RAW_SUBCLASS_FEATURES).map(([name,features])=>[`Subclass ${name}`,features]))})},

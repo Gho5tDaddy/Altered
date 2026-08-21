@@ -25,7 +25,7 @@ export interface AutomaticActionChoice {
 export interface AttackAction {
   id:string;name:string;type:'attack';cost:ActionCost;attackBonus:number;ability:Ability;
   kind:'beast'|'weapon'|'unarmed'|'spell';reach?:number;range?:string;
-  damage:DamagePacket[];effects?:ConditionEffect[];riders?:AttackRider[];recharge?:{min:number;max:number};uses?:ActionUseLimit;resourceId?:string;resourceCost?:number;oncePerTurnId?:string;notes?:string;
+  damage:DamagePacket[];effects?:ConditionEffect[];riders?:AttackRider[];recharge?:{min:number;max:number};uses?:ActionUseLimit;resourceId?:string;resourceCost?:number;oncePerTurnId?:string;prerequisite?:string;notes?:string;
 }
 export interface SaveAction {
   id:string;name:string;type:'save';cost:ActionCost;saveAbility:Ability;dc:number;

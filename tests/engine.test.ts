@@ -653,6 +653,15 @@ test('conditional attack modifiers for Grappled and Pack Tactics are surfaced wi
   state.conditions=[];const wolf=availableTransformations(c,state).find(option=>option.formId==='dire-wolf'&&option.profile==='wildshape');assert.ok(wolf);startTransformation(c,state,must(wolf));sheet=resolveSheet(c,state);attack=sheet.actions.find(action=>action.type==='attack');assert.ok(attack);assert.match(attackRollSources(c,state,must(attack),sheet).conditional.join(' '),/Pack Tactics/);
 });
 
+test('Sentinel exposes confirmed-trigger melee attacks that spend the Reaction in base and Beast forms',()=>{
+  const c=character({feats:['Sentinel'],items:[{id:'staff',name:'Quarterstaff',type:'Weapon',equipped:true,attuned:false,requiresAttunement:false,ruleset:'2024',sourceIds:['test'],mechanics:'included-in-imported-totals',attack:{ability:'str',damage:'1d6',damageType:'Bludgeoning',proficient:true,properties:['Versatile'],magicBonus:0}}]});
+  const state=createInitialState(c);let sheet=resolveSheet(c,state);const base=must(sheet.actions.find(action=>action.id==='sentinel-item-attack-staff'));
+  assert.equal(base.type,'attack');if(base.type!=='attack')throw new Error('Expected a Sentinel attack');assert.equal(base.cost,'reaction');assert.match(base.prerequisite??'',/Disengage action|target other than you/);assert.match(base.effects?.map(effect=>effect.condition).join(' ')??'',/Speed 0/);
+  assert.equal(spendActionExecution(c,state,base,sheet.conditionImmunities),null);assert.equal(state.turn.reactionRemaining,0);
+  startNewTurn(state);const wolf=must(availableTransformations(c,state).find(option=>option.formId==='dire-wolf'&&option.profile==='wildshape'));startTransformation(c,state,wolf);sheet=resolveSheet(c,state);const bite=must(sheet.actions.find(action=>action.id==='sentinel-bite'));
+  assert.equal(bite.type,'attack');if(bite.type!=='attack')throw new Error('Expected a Sentinel Beast attack');assert.equal(bite.cost,'reaction');assert.match(bite.notes??'',/Sentinel Opportunity Attack/);
+});
+
 test('choice-bearing actions are structured for beasts, rogues, multiclass characters, and Thief Fast Hands',()=>{
   const tiger=must(CREATURES.tiger).actions.find(action=>action.id==='nimble-escape');assert.equal(tiger?.type,'automatic');if(tiger?.type==='automatic')assert.deepEqual(tiger.choices?.map(choice=>choice.resolution),['disengage','hide']);
   const rogue=character({classes:[{name:'Rogue',level:3,subclass:'Thief'},{name:'Druid',level:2}],totalLevel:5,knownForms:['panther'],seenForms:['panther']});const state=createInitialState(rogue);const baseAction=resolveSheet(rogue,state).actions.find(action=>action.id==='cunning-action');assert.equal(baseAction?.type,'automatic');if(baseAction?.type==='automatic')assert.deepEqual(baseAction.choices?.map(choice=>choice.resolution),['dash','disengage','hide','skill-check','utilize','magic-item']);
