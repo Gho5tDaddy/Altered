@@ -255,7 +255,7 @@ test('the exact hosted build executes before optional mobile storage hydration',
   assert.ok(!worker.includes('Live imports are unavailable'));
 });
 
-test('hosted release downloads use the platform static-asset binding',()=>{
+test('hosted release downloads use stable same-site paths backed by current GitHub artifacts',()=>{
   const worker=readFileSync('scripts/hosted-worker.template.js','utf8');const build=readFileSync('scripts/build.mjs','utf8');const config=readFileSync('scripts/release-config.mjs','utf8');const verifier=readFileSync('scripts/verify-release.mjs','utf8');
   assert.match(worker,/async fetch\(request,env\)/);
   assert.match(build,/from '\.\/release-config\.mjs'/);assert.match(build,/if\(name!==['"]downloads['"]\)/);assert.match(build,/for\(const artifact of releaseArtifacts\)/);
@@ -264,8 +264,7 @@ test('hosted release downloads use the platform static-asset binding',()=>{
   assert.match(worker,/const DOWNLOAD_PATHS=__ALTERED_DOWNLOAD_PATHS__/);assert.match(worker,/ANDROID_DOWNLOAD_PATH=__ALTERED_ANDROID_DOWNLOAD_PATH__/);assert.match(worker,/ANDROID_DOWNLOAD_URL=__ALTERED_ANDROID_DOWNLOAD_URL__/);
   assert.equal(worker.includes('DOWNLOAD_ASSETS'),false);assert.equal(build.includes('__ALTERED_DOWNLOAD_ASSETS__'),false);
   assert.match(build,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public\/downloads\/\$\{androidReleaseArtifact\.fileName\}/);
-  assert.match(worker,/Content-Disposition.*attachment/);
-  assert.match(worker,/DOWNLOAD_PATHS\.includes\(url\.pathname\)/);assert.match(worker,/env\.ASSETS\.fetch\(request\)/);
+  assert.match(worker,/DOWNLOAD_PATHS\.includes\(url\.pathname\)/);assert.match(worker,/raw\.githubusercontent\.com\/Gho5tDaddy\/Altered\/main\/public/);
   assert.match(verifier,/dist\/downloads must contain exactly the three current advertised artifacts/);assert.match(verifier,/deploymentLimits\.workerBytes/);assert.match(verifier,/deploymentLimits\.distBytes/);
 });
 

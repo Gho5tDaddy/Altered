@@ -332,14 +332,7 @@ export default {
     }
     if(url.pathname===ANDROID_DOWNLOAD_PATH)return Response.redirect(ANDROID_DOWNLOAD_URL,302);
     if(DOWNLOAD_PATHS.includes(url.pathname)){
-      if(!env?.ASSETS?.fetch)return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
-      const asset=await env.ASSETS.fetch(request);
-      if(!asset.ok)return asset;
-      const assetHeaders=new Headers(asset.headers);
-      assetHeaders.set('Cache-Control','public, max-age=31536000, immutable');
-      assetHeaders.set('Content-Disposition',`attachment; filename="${url.pathname.split('/').pop()}"`);
-      assetHeaders.set('X-Content-Type-Options','nosniff');
-      return new Response(request.method==='HEAD'?null:asset.body,{status:asset.status,headers:assetHeaders});
+      return Response.redirect(`https://raw.githubusercontent.com/Gho5tDaddy/Altered/main/public${url.pathname}`,302);
     }
     if(url.pathname.startsWith('/downloads/'))return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
     if(url.pathname!=='/'&&url.pathname!=='/index.html')return new Response('Not found',{status:404,headers:headers('text/plain; charset=utf-8','no-cache')});
